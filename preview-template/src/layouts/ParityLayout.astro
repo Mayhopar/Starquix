@@ -1,0 +1,24 @@
+---
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parity</title>
+  </head>
+  <body class="min-h-screen bg-white text-stone-900">
+    <header class="border-b border-stone-200 px-4 py-4">
+      <p class="text-base font-semibold text-stone-900">Site header</p>
+    </header>
+    <main class="px-0 py-0">
+      <slot />
+    </main>
+    <footer class="border-t border-stone-200 px-4 py-5">
+      <p class="text-sm text-stone-500">Shared site footer</p>
+    </footer>
+    <script is:inline src="/scripts/bridge.js"></script>
+  </body>
+</html>

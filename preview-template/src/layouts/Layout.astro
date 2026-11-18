@@ -1,0 +1,27 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Starquix' } = Astro.props;
+import Header from '../components/library/Header.astro';
+import SqHmrWriteBridge from '../components/SqHmrWriteBridge.astro';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-white">
+    <slot class="bg-white" />
+    <script is:inline src="/scripts/bridge.js"></script>
+    <SqHmrWriteBridge />
+  <Header />
+</body>
+</html>

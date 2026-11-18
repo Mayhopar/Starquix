@@ -1,0 +1,104 @@
+{
+  "name": "starquix-desktop",
+  "productName": "Starquix",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "Starquix desktop editor",
+  "author": "Starquix",
+  "private": true,
+  "type": "module",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "deps": "node scripts/build-runtime-deps.mjs",
+    "test": "vitest run --exclude 'e2e/**'",
+    "test:electron": "playwright test",
+    "editor": "VITE_API_URL= npm --prefix ../app run build",
+    "dist": "npm ci && npm run editor && npm run deps && npm run mcp && electron-builder --mac --arm64",
+    "dist:x64": "npm ci && npm run editor && npm run deps -- --arch x64 && npm run mcp && electron-builder --mac --x64",
+    "mcp": "node scripts/build-mcp.mjs",
+    "postinstall": "node -e \"for (const a of ['arm64', 'x64']) try { require('fs').chmodSync('node_modules/node-pty/prebuilds/darwin-' + a + '/spawn-helper', 0o755) } catch {}\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "electron": "^44.10.1",
+    "electron-builder": "^26.15.3",
+    "vitest": "4.0.16"
+  },
+  "build": {
+    "appId": "com.starquix.desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "package.json",
+      "src/**"
+    ],
+    "asar": false,
+    "extraResources": [
+      {
+        "from": "../app/dist",
+        "to": "editor",
+        "filter": [
+          "**/*",
+          "!fonts/**",
+          "!videos/**"
+        ]
+      },
+      {
+        "from": "../preview-template",
+        "to": "preview-template",
+        "filter": [
+          "src/plugins/*.js",
+          "public/scripts/bridge.js",
+          "public/scripts/tailwind.js",
+          "public/sq-placeholder.mp4",
+          "src/components/{SqComponentView,SqStubContent,SqPostView,SqHmrWriteBridge,Media,Stack}.astro"
+        ]
+      },
+      {
+        "from": "runtime-deps/node_modules",
+        "to": "runtime-deps/node_modules"
+      },
+      {
+        "from": "mcp",
+        "to": "mcp"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true,
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "electronFuses": {
+      "runAsNode": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "grantFileProtocolExtraPrivileges": false
+    },
+    "npmRebuild": false
+  },
+  "dependencies": {
+    "@babel/parser": "^7.29.0",
+    "@xterm/addon-serialize": "0.14.0",
+    "@xterm/headless": "6.0.0",
+    "isomorphic-git": "^1.43.1",
+    "node-pty": "1.1.0"
+  }
+}

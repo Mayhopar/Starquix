@@ -1,0 +1,74 @@
+/* src/styles/globals.css */
+/* Reference theme.css for @apply usage (contains Tailwind + custom tokens) */
+@reference "./theme.css";
+
+/* Base styles */
+@layer base {
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better focus states */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-stroke-active;
+  }
+
+  /* Kill Chrome's light autofill background on dark inputs (opt-in via class).
+     Used by the DB endpoint token/url fields. */
+  input.sq-autofill-fix:-webkit-autofill,
+  input.sq-autofill-fix:-webkit-autofill:hover,
+  input.sq-autofill-fix:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-text);
+    -webkit-box-shadow: 0 0 0 1000px var(--color-input-fill) inset;
+    caret-color: var(--color-text);
+  }
+
+  /* Selection color */
+  ::selection {
+    background-color: var(--color-bg-text-selection);
+    color: var(--color-text);
+  }
+}
+
+/* Editor-specific styles */
+@layer components {
+  .editor-panel {
+    @apply bg-bg border-stroke;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-bg rounded-outer border border-stroke shadow-sm;
+  }
+
+  .card-hover {
+    @apply bg-bg rounded-outer border border-stroke shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  /* Design panel section */
+  .design-section {
+    @apply border-b border-stroke last:border-b-0;
+  }
+}
+
+/* Utilities */
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom scrollbar styling — theme tokens, so it reads in light AND dark */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-stroke) transparent;
+  }
+  .scrollbar-thin:hover {
+    scrollbar-color: var(--color-text-muted) transparent;
+  }
+}

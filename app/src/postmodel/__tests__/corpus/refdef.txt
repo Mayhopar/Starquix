@@ -1,0 +1,3 @@
+See [docs][d].
+
+[d]: https://example.com

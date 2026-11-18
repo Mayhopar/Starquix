@@ -1,0 +1,28 @@
+---
+// Dev-server notifications for the editor, shared between Layout.astro and the
+// bare-shell preview route. Relays only: source writes go through the editor's
+// token-guarded /__sq/local/* routes (the socket write path was retired
+// 2026-10-18). The local plugin serves this <script> body to user pages too.
+---
+
+<script>
+  // This script is processed by Vite (no is:inline) so import.meta.hot works
+  if (import.meta.hot) {
+    // Files-truth write-through nudge (Phase 2 Task 2.4): a write landed on
+    // disk — the editor pulls the change journal and persists.
+    // Seamless canvas (case 24): a template error keeps the last good canvas;
+    // the editor shows one inline status. Vite's overlay is off on desktop.
+    import.meta.hot.on('vite:error', (data) => {
+      const err = (data && data.err) || {};
+      const where = String((err.loc && err.loc.file) || err.id || '').replace(/\\/g, '/'); // Windows: C:\…\src\…
+      const at = where.indexOf('/src/');
+      window.parent.postMessage({ type: 'SOURCE_ERROR', payload: {
+        file: at >= 0 ? where.slice(at + 1).split('?')[0] : '', line: (err.loc && err.loc.line) || null,
+        message: String(err.message || '').split('\n')[0].slice(0, 300) }, timestamp: Date.now() }, '*');
+    });
+
+    import.meta.hot.on('sq:file-changed', (data) => {
+      window.parent.postMessage({ type: 'SQ_FILE_CHANGED', payload: data, timestamp: Date.now() }, '*');
+    });
+  }
+</script>

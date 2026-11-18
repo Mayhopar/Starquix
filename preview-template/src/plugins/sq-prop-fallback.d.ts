@@ -1,0 +1,10 @@
+export function literalValue(expr: string | undefined): string | null;
+export function parseValueForm(text: string | null | undefined): { prop: string; fallback: string | undefined; literal: string | null } | null;
+export function parseMarkupForm(text: string | null | undefined): { prop: string; markup: string } | null;
+export function valueExpr(prop: string, fallback?: string): string;
+export function markupForm(prop: string, markup: string): string;
+export function hasMarkup(s: string): boolean;
+export function escapeAstroBraces(s: string): string;
+export function encodeInnerHtmlEntities(s: string): string;
+export function decodeInnerHtmlEntities(s: string): string;
+export function collectImportSpecifiers(originalCode: string): Map<string, string>;

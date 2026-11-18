@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vite cache
+.vite/
+
+# OS files
+.DS_Store
+
+# Editor directories
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Swap files
+*.swp
+
+# Documents
+documents/
+
+# Coverage reports
+coverage/
+
+# Test outputs
+*.test-results/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Claude/AI (but version the design-system skill — the ui lint requires its sub-docs)
+.claude/*
+!.claude/skills/
+.covibe/
+.frame/
+.playwright-mcp/
+
+# export-diff baseline
+.starquix/
+
+# Project docs (local only)
+CLAUDE.md
+PROJECT_NOTES.md
+QUICKSTART.md
+STRUCTURE.json
+tasks.json
+.worktrees/
+
+# task-132 local-mode fixture deps
+fixtures/local-astro-project/node_modules/
+fixtures/local-astro-project/.astro/
+fixtures/local-astro-project/src/env.d.ts
+
+# Generated native-size icon review sheet
+/app/icon-review.html

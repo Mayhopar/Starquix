@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Starquix — help</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.6; }
+    body { max-width: 48rem; margin: auto; padding: 2rem 1.25rem 4rem; }
+    h1, h2 { line-height: 1.2; } h2 { margin-top: 2rem; } li { margin-block: .5rem; }
+    a { text-underline-offset: .2em; } :focus-visible { outline: 2px solid; outline-offset: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Starquix help</h1>
+  <p>Edit real Astro files on your computer. Keep regular ZIP backups.</p>
+  <nav aria-label="Help topics"><a href="#startup">Startup</a> · <a href="#storage">Storage</a> · <a href="#limits">Editing limits</a> · <a href="#ai">AI</a> · <a href="#recovery">Recovery</a></nav>
+  <h2 id="startup">Startup</h2>
+  <p>Starquix runs each project with its own local Astro server. The first open of an imported site may install its packages, which needs the network once.</p>
+  <h2 id="storage">Storage and backups</h2>
+  <p>Projects are saved by the app on this computer. Export a ZIP regularly as your backup. A project made with the older browser version of Starquix comes in the same way: export it as a ZIP there, then Import it here.</p>
+  <p>Every change is stored the moment the editor accepts it. There is no separate save step: reloading, closing the window or a preview restart cannot lose an accepted change. The preview and the project files catch up in the background; export and deployment wait for that to finish.</p>
+  <h2 id="limits">Import and editing limits</h2>
+  <ul>
+    <li>Import an Astro folder, up to 2,000 files / 500 MB. Visual styling works best with Tailwind CSS.</li>
+    <li>Dependency folders, build output and hidden files (including .env) are skipped. Private registries and server-secret-dependent projects may not run.</li>
+    <li>Preserved source, media and fonts can be exported, but not every imported construct is visually editable. Arbitrary Astro integrations are not guaranteed.</li>
+    <li>Public SEO and database/schema/form-binding controls are hidden where their editor state cannot persist.</li>
+    <li>Group moves containing source elements are refused, even within one file. Move one source element at a time, or edit the original source.</li>
+    <li>Unsupported CMS/MDX expressions, imports and component constructs remain read-only. Edit their original source rather than forcing a visual rewrite. Dynamic routes also have source-based editing/deletion limits.</li>
+  </ul>
+  <h2 id="ai">AI and provider charges</h2>
+  <p>AI is optional. Your provider keys are stored locally. Invoking AI sends prompts/context to your selected provider. Provider charges are separate from Starquix; review provider pricing and limits before use. AI follows the same unsupported SEO/database restrictions.</p>
+  <h2 id="recovery">Recover without deleting your work</h2>
+  <p>Accepted changes are already stored, so recovery never has to save anything first. If a change could not be stored, the control you used says so and keeps your input for another try; earlier changes are unaffected.</p>
+  <p>Create/import failures keep existing projects; imports retain selected files for retry. No recovery action automatically deletes app data.</p>
+  <p>“Try again” retries startup or remounts a failed editor. “Reload” is safe: the editor restores your stored changes and resumes writing them to the project files. The preview restarts itself after a transient failure; “Restart preview” is offered only when that did not help.</p>
+  <p>“Download diagnostics” saves JSON locally with only app version, time, coarse platform family, snapshot version and a stable failure category. It excludes project names/IDs, source/files, URLs, raw errors/stacks, local storage contents, keys/tokens and provider responses. Nothing is uploaded automatically.</p>
+  <p><a href="/">Open projects</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,42 @@
+---
+// The post-editor `/` menu's DoubleImage — the SAME contract as the local-mode
+// fixture component (slashItems.ts inserts it identically in every runtime).
+// Self-styled, unlike the fixture copy, because template blog pages carry no
+// media-block CSS of their own.
+import { resolveAsset } from './resolveAsset';
+const { src1, src2, alt1 = '', alt2 = '', caption = '', customClass = '' } = Astro.props;
+---
+<figure class:list={['double-image', customClass]}>
+  <div class="double-image__grid">
+    <img src={resolveAsset(src1)} alt={alt1} />
+    <img src={resolveAsset(src2)} alt={alt2} />
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .double-image {
+    margin: 3rem 0;
+    padding: 0;
+  }
+  .double-image__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+    background: #f3f4f6;
+    border-radius: 12px;
+    padding: 2.5rem;
+  }
+  .double-image__grid > img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+  figcaption {
+    font-size: 0.95rem;
+    color: #6b7280;
+    margin-top: 0.9rem;
+    text-align: center;
+  }
+</style>

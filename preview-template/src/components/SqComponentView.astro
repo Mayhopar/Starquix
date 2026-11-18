@@ -1,0 +1,303 @@
+---
+/**
+ * task-136/137 local-mode component/layout editor surface.
+ * Injected into the USER's astro dev by the wrapper config (injectRoute
+ * pattern /__sq_component_view/[...file]). Renders one of their components/
+ * layouts as a tiny real page — tagging, bridge, selection and the file
+ * writers then work on it exactly like any other local route. Files are
+ * truth; there is no doc seeding and no push machinery.
+ *
+ * The file rides the PATH, not a query string (a prerendered route gets its
+ * query stripped from Astro.url/request even in dev). getStaticPaths
+ * enumerates the real .astro files under src/components + src/layouts (+
+ * dynamic pages) — which is also the whole allowlist (ledger E11): nothing
+ * else opens.
+ *
+ * The allowlist is read from the disk on EVERY request: Astro 7 dev caches
+ * getStaticPaths() until this module reloads, so a library component copied
+ * in after the first view 404'd until the project reopened (HN report
+ * 2026-11-09). Astro ≥5 renders this route on demand and never calls
+ * getStaticPaths; an Astro ≤4 a project brings in its own node_modules
+ * ignores `prerender` in static output and still needs it.
+ */
+import { readdirSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import SqStubContent from './SqStubContent.astro';
+import { readBackdrop } from '../plugins/sq-backdrop.js';
+
+export const prerender = false;
+
+export function getStaticPaths() {
+  // astro dev is spawned with cwd = the user's folder (local-instance-manager)
+  const root = process.cwd();
+  const out: Array<{ params: { file: string } }> = [];
+  const walk = (rel: string, dynamicOnly = false): void => {
+    const abs = join(root, rel);
+    if (!existsSync(abs)) return;
+    for (const e of readdirSync(abs, { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const r = `${rel}/${e.name}`;
+      if (e.isDirectory()) walk(r, dynamicOnly);
+      // Pages: DYNAMIC routes only ([slug].astro) — the post-design surface
+      // (owner ask 2026-08-14: edit the full post layout against fake data).
+      // Static pages are already editable as real pages and stay out.
+      else if (e.name.endsWith('.astro') && (!dynamicOnly || e.name.includes('['))) {
+        out.push({ params: { file: r } });
+      }
+    }
+  };
+  walk('src/components');
+  walk('src/layouts');
+  walk('src/pages', true);
+  return out;
+}
+
+const file = Astro.params.file ?? '';
+if (!getStaticPaths().some((p) => p.params.file === file)) return new Response(null, { status: 404 });
+// Layouts AND dynamic page routes bring their own <html> shell — render bare.
+const isLayout = file.startsWith('src/layouts/') || file.startsWith('src/pages/');
+
+// ── Site CSS (owner report 2026-08-14: "assets version is completely
+// different") ── A lone component rendered outside the user's layouts loses
+// every stylesheet those layouts import (fonts, prose, vars) and looks
+// nothing like the real page. Collect the layouts' relative .css imports and
+// <link> them: vite dev serves /src/…css directly to stylesheet requests.
+const siteCss: string[] = [];
+try {
+  const { readFileSync } = await import('node:fs');
+  const { resolve: presolve, relative: prelative } = await import('node:path');
+  const root = process.cwd();
+  const layoutsDir = join(root, 'src/layouts');
+  if (existsSync(layoutsDir)) {
+    for (const name of readdirSync(layoutsDir)) {
+      if (!name.endsWith('.astro')) continue;
+      const src = readFileSync(join(layoutsDir, name), 'utf-8');
+      for (const m of src.matchAll(/import\s+['"]([^'"]+\.css)['"]/g)) {
+        if (!m[1].startsWith('.')) continue; // package css — the page will import it itself
+        const abs = presolve(layoutsDir, m[1]);
+        const href = '/' + prelative(root, abs).replace(/\\/g, '/');
+        if (!href.includes('..') && !siteCss.includes(href)) siteCss.push(href);
+      }
+    }
+  }
+} catch { /* styling is best-effort — an unreadable layout never blocks the view */ }
+
+// The backdrop behind a component: the file's own `@sq-backdrop #hex` note
+// (Design panel, the component root selected), else a neutral white at zero
+// specificity (the site's own background wins). Editor-only — the site never renders it.
+let backdrop: string | null = null;
+try { backdrop = readBackdrop(readFileSync(join(process.cwd(), file), 'utf-8')); } catch { /* best-effort */ }
+const backdropCss = backdrop ? `html,body{background:${backdrop} !important}` : ':where(html){background:#fff}';
+
+// THE one rendering of the site-css links (both branches, via set:html).
+// A prebuilt string is mandatory in the layout branch: this compiler version
+// emits broken JS ('Expected ")" but found "}"') for JSX expressions (maps,
+// even {/* */} comments) inside dynamic-component slot children. hrefs are
+// project-relative paths we constructed above — no escaping hazard.
+const siteCssHtml = siteCss
+  .map((href) => `<link rel="stylesheet" href="${href}">`)
+  .join('');
+
+// ── task-139: stub props so prop-requiring components render their shell ──
+// Placeholder values by rough type/name; a component that still throws falls
+// back to the astro dev overlay (ledger E5 residual).
+const PLACEHOLDER_IMG =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">' +
+    '<rect width="1200" height="800" fill="#e2e8f0"/>' +
+    '<circle cx="880" cy="235" r="72" fill="#94a3b8"/>' +
+    '<path d="M96 640 L478 288 L780 640 Z" fill="#cbd5e1"/>' +
+    '<path d="M570 640 L834 394 L1104 640 Z" fill="#94a3b8"/>' +
+    '</svg>',
+  );
+
+/** Tolerant stand-in for unknown object props (collection entries, nested
+ *  data). Fields resolve by NAME so real content appears: image-ish → the
+ *  placeholder tile, title/name → sample text, date → a real date, slug/href
+ *  → '#'. Unknown fields chain to another stub; array methods behave empty;
+ *  it prints as "Sample". Object-based on purpose — a FUNCTION rendered as an
+ *  astro child is invoked as a thunk and would recurse forever. */
+const EMPTY_ARRAY_METHODS: Record<string, unknown> = {
+  map: () => [], filter: () => [], sort: () => [], slice: () => [],
+  flatMap: () => [], find: () => undefined, forEach: () => {}, some: () => false,
+  every: () => true, includes: () => false, join: () => '', indexOf: () => -1,
+};
+
+function smartStub(index = 0): unknown {
+  const stub: unknown = new Proxy({}, {
+    get(_t, prop) {
+      if (typeof prop !== 'string') {
+        if (prop === Symbol.toPrimitive) return () => 'Sample';
+        if (prop === Symbol.iterator) return function* () {};
+        return undefined;
+      }
+      if (prop === 'toString') return () => 'Sample';
+      if (prop === 'then') return undefined; // not a thenable — await passes through
+      // Collection entries: `const {Content} = await entry.render()` must hand
+      // back a REAL component or `<Content/>` throws. SqStubContent is sample
+      // prose in plain semantic tags, so the page's own styling applies.
+      if (prop === 'render') {
+        return async () => ({ Content: SqStubContent, headings: [], remarkPluginFrontmatter: {} });
+      }
+      if (prop in EMPTY_ARRAY_METHODS) return EMPTY_ARRAY_METHODS[prop];
+      // Boolean-ish flags alternate by entry index so BOTH filter directions
+      // (featured / !featured) keep at least one placeholder entry.
+      if (/^(is|has|show|featured|draft|hidden|disabled|active|visible|published)/i.test(prop)) return index % 2 === 0;
+      if (/video/i.test(prop)) return '/sq-placeholder.mp4';
+      if (/(image|img|src|poster|thumb|avatar|logo|cover|photo|picture|preview)/i.test(prop)) return imgStub();
+      if (/(alt|title|name|label|heading)/i.test(prop)) return 'Sample title';
+      if (/(description|summary|excerpt|text|caption|body|subtitle)/i.test(prop)) return 'Sample description text for this placeholder entry.';
+      if (/date/i.test(prop)) return '2026-01-01';
+      if (/(url|href|link|slug)/i.test(prop)) return '#';
+      if (/(count|length|width|height|year|index|order)/i.test(prop)) return 3;
+      return stub;
+    },
+  });
+  return stub;
+}
+
+/** 3 placeholder entries so list components render visible cards. */
+const listStub = () => [smartStub(0), smartStub(1), smartStub(2)];
+
+function stubForType(name: string, type: string, videoHint = false): unknown {
+  const t = type.trim();
+  if (/\[\]$|^Array<|^readonly /.test(t)) return listStub();
+  if (/^(number|Number)/.test(t)) return 800;
+  if (/^(boolean|Boolean)/.test(t)) return false;
+  if (/ImageMetadata/.test(t)) return { src: PLACEHOLDER_IMG, width: 1200, height: 800, format: 'svg' };
+  if (/^(string|String)/.test(t) || t.startsWith("'") || t.startsWith('"')) return stubForName(name, videoHint);
+  return smartStub();
+}
+
+/** ImageMetadata-shaped AND stringifies to the placeholder data URI — works
+ *  as astro:assets <Image src> (reads .src/.width/.height) and as <img src>
+ *  (attribute interpolation calls String()). */
+const imgStub = () => ({
+  src: PLACEHOLDER_IMG, width: 1200, height: 800, format: 'svg' as const,
+  toString: () => PLACEHOLDER_IMG,
+});
+
+function stubForName(name: string, videoHint = false): unknown {
+  // `page` is Astro's paginate() Page; a lone component has none. Absent, the
+  // component's own no-page fallback renders — the 'Sample text' stub threw on
+  // `page.url.current` and left BlogPaginationNumbered blank (HN report 2026-11-09).
+  if (name === 'page') return undefined;
+  // class/className/customClass props land in class attributes — sample text
+  // there becomes junk tokens that class WRITES bake back into source
+  // (task-142: customClass matched the plural rule → "Sample,Sample,Sample").
+  if (/class/i.test(name)) return '';
+  // In a *Video* component, bare `src`/`lsrc`/… props mean the video, not an image
+  if (/video/i.test(name) || (videoHint && /src/i.test(name))) return '/sq-placeholder.mp4';
+  if (/(image|img|src|poster|thumb|avatar|logo|cover)/i.test(name)) return imgStub();
+  if (/(url|href|link)/i.test(name)) return '#';
+  if (/(alt|title|label)/i.test(name)) return 'Placeholder';
+  if (/s$/.test(name)) return listStub(); // plural → probably a list
+  return 'Sample text';
+}
+
+/** Parse the component's Props type (or Astro.props destructuring) from its
+ *  source and build a stub props object. Best-effort regex, dev-only. */
+function buildStubProps(source: string, videoHint = false): Record<string, unknown> {
+  const props: Record<string, unknown> = {};
+  const typeMatch = source.match(/(?:type\s+Props\s*=|interface\s+Props)\s*{([\s\S]*?)\n}/);
+  if (typeMatch) {
+    for (const line of typeMatch[1].split('\n')) {
+      const m = line.match(/^\s*(\w+)(\?)?\s*:\s*(.+?);?\s*$/);
+      if (m && !m[2]) props[m[1]] = stubForType(m[1], m[3], videoHint); // optional props stay absent
+    }
+    if (Object.keys(props).length > 0) return props;
+  }
+  const destructure = source.match(/(?:const|let)\s*{([^}]*)}\s*=\s*Astro\.props/);
+  if (destructure) {
+    for (const part of destructure[1].split(',')) {
+      const m = part.trim().match(/^(\w+)\s*$/); // names WITH defaults are skipped
+      if (m) props[m[1]] = stubForName(m[1], videoHint);
+    }
+  }
+  // USAGE beats name guessing: if the template feeds a prop into <video>/<source>
+  // it gets the placeholder clip; into <Image>/<img>, the placeholder tile.
+  // [^<] keeps the match inside ONE tag.
+  for (const name of Object.keys(props)) {
+    if (new RegExp(`<(?:video|source)\\b[^<]{0,400}src=\\{${name}\\}`).test(source)) {
+      props[name] = '/sq-placeholder.mp4';
+    } else if (new RegExp(`<(?:Image|img|Picture|picture)\\b[^<]{0,400}src=\\{${name}\\}`).test(source)) {
+      props[name] = imgStub();
+    }
+  }
+  return props;
+}
+
+let Component: unknown = null;
+let importError = '';
+let stubProps: Record<string, unknown> = {};
+try {
+  // Root-relative id — vite's SSR dynamic-import resolves it against the
+  // user project root at runtime (dev only, which is the only mode we run).
+  const mod = await import(/* @vite-ignore */ '/' + file);
+  Component = mod.default ?? null;
+  if (!Component) importError = `${file} has no default export`;
+  const { readFileSync } = await import('node:fs');
+  stubProps = buildStubProps(readFileSync(file, 'utf-8'), /video/i.test(file));
+  // A collection card previews a REAL post of its collection (owner 2026-10-11:
+  // the fake entry belongs to no collection, so a card's field block showed
+  // every hidden slot plus "Sample …" values). First collection of the type with posts.
+  const source = readFileSync(file, 'utf-8');
+  const entryProp = source.match(/(?:type\s+Props\s*=|interface\s+Props)\s*{[\s\S]*?\b(\w+)\??\s*:\s*((?:CollectionEntry<\s*["'][^"']+["']\s*>\s*\|?\s*)+)/);
+  if (entryProp) {
+    try {
+      const { getCollection } = await import('astro:content');
+      for (const [, col] of entryProp[2].matchAll(/CollectionEntry<\s*["']([^"']+)["']\s*>/g)) {
+        const entries = await getCollection(col as never).catch(() => []);
+        if (entries.length) { stubProps[entryProp[1]] = entries[0]; break; }
+      }
+    } catch { /* no content layer — the stub stays */ }
+  }
+  // task-206: the system Media component's props are all optional, so the
+  // stub builder leaves them absent and the viewer shows a single default
+  // slot. Two null items = two visible placeholder slots (demo shape).
+  if (/\/sq\/Media\.astro$/.test(file)) stubProps.items = [null, null];
+} catch (e) {
+  importError = e instanceof Error ? e.message : String(e);
+}
+const C = Component as import('astro/runtime/server/index.js').AstroComponentFactory;
+
+// Slot-only wrappers (a <main> with padding and nothing else) rendered a lone
+// bare div, which reads as "broken/empty" (owner report 2026-08-14). The slot
+// placeholder now looks like a real content block so the wrapper's own
+// width/padding/background are visible and selectable. Inline-styled scenery —
+// it lives in THIS file, not the user's, so it is untagged and uneditable.
+---
+{
+  !Component ? (
+    <html>
+      <head><title>Component view</title></head>
+      <body><p style="font: 13px system-ui; color: #b91c1c; padding: 16px;">{importError}</p></body>
+    </html>
+  ) : isLayout ? (
+    <C {...stubProps}>
+      <Fragment set:html={siteCssHtml} />
+      <div data-sq-view-slot style="display:flex;align-items:center;justify-content:center;min-height:50vh;background:rgba(59,130,246,.10);border-radius:8px;">
+        <div style="font:500 13px system-ui;color:#3b82f6;">slot</div>
+      </div>
+    </C>
+  ) : (
+    <html>
+      <head>
+        <title>{file}</title>
+        {/* Editor viewer chrome: the backdrop (see backdropCss) — set:html, Astro does not evaluate {…} inside <style>. */}
+        <style is:inline data-sq-head="backdrop" set:html={backdropCss} />
+        <Fragment set:html={siteCssHtml} />
+      </head>
+      <body>
+        <C {...stubProps}>
+          <div data-sq-view-slot style="display:grid;gap:16px;padding:8px 0;">
+            <img src={PLACEHOLDER_IMG} alt="Placeholder" style="width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:8px;" />
+            <div style="font:600 28px/1.2 system-ui;">Slot content</div>
+            <div style="font:15px/1.6 system-ui;opacity:.7;max-width:60ch;">This placeholder stands in for whatever the page puts inside this component's slot. Edit the component's own elements around it — the placeholder itself is scenery.</div>
+          </div>
+        </C>
+      </body>
+    </html>
+  )
+}

@@ -1,0 +1,134 @@
+{
+  "_": "Gate thresholds of docs/plans/2026-11-17-instant-edit-design.md section 4.3. A null threshold = report only. kind=time checks are only valid at load <= loadGate; kind=structural counts are not. level=cell judges every cell (cells: all | deepest | shallowest), level=fixture judges the fit over all cells. A threshold map names the fixtures it gates (page size: owner 54 KB, bigpage 34 KB, big 1.4 KB); any other fixture is reported only.",
+  "loadGate": 13,
+  "loadWaitMs": 180000,
+  "fixtures": {
+    "tiny": { "pages": 1 },
+    "big": { "pages": 6 },
+    "huge": { "pages": 40 },
+    "bigpage": { "pages": 1 },
+    "comp": { "pages": 1 },
+    "comp2": { "pages": 1, "args": ["--img1", "1", "--img2", "3", "--text2", "200", "--zoomfit", "1"] },
+    "compbig": { "pages": 1 },
+    "owner": { "pages": 1, "private": true, "args": ["--img1", "1", "--layers", "1=auto,2=auto,5=auto,6=auto"] }
+  },
+  "gates": {
+    "smoke": {
+      "slice": "P-1",
+      "summary": "S1@90 once on tiny: the harness runs end to end here (bundle, server, isolated Electron, import, typed edit, marks, analysis)",
+      "fixtures": ["tiny"],
+      "run2": { "plan": "S1@90*1", "measure": null, "args": ["--tail", "12000"] },
+      "timeoutMs": 900000,
+      "checks": [
+        { "id": "final-canvas", "label": "the typed value ends on the canvas", "level": "cell", "metric": "S1.finalCanvasOk", "op": "==", "threshold": true, "kind": "structural" },
+        { "id": "final-file", "label": "the typed value ends in the page file", "level": "cell", "metric": "S1.finalFileOk", "op": "==", "threshold": true, "kind": "structural" },
+        { "id": "keys-unpainted", "label": "typed partials that never reached the canvas (P2: 3 and 30 stay in the input, only the settled 300 paints)", "level": "cell", "metric": "S1.keysUnpainted", "op": "==", "threshold": 2, "kind": "structural" },
+        { "id": "edits-accepted", "label": "accepted edits seen through the editor marks (P2: typed 300 = ONE commit; before P2 3 keys = 3)", "level": "cell", "metric": "S1.edits", "op": "==", "threshold": 1, "kind": "structural" },
+        { "id": "journal-grew", "label": "journal rows added by the run (P2: one gesture = one row)", "level": "cell", "metric": "S1.rowsAdded", "op": "==", "threshold": 1, "kind": "structural" }
+      ]
+    },
+    "G-0": {
+      "slice": "P-1",
+      "summary": "baseline of the code before P0a: the full metric vector at journal depth 1 / 100 / 220 on tiny, big, bigpage and the owner page; reproduces R12 within 20%",
+      "fixtures": ["tiny", "big", "bigpage", "owner"],
+      "run2": { "plan": "CELL@1*1,CELL@100*1,CELL@220*1", "measure": "S1@90*3,S3@33*1", "args": ["--tail", "9000", "--draincapture", "1", "--growbatch", "25", "--growinterval", "80", "--growcap", "900000", "--maxaccept", "1500"] },
+      "timeoutMs": 3600000,
+      "checks": [
+        { "id": "scans-per-edit", "label": "journal scans (sc:start) per edit, worst edit (R12: 6)", "level": "cell", "metric": "S1.scansPerEdit.max", "op": "==", "threshold": 6, "kind": "structural" },
+        { "id": "service-slope-r12", "label": "lane service slope, ms per journal row, vs R12 within 20%", "level": "fixture", "metric": "fit.service.b", "op": "within", "ref": { "owner": 5.24, "bigpage": 3.23, "big": 0.52 }, "tol": 0.2, "kind": "time" },
+        { "id": "service-p50-j1-r12", "label": "S1 lane service p50 at the shallowest cell vs R12 within 20%", "level": "cell", "cells": "shallowest", "metric": "S1.service.p50", "op": "within", "ref": { "owner": 60.5, "bigpage": 38, "big": 20.5 }, "tol": 0.2, "kind": "time" },
+        { "id": "key-to-paint-p50-j1-r12", "label": "S1 key-to-paint p50 at the shallowest cell vs R12 within 20%", "level": "cell", "cells": "shallowest", "metric": "S1.keyToPaint.p50", "op": "within", "ref": { "bigpage": 59, "big": 42 }, "tol": 0.2, "kind": "time" },
+        { "id": "service-p50", "label": "S1 lane service p50 (reported)", "level": "cell", "metric": "S1.service.p50", "op": "<=", "threshold": null, "kind": "time" },
+        { "id": "key-to-paint-p50", "label": "S1 key-to-paint p50 (reported)", "level": "cell", "metric": "S1.keyToPaint.p50", "op": "<=", "threshold": null, "kind": "time" },
+        { "id": "lost-increments", "label": "lost increments of a 2 s hold, of 61 (reported)", "level": "cell", "metric": "S3.lostIncrements", "op": "<=", "threshold": null, "kind": "time" }
+      ],
+      "pending": [
+        { "id": "relaunch-smoke", "note": "relaunch on a kept profile reads the same journal: needs the persistent-profile mode (--keep-profile), a later P-1 chunk" },
+        { "id": "v2-writer-probe", "note": "the V2 writer probe is its own gate: node probe/gate.mjs V2 (compbig S1 x6); the verdict is in docs/plans/2026-11-17-instant-edit-gates/V2-writer-probe.md" }
+      ]
+    },
+    "G-L1": {
+      "slice": "P0a",
+      "summary": "lane diet, structural: reads per accepted edit and the traffic around it (counts, not milliseconds)",
+      "fixtures": ["tiny", "big", "bigpage", "owner"],
+      "run2": { "plan": "CELL@1*1,CELL@100*1,CELL@220*1", "measure": "S1@90*3,S3@33*1", "args": ["--tail", "9000", "--draincapture", "1", "--growbatch", "25", "--growinterval", "80", "--growcap", "900000", "--maxaccept", "1500"] },
+      "timeoutMs": 3600000,
+      "checks": [
+        { "id": "scans-per-edit", "label": "journal scans (sc:start) per edit, worst edit", "level": "cell", "metric": "S1.scansPerEdit.max", "op": "<=", "threshold": 1, "baseline": 6, "kind": "structural" },
+        { "id": "receipt-gets-per-edit", "label": "receipt gets per edit, worst edit (today: one per materialized row = J)", "level": "cell", "metric": "S1.receiptGetsPerEdit.max", "op": "<=", "threshold": 0, "baseline": "J", "kind": "structural" },
+        { "id": "layout-plan-posts-per-edit", "label": "layout-plan POSTs per class edit", "level": "cell", "metric": "S1.layoutPlanPostsPerEdit", "op": "<=", "threshold": 0, "baseline": 1, "kind": "structural" },
+        { "id": "file-reads-per-edit", "label": "whole-file reads (GET file probe=1) inside the lane window, worst edit", "level": "cell", "metric": "S1.fileReadsPerEdit.max", "op": "<=", "threshold": 2, "baseline": "5-6", "kind": "structural" },
+        { "id": "card-source-triggers", "label": "card-source triggers (GET pages) per gesture", "level": "cell", "metric": "S1.cardSourceTriggers.max", "op": "<=", "threshold": 2, "kind": "structural" },
+        { "id": "ipc-per-trigger", "label": "IPC calls per card-source trigger (reported against P)", "level": "cell", "metric": "S1.ipcPerTrigger", "op": "<=", "threshold": null, "baseline": "19 + 2.3 P per edit today", "kind": "structural" }
+      ]
+    },
+    "G-L2": {
+      "slice": "P0a",
+      "summary": "lane diet, time: service slope, service p95 at depth and lost increments, at load <= 13",
+      "fixtures": ["tiny", "big", "bigpage", "owner"],
+      "run2": { "plan": "CELL@1*1,CELL@100*1,CELL@220*1", "measure": "S1@90*3,S3@33*1", "args": ["--tail", "9000", "--draincapture", "1", "--growbatch", "25", "--growinterval", "80", "--growcap", "900000", "--maxaccept", "1500"] },
+      "timeoutMs": 3600000,
+      "checks": [
+        { "id": "service-slope", "label": "lane service slope, ms per journal row, all edits", "level": "fixture", "metric": "fit.service.b", "op": "<=", "threshold": { "owner": 1.3, "bigpage": 0.5, "big": 0.1 }, "baseline": { "owner": 5.24, "bigpage": 3.23, "big": 0.52 }, "kind": "time" },
+        { "id": "service-p95-deepest", "label": "S1 lane service p95 at the deepest cell (J about 220)", "level": "cell", "cells": "deepest", "metric": "S1.service.p95", "op": "<=", "threshold": { "owner": 350, "bigpage": 150, "big": 60 }, "baseline": { "owner": 1386, "bigpage": 754, "big": 146 }, "kind": "time" },
+        { "id": "lost-increments", "label": "lost increments of a 2 s hold, of 61", "level": "cell", "metric": "S3.lostIncrements", "op": "<=", "threshold": 0, "baseline": "3-11 at depth", "kind": "time" }
+      ]
+    },
+    "G-T3": {
+      "implemented": true,
+      "slice": "P0b",
+      "metrics": "scenario",
+      "summary": "no late class change on any element, class level and visible level, outside writers included; wrong-value dwell, overlay jumps, painted == typed == disk (design 4.3). Report-only until P0b lands: every check carries its target, none a threshold",
+      "fixtures": ["tiny", "big", "huge", "bigpage", "owner", "comp2", "compbig"],
+      "run2": [
+        { "fixtures": ["tiny"], "plan": "S1@40*3,S1@90*3,S1@150*3,S2@90*3,S2O@90*3,S6@90*3,S7@90*3,S7b@90*3,S8@90*3,S3@33*2", "args": ["--fresh", "1", "--overlay", "1", "--rows", "1", "--tail", "3000", "--replaycapture", "1", "--text", "150"] },
+        { "fixtures": ["big", "huge", "bigpage", "owner"], "plan": "S1@40*3,S1@90*3,S1@150*3,S2@90*3,S2O@90*3,S6@90*3,S7@90*3,S7b@90*3,S8@90*3,S3@33*2,S4@20*2,S4@60*2", "args": ["--fresh", "1", "--overlay", "1", "--rows", "1", "--tail", "3000", "--replaycapture", "1"] },
+        { "fixtures": ["comp2", "compbig"], "plan": "S1@90*2,S2@90*2", "args": ["--fresh", "1", "--overlay", "1", "--rows", "1", "--tail", "3000", "--replaycapture", "1"] }
+      ],
+      "timeoutMs": 14400000,
+      "checks": [
+        { "id": "late-class-changes", "label": "class-attribute mutations after an element's final value, ANY element, summed over the runs of the cell (class level)", "level": "cell", "metric": "T3.lateMutations", "op": "<=", "threshold": null, "target": 0, "baseline": "23 of 117 runs (DV2); 6 of 6 with an outside writer (R12 3.4)", "kind": "structural" },
+        { "id": "late-wrong-values", "label": "late entries into a wrong class value", "level": "cell", "metric": "T3.lateWrongStates", "op": "<=", "threshold": null, "target": 0, "kind": "structural" },
+        { "id": "late-visible", "label": "late wrong values a frame stood on (visible-frame level)", "level": "cell", "metric": "T3.lateVisible", "op": "<=", "threshold": null, "target": 0, "baseline": "9 of 117 runs, S3 not rated (DV2)", "kind": "structural" },
+        { "id": "collateral", "label": "class changes on elements the scenario never touched", "level": "cell", "metric": "T3.collateral", "op": "<=", "threshold": null, "target": 0, "baseline": "0 in 102 S1-S4 runs (DV2)", "kind": "structural" },
+        { "id": "wrong-value-dwell", "label": "ms on a wrong value after the final value, worst run", "level": "cell", "metric": "T3.dwellMs.max", "op": "<=", "threshold": null, "target": 0, "baseline": "up to 4.9 s per image (bigpage S4@60, R12 3.5)", "kind": "time" },
+        { "id": "overlay-jumps", "label": "selection-overlay width steps after the final value", "level": "cell", "metric": "T3.overlayJumps", "op": "<=", "threshold": null, "target": 0, "baseline": "4-6 per image (S4@60, R12 3.5)", "kind": "structural" },
+        { "id": "final-canvas", "label": "the canvas ends on what was typed (after the drain)", "level": "cell", "metric": "T3.finalCanvasOk", "op": "==", "threshold": null, "target": true, "kind": "structural" },
+        { "id": "final-file", "label": "the page file ends on what was typed (after the drain)", "level": "cell", "metric": "T3.finalFileOk", "op": "==", "threshold": null, "target": true, "kind": "structural" }
+      ]
+    },
+    "G-T1a": { "implemented": false, "slice": "P1", "summary": "key-to-paint p50 <= 20 ms flat in J, stop within one frame of release, rollback, CPU throttle x4 (design section 4.3)" },
+    "G-T1b": { "implemented": false, "slice": "P2", "summary": "no partial values, one row / one undo step / one file write per gesture (design section 4.3)" },
+    "G-D": { "implemented": false, "slice": "P2", "summary": "durability: renderer kill, quit flush, window close, undo, injected failure (design section 4.3)" },
+    "V2": {
+      "slice": "P-1",
+      "metrics": "scenario",
+      "v2probe": true,
+      "summary": "V2 writer probe: compbig S1 x6 plain and x6 under CPU throttle x4 (the throttle widens the editor's lane window past a scan's arrival: plain runs did not reproduce) with the editor writer marks (cls:set, v2:write, v2:csv, v2:sync, v2:seed, v2:reg, cls:accepted): which of the two design 3.1 mechanisms (stale scan, client-id overwrite) makes a component-root edit show an older class, and which writer",
+      "fixtures": ["compbig"],
+      "run2": { "plan": "S1@90*6,S13@90*6", "args": ["--fresh", "1", "--rows", "1", "--tail", "3000", "--replaycapture", "1"] },
+      "timeoutMs": 3600000,
+      "checks": [
+        { "id": "marks-recorded", "label": "every run carried the editor writer marks", "level": "cell", "metric": "V2.allRunsHaveMarks", "op": "==", "threshold": true, "kind": "structural" },
+        { "id": "symptom-edits", "label": "edits whose SYNC or live-doc class differed from the class just typed", "level": "cell", "metric": "V2.symptoms", "op": "<=", "threshold": null, "target": 0, "baseline": "2 of 4 runs on the 34 KB page (R12 3.3)", "kind": "structural" },
+        { "id": "verdict", "label": "mechanism the marks name", "level": "cell", "metric": "V2.mechanism", "op": "==", "threshold": null, "kind": "structural" }
+      ]
+    },
+    "scenarios": {
+      "slice": "P-1",
+      "metrics": "scenario",
+      "summary": "the harness smoke of the P-1b scenarios: S7, S7b, S8, S10, S12 and S13 / S13H once on tiny, big and comp2 (fresh import per run): every run completes, the canvas class log is recorded, the CPU throttle reached both targets",
+      "fixtures": ["tiny", "big", "comp2"],
+      "run2": [
+        { "fixtures": ["tiny"], "plan": "S7@90*1,S7b@90*1,S8@90*1,S10@90*1,S12@5300*1,S13@90*1,S13H@33*1", "args": ["--fresh", "1", "--overlay", "1", "--rows", "1", "--tail", "3000", "--replaycapture", "1", "--text", "150"] },
+        { "fixtures": ["big", "comp2"], "plan": "S7@90*1,S7b@90*1,S8@90*1,S10@90*1,S12@5300*1,S13@90*1,S13H@33*1", "args": ["--fresh", "1", "--overlay", "1", "--rows", "1", "--tail", "3000", "--replaycapture", "1"] }
+      ],
+      "timeoutMs": 7200000,
+      "checks": [
+        { "id": "class-log", "label": "every completed run recorded the canvas class log (cc)", "level": "cell", "metric": "T3.missing", "op": "==", "threshold": 0, "kind": "structural" },
+        { "id": "throttle-both-targets", "label": "the CPU throttle slowed BOTH CDP targets (editor renderer and canvas iframe), measured with a busy loop", "level": "cell", "scn": ["S13", "S13H"], "metric": "throttle.bothTargets", "op": "==", "threshold": true, "kind": "structural" },
+        { "id": "late-class-changes", "label": "class-attribute mutations after an element's final value (reported)", "level": "cell", "metric": "T3.lateMutations", "op": "<=", "threshold": null, "target": 0, "kind": "structural" }
+      ]
+    }
+  }
+}

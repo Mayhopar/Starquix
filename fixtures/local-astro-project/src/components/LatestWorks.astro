@@ -1,0 +1,12 @@
+---
+// Content-bound fixture component: exercises the scan's extractContentBound
+// sniff → Dynamic section + yellow accent in local mode.
+import { getCollection } from 'astro:content';
+const works = await getCollection('works');
+---
+<section class="latest-works">
+  <h2>Latest works</h2>
+  <ul>
+    {works.map((w) => <li>{w.data.title}</li>)}
+  </ul>
+</section>

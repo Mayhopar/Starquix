@@ -1,0 +1,77 @@
+---
+/**
+ * sq-stack-v5 — editorial layout container (design: docs/plans/2026-09-28-editorial-layouts-design.md).
+ * SYSTEM-OWNED: shipped by ensure-sq-component, hidden from Assets/⌘K/`/`,
+ * upgraded when this marker is missing. Tailwind utilities ONLY (no style blocks).
+ * Class literals MUST equal app/src/core/stack/stackClasses.ts (parity test).
+ *
+ *   direction="row"    → two <div> children side by side from lg; stacked below,
+ *                        source order = visual order = reading order.
+ *   direction="column" → blocks one under another (the colored passage).
+ *   width              → content on the text / wide (64rem) / full line (alignment
+ *                        lines: app/src/core/post/articleTokens.ts LINES).
+ *   class              → the user's color classes (bg-*, text-*), verbatim.
+ *   text="auto"        → editor marker only; the editor writes the text class.
+ *
+ * sq-utilities.css: `@tailwind base; @tailwind utilities;` on a site that had
+ * no Tailwind (import normalization adds it with preflight OFF, so base emits
+ * only the --tw-* defaults translate needs — no reset); empty everywhere else.
+ * ensure-sq-component creates it when missing. `box-border` because such a
+ * site may be content-box (w-screen + padding would overflow).
+ */
+import './sq-utilities.css';
+interface Props {
+  direction?: 'column' | 'row';
+  ratio?: '1:1' | '2:1' | '1:2';
+  width?: 'reading' | 'wide' | 'edge';
+  text?: string;
+  class?: string;
+  [key: `data-${string}`]: string | undefined;
+}
+const { direction = 'column', ratio = '1:1', width = 'reading', text: _text, class: cls = '', ...rest } = Astro.props;
+const ROW_BASE = 'grid grid-cols-1 items-start gap-8 lg:gap-12 [&>*]:min-w-0 [&>*>:first-child]:mt-0 [&>*>:last-child]:mb-0';
+const ROW_RATIO = {
+  '1:1': 'lg:grid-cols-2',
+  '2:1': 'lg:grid-cols-[2fr_1fr]',
+  '1:2': 'lg:grid-cols-[1fr_2fr]',
+};
+const TOP_WIDTH = {
+  reading: 'w-full',
+  wide: 'relative left-1/2 -translate-x-1/2 w-[min(66.5rem,100vw)] sm:w-[min(67rem,100vw)] px-5 sm:px-6',
+  edge: 'relative left-1/2 -translate-x-1/2 w-screen',
+};
+const EDGE_INSET = 'px-[max(1.25rem,calc((100vw-64rem)/2))] sm:px-[max(1.5rem,calc((100vw-64rem)/2))]';
+const READING_COLORED = '[[data-sq-post-layout]_&]:-mx-5 sm:[[data-sq-post-layout]_&]:-mx-6 px-5 sm:px-6';
+const COLUMN_NESTED = '[&>[data-sq-stack]]:left-0 [&>[data-sq-stack]]:translate-x-0 [&>[data-sq-stack]]:mx-auto [&>[data-sq-stack]]:w-full [&>[data-sq-stack]]:max-w-[64rem] [&>[data-sq-stack]:not([data-sq-colored])]:px-0';
+const COLUMN_TEXT_CAP = '[&&>:is(p,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,pre,table)]:mx-auto [&&>:is(p,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,pre,table)]:max-w-[39.5rem]';
+const COLORED = '[&>:first-child]:mt-0 [&>:last-child]:mb-0 [&:not(:has(*))]:py-6 [[data-sq-colored]+&]:mt-0 [&:has(+[data-sq-colored])]:mb-0 [[data-sq-block]:has(>[data-sq-colored])+[data-sq-block]>&]:mt-0 [[data-sq-block]:has(+[data-sq-block]>[data-sq-colored])>&]:mb-0';
+const COLORED_PAD = {
+  reading: 'py-8 md:py-10',
+  band: 'py-12 md:py-16',
+};
+const COLORED_TEXT = '[--tw-prose-body:currentColor] [--tw-prose-headings:currentColor] [--tw-prose-links:currentColor] [--tw-prose-bold:currentColor] [--tw-prose-quotes:currentColor] [--tw-prose-captions:currentColor] [&_:is(h1,h2,h3,h4,h5,h6,figcaption,blockquote)]:text-inherit [&_a]:text-inherit [&_a]:underline';
+const COLORED_ROUND = {
+  reading: 'min-[680px]:rounded-xl [[data-sq-colored]+&]:rounded-t-none [&:has(+[data-sq-colored])]:rounded-b-none [[data-sq-block]:has(>[data-sq-colored])+[data-sq-block]>&]:rounded-t-none [[data-sq-block]:has(+[data-sq-block]>[data-sq-colored])>&]:rounded-b-none',
+  wide: 'min-[1072px]:rounded-xl [[data-sq-colored]+&]:rounded-t-none [&:has(+[data-sq-colored])]:rounded-b-none [[data-sq-block]:has(>[data-sq-colored])+[data-sq-block]>&]:rounded-t-none [[data-sq-block]:has(+[data-sq-block]>[data-sq-colored])>&]:rounded-b-none',
+};
+const TOP_SPACING = 'my-12 md:my-16 box-border [&>:first-child]:mt-0 [&>:last-child]:mb-0';
+const MEDIA_FIT = '[&_img]:max-w-full [&_img]:h-auto [&_video]:max-w-full [&_video]:h-auto';
+const colored = /(^|\s)bg-/.test(cls);
+const hasText = /(^|\s)text-/.test(cls);
+const w = width === 'wide' || width === 'edge' ? width : 'reading';
+// an uncolored edge column bleeds (full-width media); everything else at edge sits on the wide line
+const bleeds = w === 'edge' && direction === 'column' && !colored;
+const classes = [
+  TOP_SPACING,
+  MEDIA_FIT,
+  w === 'reading' && colored ? READING_COLORED : TOP_WIDTH[w],
+  w === 'edge' && !bleeds ? EDGE_INSET : '',
+  direction === 'row' ? `${ROW_BASE} ${ROW_RATIO[ratio] ?? ROW_RATIO['1:1']}` : COLUMN_NESTED,
+  direction === 'column' && w !== 'reading' ? COLUMN_TEXT_CAP : '',
+  colored ? `${COLORED} ${COLORED_PAD[w === 'reading' ? 'reading' : 'band']}` : '',
+  colored && w !== 'edge' ? COLORED_ROUND[w] : '',
+  hasText ? COLORED_TEXT : '',
+  cls,
+];
+---
+<div {...rest} data-sq-stack={direction} data-sq-colored={colored ? '' : undefined} class:list={classes}><slot /></div>

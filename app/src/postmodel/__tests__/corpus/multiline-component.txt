@@ -1,0 +1,5 @@
+<CreditWrapper
+  title="Team"
+>
+  <Credit name="Oleg" />
+</CreditWrapper>

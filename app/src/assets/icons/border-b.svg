@@ -1,0 +1,14 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="border-b">
+  <g class="sq-g16">
+    <g transform="rotate(180 8 8)">
+      <rect x="3" y="3" width="10" height="10" opacity="0.35" stroke-linejoin="miter"/>
+      <path d="M3 3H13" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/>
+    </g>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <g transform="rotate(180 10 10)">
+      <rect x="4" y="4" width="12" height="12" opacity="0.35" stroke-linejoin="miter"/>
+      <path d="M4 4H16" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/>
+    </g>
+  </g>
+</svg>

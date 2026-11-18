@@ -1,0 +1,8 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="format-bold">
+  <g class="sq-g16">
+    <path d="M4.5 8H9A2.5 2.5 0 0 0 9 3H4.5V13H9.5A2.5 2.5 0 0 0 9.5 8" stroke-linecap="square"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M5.5 10H11.125A3 3 0 0 0 11.125 4H5.5V16H11.75A3.001 3.001 0 0 0 11.875 10" stroke-linecap="square"/>
+  </g>
+</svg>

@@ -1,0 +1,14 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="share">
+  <g class="sq-g16">
+    <circle cx="11.5" cy="3.5" r="1.75"/>
+    <circle cx="4" cy="8" r="1.75"/>
+    <circle cx="11.5" cy="12.5" r="1.75"/>
+    <path d="M5.5 7L10 4.5M5.5 9L10 11.5"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <circle cx="14.375" cy="4.375" r="2.188"/>
+    <circle cx="5" cy="10" r="2.188"/>
+    <circle cx="14.375" cy="15.625" r="2.188"/>
+    <path d="M6.875 8.75L12.5 5.625M6.875 11.25L12.5 14.375"/>
+  </g>
+</svg>

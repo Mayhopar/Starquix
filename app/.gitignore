@@ -1,0 +1,24 @@
+node_modules
+dist
+.DS_Store
+*.local
+.env
+
+# Design variables (user-specific, not committed)
+src/styles/variables.json
+
+# Example projects (separate repos)
+examples/starquix
+examples/starquix-api
+examples/vs-design
+
+# Playwright test artifacts
+playwright-report/
+test-results/
+e2e/**/*-snapshots/
+
+# Vitest scratch dirs (sq-source plugin parity test)
+.sq-parity-tmp-*
+
+*storybook.log
+storybook-static

@@ -1,0 +1,11 @@
+---
+import { resolveAsset } from './resolveAsset';
+const { src1, src2, alt1 = '', alt2 = '', caption = '', customClass = '' } = Astro.props;
+---
+<figure class:list={['double-image', customClass]}>
+  <div class="double-image__grid">
+    <img src={resolveAsset(src1)} alt={alt1} />
+    <img src={resolveAsset(src2)} alt={alt2} />
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

@@ -1,0 +1,25 @@
+{
+  "name": "starquix-mcp",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "MCP server that lets coding agents drive an open Starquix editor tab",
+  "type": "module",
+  "bin": { "starquix-mcp": "./dist/cli.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test:run": "vitest run",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.18.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.9.0"
+  },
+  "engines": { "node": ">=20" }
+}

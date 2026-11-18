@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="visible">
+  <g class="sq-g16">
+    <path d="M1.75 8C1.75 8 4 3.75 8 3.75C12 3.75 14.25 8 14.25 8C14.25 8 12 12.25 8 12.25C4 12.25 1.75 8 1.75 8Z"/>
+    <circle cx="8" cy="8" r="1.75"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M2.188 10C2.188 10 5 4.688 10 4.688C15 4.688 17.812 10 17.812 10C17.812 10 15 15.312 10 15.312C5 15.312 2.188 10 2.188 10Z"/>
+    <circle cx="10" cy="10" r="2.188"/>
+  </g>
+</svg>

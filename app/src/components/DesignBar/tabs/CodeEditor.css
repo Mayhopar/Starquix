@@ -1,0 +1,87 @@
+/* Shared code editor styles - theme-aware */
+
+/* Base editor styles */
+.code-editor,
+.code-editor * {
+  color: var(--color-text);
+}
+
+.code-editor textarea {
+  color: var(--color-text) !important;
+  caret-color: var(--color-text);
+}
+
+.code-editor pre {
+  color: var(--color-text) !important;
+}
+
+/* Common token colors */
+.code-editor .token.comment,
+.code-editor .token.prolog,
+.code-editor .token.doctype,
+.code-editor .token.cdata {
+  color: var(--color-text-secondary);
+}
+
+.code-editor .token.punctuation {
+  color: var(--color-text-secondary);
+}
+
+/* Source Tab specific tokens (HTML/markup) */
+.source-editor .token.tag,
+.source-editor .token.namespace {
+  color: #e06c75; /* red for tags */
+}
+
+.source-editor .token.attr-name {
+  color: #d19a66; /* orange for attributes */
+}
+
+.source-editor .token.attr-value,
+.source-editor .token.string {
+  color: #98c379; /* green for strings/values */
+}
+
+.source-editor .token.boolean,
+.source-editor .token.number {
+  color: #d19a66; /* orange for numbers */
+}
+
+.source-editor .token.entity,
+.source-editor .token.url,
+.source-editor .token.symbol,
+.source-editor .token.regex,
+.source-editor .token.inserted {
+  color: #98c379; /* green */
+}
+
+.source-editor .token.atrule,
+.source-editor .token.keyword {
+  color: #c678dd; /* purple for keywords */
+}
+
+.source-editor .token.function {
+  color: #61afef; /* blue for functions */
+}
+
+.source-editor .token.deleted {
+  color: #e06c75; /* red for deleted */
+}
+
+.source-editor .token.important,
+.source-editor .token.bold {
+  font-weight: bold;
+}
+
+.source-editor .token.italic {
+  font-style: italic;
+}
+
+/* Classes Tab specific tokens (Tailwind) */
+.classes-editor .token.prefix {
+  color: #c678dd; /* purple for prefixes like sm:, hover: */
+}
+
+.classes-editor .token.class-name {
+  color: #61afef; /* blue for utility classes */
+}

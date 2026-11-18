@@ -1,0 +1,13 @@
+import Stack from '../../components/sq/Stack.astro';
+
+<Stack width="wide" class="bg-[var(--brand)] text-[#111111]" text="auto">
+
+## A colored passage
+
+With a paragraph and a [link](https://example.com).
+
+> A quote.
+
+</Stack>
+
+Trailing text.

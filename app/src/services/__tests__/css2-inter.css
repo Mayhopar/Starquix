@@ -1,0 +1,27 @@
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v19/cyr.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v19/latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v19/latin700.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}

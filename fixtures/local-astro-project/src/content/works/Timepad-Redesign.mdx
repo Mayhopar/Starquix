@@ -1,0 +1,46 @@
+---
+featured: true
+cover: ./images/timepad/cover.png
+years: "2020—22'"
+role: Design Director
+lead:
+date: 2024-04-04
+thumb1: ./images/misc/blank.png
+thumb2: ./images/misc/blank.png
+thumb3: ./images/misc/blank.png
+link: https://afisha.timepad.ru
+title: Some stuff
+---
+import { Image } from 'astro:assets';
+import SingleImage from '../../components/SingleImage.astro';
+import DoubleImage from '../../components/DoubleImage.astro';
+import SingleVideo from '../../components/SingleVideo.astro';
+import ImageVideo from '../../components/ImageVideo.astro';
+import DoubleVideo from '../../components/DoubleVideo.astro';
+import Credit from '../../components/Credit.astro';
+import CreditWrapper from '../../components/CreditWrapper.astro';
+
+<SingleImage src="./images/timepad/hero.png" alt="Afisha home, 2022" />
+
+Timepad ran the largest independent ticketing platform in the region, and the
+discovery surface had been bolted on to a seller tool. We rebuilt the afisha as
+its own product: a feed people open on a Friday, not a search box they endure.
+
+<DoubleImage src1="./images/timepad/grid-1.png" src2="./images/timepad/grid-2.png" caption="Field trip notes." />
+
+## What shipped
+
+<CreditWrapper title="Team">
+  <Credit role="Design Director" name="Oleg Mayhopar" />
+  <Credit role="Product Design" name="Jane Doe" />
+</CreditWrapper>
+dk
+```js
+import SingleImage from '../../components/SingleImage.astro';
+<SingleImage src="./images/misc/blank.png" alt="not a real invocation" />
+```
+
+{/* <SingleVideo src="./images/timepad/teaser.mp4" poster="./images/misc/blank.png" /> */}
+
+Two years later the feed is still the default entry point, which is the only
+metric that ever mattered here.

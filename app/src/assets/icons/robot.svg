@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="robot">
+  <g class="sq-g16">
+    <rect x="2.5" y="5" width="11" height="8" rx="1.5" stroke-linejoin="miter"/>
+    <path d="M8 2.5V5M5.5 8V9M10.5 8V9M6 11H10" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <rect x="3" y="6.5" width="14" height="9.5" rx="1.875" stroke-linejoin="miter"/>
+    <path d="M10 3V6.5M7 10V11M13 10V11M7.5 13.5H12.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+</svg>

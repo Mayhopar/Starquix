@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="search">
+  <g class="sq-g16">
+    <circle cx="7" cy="7" r="4"/>
+    <path d="M10 10L13 13"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <circle cx="8.75" cy="8.75" r="5"/>
+    <path d="M12.5 12.5L16.5 16.5"/>
+  </g>
+</svg>

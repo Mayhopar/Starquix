@@ -1,0 +1,39 @@
+---
+/**
+ * Stand-in for a content entry's rendered <Content /> in the component view
+ * (post-design surface). Plain semantic tags on purpose: the page's own
+ * prose/article styling applies, so the design preview shows how REAL post
+ * bodies will look. Scenery — lives here, not in the user's files, so it is
+ * untagged and uneditable.
+ */
+const PLACEHOLDER_IMG =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">' +
+    '<rect width="1200" height="800" fill="#e2e8f0"/>' +
+    '<circle cx="880" cy="235" r="72" fill="#94a3b8"/>' +
+    '<path d="M96 640 L478 288 L780 640 Z" fill="#cbd5e1"/>' +
+    '<path d="M570 640 L834 394 L1104 640 Z" fill="#94a3b8"/>' +
+    '</svg>',
+  );
+---
+
+<h2>Sample section heading</h2>
+<p>
+  This is placeholder body text standing in for a real post. It exists so the
+  page's typography, spacing and column width are visible while designing —
+  every real post will flow through the same elements.
+</p>
+<img src={PLACEHOLDER_IMG} alt="Placeholder image" />
+<p>
+  A second paragraph with a bit more length, enough to wrap across a few lines
+  at typical article widths so line-height and measure read true. The text
+  itself carries no meaning.
+</p>
+<ul>
+  <li>First sample list item</li>
+  <li>Second sample list item</li>
+  <li>Third sample list item</li>
+</ul>
+<blockquote>A short sample quotation to preview blockquote styling.</blockquote>
+<p>Closing placeholder paragraph.</p>

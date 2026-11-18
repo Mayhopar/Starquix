@@ -1,0 +1,19 @@
+import Stack from '../../components/sq/Stack.astro';
+
+<Stack class="bg-[#eeeeee]">
+
+One.
+
+<Stack>
+
+Two.
+
+<Stack>
+
+Three.
+
+</Stack>
+
+</Stack>
+
+</Stack>

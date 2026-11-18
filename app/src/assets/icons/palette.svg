@@ -1,0 +1,16 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="palette">
+  <g class="sq-g16">
+    <path d="M8 2.5A5.5 5.5 0 1 0 8 13.5C9.5 13.5 8 11.5 9 11C10 10.5 13.5 11.5 13.5 8A5.5 5.5 0 0 0 8 2.5Z"/>
+    <circle cx="5" cy="6" r="0.75" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"/>
+    <circle cx="11" cy="7" r="0.75" fill="currentColor" stroke="none"/>
+    <circle cx="5" cy="9" r="0.75" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M10 3.125A6.875 6.875 0 1 0 10 16.875C11.875 16.875 10 14.375 11.25 13.75C12.5 13.125 16.875 14.375 16.875 10A6.875 6.875 0 0 0 10 3.125Z"/>
+    <circle cx="6.25" cy="7.5" r="0.938" fill="currentColor" stroke="none"/>
+    <circle cx="10" cy="6.25" r="0.938" fill="currentColor" stroke="none"/>
+    <circle cx="13.75" cy="8.75" r="0.938" fill="currentColor" stroke="none"/>
+    <circle cx="6.25" cy="11.25" r="0.938" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

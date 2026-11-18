@@ -1,0 +1,13 @@
+---
+import Layout from '../../layouts/Layout.astro';
+export function getStaticPaths() {
+  return [{ params: { slug: 'widget' } }];
+}
+---
+<Layout title="Release widget">
+  <main class="p-8">
+    <h1 class="text-3xl">Release widget</h1>
+    <p>Link-only dynamic source preserved.</p>
+    <a href="/">Release home</a>
+  </main>
+</Layout>

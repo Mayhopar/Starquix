@@ -1,0 +1,30 @@
+import Stack from '../../components/sq/Stack.astro';
+import Media from '../../components/sq/Media.astro';
+
+Before.
+
+<Stack width="edge" class="bg-[#1f3a2e] text-white" text="auto">
+
+Intro *paragraph*.
+
+<Stack direction="row" ratio="2:1">
+<div>
+
+## Left
+
+- one
+- two
+
+</div>
+<div>
+
+<Media items={["/uploads/a.jpg"]} />
+
+</div>
+</Stack>
+
+Outro.
+
+</Stack>
+
+After.

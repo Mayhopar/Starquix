@@ -1,0 +1,62 @@
+---
+featured: true
+cover: ./images/timepad/cover.png
+years: "2023—24'"
+role: Lead Product Designer
+lead: A greenfield banking app taken from first sketch to 400k users in fourteen months.
+date: 2024-11-12
+thumb1: ./images/timepad/grid-1.png
+thumb2: ./images/timepad/grid-2.png
+thumb3: ./images/misc/blank.png
+link: https://example.com/nova
+title: Nova Banking App
+---
+import SingleImage from '../../components/SingleImage.astro';
+import DoubleImage from '../../components/DoubleImage.astro';
+import Credit from '../../components/Credit.astro';
+import CreditWrapper from '../../components/CreditWrapper.astro';
+
+<SingleImage src="./images/timepad/hero.png" alt="Nova home screen, launch build" />
+
+Nova started as a compliance-driven rebuild of a legacy retail bank and turned
+into a full product reset. We threw away the account-first navigation and
+organized the whole app around money movement: pay, save, and see where it went.
+
+## The problem
+
+The old app had **41 screens** to make a single transfer. Support tickets told
+the same story every week:
+
+- People couldn't find their own IBAN.
+- Recurring payments were buried three menus deep.
+- The savings product had a 9% activation rate despite a 4.5% APY.
+
+<DoubleImage src1="./images/timepad/grid-1.png" src2="./images/timepad/grid-2.png" caption="Left: the legacy transfer flow. Right: the same job in Nova — two taps." />
+
+## What we changed
+
+Every screen answers one question: *what can I do with this money right now?*
+The home feed mixes balances with actions, so the most common jobs — send,
+split, top up — are never more than one tap from launch.
+
+> "It's the first banking app where I don't feel like I'm filing taxes."
+> — beta tester, week 3
+
+<SingleImage src="/uploads/55445954468_822ed2e16a_k.jpg" alt="Design system audit wall" />
+
+## Results
+
+1. Transfer completion time dropped from 74s to 11s.
+2. Savings activation went from 9% to 38% in the first quarter.
+3. App-store rating climbed from 2.9 to 4.7.
+
+<DoubleImage src1="/uploads/original_80d96beafcb91cdffa0f32474b4832f0.jpeg" src2="/uploads/55445954468_822ed2e16a_k-1.jpg" caption="Launch-day war room, and the first real transaction." />
+
+<CreditWrapper title="Team">
+  <Credit role="Lead Product Designer" name="Oleg Mayhopar" />
+  <Credit role="iOS Engineering" name="Marta Silva" />
+  <Credit role="Research" name="Dmitri Volkov" />
+</CreditWrapper>
+
+Fourteen months after kickoff, Nova processes a third of the bank's retail
+volume. The legacy app is scheduled for shutdown next spring.

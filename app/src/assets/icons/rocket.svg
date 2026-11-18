@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="rocket">
+  <g class="sq-g16">
+    <path d="M6 10C6 6 9.5 2.5 13.5 2.5C13.5 6.5 10 10 6 10ZM6 5H3.5L2 9H6M11 10V12.5L7 14V10M4.5 11.5L2.5 13.5" stroke-linecap="square"/>
+    <circle cx="10.5" cy="5.5" r="0.75" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M7.5 12.5C7.5 7.5 11.875 3.125 16.875 3.125C16.875 8.125 12.5 12.5 7.5 12.5ZM7.5 6.5H4.375L2.5 11H7.5M13.5 12.5V15.625L9 17.5V12.5M5.5 14.5L3 17" stroke-linecap="square"/>
+    <circle cx="13.125" cy="6.875" r="0.938" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

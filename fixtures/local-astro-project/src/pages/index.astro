@@ -1,0 +1,25 @@
+---
+import Card from '../components/Card.astro';
+import LatestWorks from '../components/LatestWorks.astro';
+const items = [1, 2];
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture Home</title>
+  </head>
+  <body>
+    <h1>Fixture Home</h1>
+    <p>A minimal Astro project for local-mode smoke tests.</p>
+    <img src="/favicon.svg" alt="logo" width="32" height="32" />
+    <a href="/about">About</a>
+    <div class="text-lg">Editable target div</div>
+    <Card title="First card">
+      <p>Card body</p>
+    </Card>
+    <ul>
+      {items.map((n) => <li>Item {n}</li>)}
+    </ul>
+    <LatestWorks />
+  </body>
+</html>

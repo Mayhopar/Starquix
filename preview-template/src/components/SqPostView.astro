@@ -1,0 +1,208 @@
+---
+/**
+ * Content editor — starquix-owned edit surface for ONE content entry.
+ * Renders only the post body: no site layout, no nav, no header. The published
+ * post keeps its own page; this is the writing surface (design §2).
+ *
+ * Params ride the PATH, never the query string: user projects are static output
+ * with no adapter, so every route is prerendered and Astro strips query params
+ * from Astro.url even in dev. (Same rule as SqComponentView.astro.)
+ *
+ * Keep this file SELF-CONTAINED — no imports from our repo, no path aliases.
+ * It is copyFileSync'd into a /tmp wrapper dir and injected as a route; an
+ * import that reaches back into the workspace trips vite's tsconfig walker
+ * (TSConfckParseError).
+ */
+import { getCollection } from 'astro:content';
+import { readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+type Entry = { id: string; slug: string; data?: { title?: string }; render: () => Promise<{ Content: unknown }> };
+
+/** Collections = the folders under src/content (astro dev's cwd is the user's folder). */
+function collectionNames(): string[] {
+  const dir = join(process.cwd(), 'src', 'content');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+    .map(e => e.name);
+}
+
+async function entriesOf(collection: string): Promise<Entry[]> {
+  try {
+    return (await getCollection(collection as never)) as unknown as Entry[];
+  } catch {
+    return []; // not a defined collection — skip it rather than fail the route
+  }
+}
+
+/** The FILE is the identity (local-mode law), so `Timepad-Redesign.mdx` is
+ *  addressed as `Timepad-Redesign` — what the editor's `post.slug` already is
+ *  (content-ops derives it from the filename). Astro's own slug is accepted
+ *  too: it differs by case, and a `slug:` frontmatter key can override it
+ *  outright, so neither side may derive the other. */
+const fileKey = (e: Entry) => e.id.replace(/\.mdx?$/, '');
+
+/**
+ * getStaticPaths stays the allowlist here. Astro 7 dev caches it until the
+ * route module reloads, but every content change clears that cache, so a post
+ * created after the first view opens (desktop/test/post-view.test.mjs). A new
+ * COMPONENT is no content change — SqComponentView.astro renders on demand
+ * instead (`prerender = false` works on Astro ≥5; Astro 4 ignored it in static
+ * output and 500'd without getStaticPaths).
+ *
+ * Every helper is redeclared INSIDE this function on purpose: Astro hoists
+ * getStaticPaths into its own isolated scope, so frontmatter-level consts and
+ * functions are not defined here ("collectionNames is not defined" at runtime).
+ * SqComponentView.astro nests its `walk` for the same reason.
+ */
+export async function getStaticPaths() {
+  const { readdirSync, existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { getCollection } = await import('astro:content');
+
+  const dir = join(process.cwd(), 'src', 'content');
+  if (!existsSync(dir)) return [];
+  const names = readdirSync(dir, { withFileTypes: true })
+    .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+    .map(e => e.name);
+
+  const out: Array<{ params: { path: string } }> = [];
+  for (const name of names) {
+    let entries: Array<{ id: string; slug: string }> = [];
+    try {
+      entries = (await getCollection(name as never)) as unknown as Array<{ id: string; slug: string }>;
+    } catch {
+      continue; // not a defined collection
+    }
+    for (const entry of entries) {
+      // Both address forms, deduped — see fileKey below for why neither side
+      // may derive the other.
+      for (const key of new Set([entry.id.replace(/\.mdx?$/, ''), entry.slug])) {
+        out.push({ params: { path: `${name}/${key}` } });
+      }
+    }
+  }
+  return out;
+}
+
+// Injected route (the wrapper config's injectRoute): the path comes in params.
+const raw = Astro.params.path ?? '';
+const [collection, ...rest] = raw.split('/');
+const key = rest.join('/');
+
+let entry: Entry | null = null;
+let error: string | null = null;
+try {
+  if (collection && key) {
+    const all = await entriesOf(collection);
+    entry = all.find(e => fileKey(e) === key) ?? all.find(e => e.slug === key) ?? null;
+  }
+  if (!entry) error = `No entry ${collection}/${key}`;
+} catch (e) {
+  error = e instanceof Error ? e.message : String(e);
+}
+
+let rendered: { Content?: unknown } | null = null;
+if (entry) {
+  try {
+    rendered = await entry.render();
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+  }
+}
+const Content = rendered?.Content as
+  | import('astro/runtime/server/index.js').AstroComponentFactory
+  | undefined;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{entry?.data?.title ?? 'Post'}</title>
+  </head>
+  <body>
+    {error && <pre data-sq-post-error>{error}</pre>}
+    <div data-sq-post-body class="sq-post-grid">
+      {Content && <Content />}
+    </div>
+    {/*
+      Fallback for the editor when its direct fetch of this route fails
+      (loadPostViewHtml.ts tries the fetch first, then a hidden iframe): the
+      page hands its own HTML up to the PARENT frame.
+
+      Must live INSIDE this <body>: this component renders the whole document,
+      so anything the route places after <SqPostView/> is dropped.
+    */}
+    <script is:inline define:vars={{ sqPath: raw }}>
+      (function () {
+        if (window.parent === window) return;
+        var post = function () {
+          window.parent.postMessage({
+            type: 'SQ_POST_VIEW_HTML',
+            payload: { path: sqPath, html: document.documentElement.outerHTML },
+          }, '*');
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', post);
+        } else {
+          post();
+        }
+      })();
+    </script>
+    {/* is:inline is REQUIRED, not a preference: a compiled <style> in a route
+        injected from /tmp asks vite for a virtual style module whose id Astro
+        resolves against the project root, producing
+        `<userDir>/private/var/folders/…` and "No cached compile metadata found"
+        → 500 on every render. is:inline leaves the tag alone. */}
+    <style is:inline>
+      .sq-post-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 1.5rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        /* A FIXED bottom gutter, never a vh unit. The parent sizes this iframe
+           from the content height it reports, so `40vh` measured against the
+           iframe's own (already content-sized) viewport fed back into itself:
+           taller frame → taller padding → taller frame. Measured at 5881px with
+           ~1500px of trailing blank before this was pinned. */
+        padding: 2rem 1.5rem 6rem;
+      }
+      /* Every direct child defaults to the centered 8-of-12 text column.
+         An explicit col-span-* / col-start-* on the element wins.
+         min-width:0 is load-bearing: a grid item's default `min-width:auto`
+         refuses to shrink below its content, so one wide image widens its
+         whole track and the post scrolls sideways. */
+      .sq-post-grid > * { grid-column: 3 / span 8; min-width: 0; }
+      /* THE WIDTH CONTRACT (same rules as the fixture post template): the
+         editor's width modes write col-span-N wrappers; the runtime tagging
+         may add an unclassed data-sq-block wrapper the grid must see through.
+         Descendant selectors on purpose; last so they win the default. */
+      .sq-post-grid > [data-sq-block] { display: contents; }
+      .sq-post-grid > [data-sq-block] > * { grid-column: 3 / span 8; min-width: 0; }
+      .sq-post-grid .col-span-4 { grid-column: 5 / span 4; }
+      .sq-post-grid .col-span-6 { grid-column: 4 / span 6; }
+      .sq-post-grid .col-span-8 { grid-column: 3 / span 8; }
+      .sq-post-grid .col-span-12 { grid-column: 1 / span 12; }
+      .sq-post-grid .col-span-full {
+        grid-column: 1 / -1;
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+      }
+      /* This route deliberately renders NO site layout, so the user's own
+         stylesheet — and with it their `img { max-width: 100% }` — never loads.
+         Without this reset every image drew at its intrinsic size (the fixture's
+         1600px hero inside a 1184px frame) and overflowed the editor. */
+      .sq-post-grid img,
+      .sq-post-grid video,
+      .sq-post-grid canvas,
+      .sq-post-grid svg,
+      .sq-post-grid iframe {
+        max-width: 100%;
+        height: auto;
+      }
+      .sq-post-grid pre { overflow-x: auto; }
+    </style>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "navRenderBranch",
+    "filePath": "/rig/src/components/Nav.astro",
+    "source": "---\nconst url = '/a';\n---\n<nav class=\"nav\">\n  <a href={url} class=\"first\">one</a>\n  <a class=\"second\">two</a>\n  <a class=\"third\">three</a>\n</nav>\n",
+    "compiled": "import {\n  render as $$render,\n  createComponent as $$createComponent,\n  maybeRenderHead as $$maybeRenderHead,\n  addAttribute as $$addAttribute\n} from \"astro/compiler-runtime\";\nconst $$Nav = $$createComponent(($$result, $$props, $$slots) => {\n  const url = \"/a\";\n  return $$render`${$$maybeRenderHead($$result)}<nav class=\"nav\" data-astro-source-file=\"/rig/src/components/Nav.astro\" data-astro-source-loc=\"4:18\"> <a${$$addAttribute(url, \"href\")} class=\"first\" data-astro-source-file=\"/rig/src/components/Nav.astro\" data-astro-source-loc=\"5:31\">one</a> <a class=\"second\" data-astro-source-file=\"/rig/src/components/Nav.astro\" data-astro-source-loc=\"6:21\">two</a> <a class=\"third\" data-astro-source-file=\"/rig/src/components/Nav.astro\" data-astro-source-loc=\"7:20\">three</a> </nav>`;\n}, \"/rig/src/components/Nav.astro\", void 0);\nexport default $$Nav;\n\nconst $$file = \"/rig/src/components/Nav.astro\";\nconst $$url = undefined;export { $$file as file, $$url as url };\n"
+  },
+  {
+    "name": "tplTemplateBranch",
+    "filePath": "/rig/src/components/Tpl.astro",
+    "source": "---\nconst cls = 'dyn';\n---\n<section class={cls} id=\"s1\"><b class=\"b1\">B1</b></section>\n<section class=\"s2\" id=\"s2\">Second</section>\n<script is:inline>window.__tpl = 1;</script>\n",
+    "compiled": "var __freeze = Object.freeze;\nvar __defProp = Object.defineProperty;\nvar __template = (cooked, raw) => __freeze(__defProp(cooked, \"raw\", { value: __freeze(raw || cooked.slice()) }));\nvar _a;\nimport {\n  render as $$render,\n  createComponent as $$createComponent,\n  maybeRenderHead as $$maybeRenderHead,\n  addAttribute as $$addAttribute\n} from \"astro/compiler-runtime\";\nconst $$Tpl = $$createComponent(($$result, $$props, $$slots) => {\n  const cls = \"dyn\";\n  return $$render(_a || (_a = __template([\"\", \"<section\", ' id=\"s1\" data-astro-source-file=\"/rig/src/components/Tpl.astro\" data-astro-source-loc=\"4:31\"><b class=\"b1\" data-astro-source-file=\"/rig/src/components/Tpl.astro\" data-astro-source-loc=\"4:44\">B1</b></section> <section class=\"s2\" id=\"s2\" data-astro-source-file=\"/rig/src/components/Tpl.astro\" data-astro-source-loc=\"5:29\">Second</section> <script>window.__tpl = 1;<\\/script>'])), $$maybeRenderHead($$result), $$addAttribute(cls, \"class\"));\n}, \"/rig/src/components/Tpl.astro\", void 0);\nexport default $$Tpl;\n\nconst $$file = \"/rig/src/components/Tpl.astro\";\nconst $$url = undefined;export { $$file as file, $$url as url };\n"
+  }
+]

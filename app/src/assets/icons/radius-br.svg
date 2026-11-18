@@ -1,0 +1,12 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="radius-br">
+  <g class="sq-g16">
+    <g transform="rotate(180 8 8)">
+      <path d="M3 13V7A4 4 0 0 1 7 3H13" stroke-linecap="square"/>
+    </g>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <g transform="rotate(180 10 10)">
+      <path d="M4 16.5V9A5 5 0 0 1 9 4H16.5" stroke-linecap="square"/>
+    </g>
+  </g>
+</svg>

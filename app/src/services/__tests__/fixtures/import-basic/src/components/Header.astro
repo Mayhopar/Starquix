@@ -1,0 +1,7 @@
+---
+const links = ['Home', 'About'];
+---
+<header class="flex gap-4 p-4">
+  <img src="/images/logo.png" alt="logo" class="h-8" />
+  <nav>{links.map((l) => <a href="/">{l}</a>)}</nav>
+</header>

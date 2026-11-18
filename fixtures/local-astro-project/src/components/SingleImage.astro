@@ -1,0 +1,7 @@
+---
+import { resolveAsset } from './resolveAsset';
+const { src, alt = '', customClass = '' } = Astro.props;
+---
+<figure class:list={['single-image', customClass]}>
+  <img src={resolveAsset(src)} alt={alt} />
+</figure>

@@ -1,0 +1,22 @@
+{
+  "src/components/CreateProjectCard.tsx": {
+    "hand-rolled-row": 1
+  },
+  "src/components/DesignBar/DesignBarHeader.tsx": {
+    "hand-rolled-row": 1,
+    "raw-text-size": 1
+  },
+  "src/components/DesignBar/OrphanedOverridesBadge.tsx": {
+    "deprecated-row-slots": 1
+  },
+  "src/components/DesignBar/VariablesQuickPanel.tsx": {
+    "deprecated-row-slots": 2
+  },
+  "src/components/DesignBar/blocks/LayoutPropsEditor.tsx": {
+    "hand-rolled-row": 1
+  },
+  "src/pages/ProjectsPage.tsx": {
+    "hand-rolled-row": 1,
+    "raw-text-size": 1
+  }
+}

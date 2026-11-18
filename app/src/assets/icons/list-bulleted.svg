@@ -1,0 +1,18 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="list-bulleted">
+  <g class="sq-g16">
+    <path d="M6 4H14M6 8H14M6 12H14" stroke-linecap="square" stroke-linejoin="miter"/>
+    <g fill="currentColor" stroke="none">
+      <circle cx="2.5" cy="4" r="1"/>
+      <circle cx="2.5" cy="8" r="1"/>
+      <circle cx="2.5" cy="12" r="1"/>
+    </g>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M7.5 5H17.5M7.5 10H17.5M7.5 15H17.5" stroke-linecap="square" stroke-linejoin="miter"/>
+    <g fill="currentColor" stroke="none">
+      <circle cx="3.125" cy="5" r="1.25"/>
+      <circle cx="3.125" cy="10" r="1.25"/>
+      <circle cx="3.125" cy="15" r="1.25"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+import Stack from '../../components/sq/Stack.astro';
+import Media from '../../components/sq/Media.astro';
+
+Intro.
+
+<Stack direction="row" ratio="1:2">
+<div>
+
+Text *beside* the image.
+
+Second paragraph.
+
+</div>
+<div>
+
+<Media items={[null]} />
+
+</div>
+</Stack>
+
+Outro.

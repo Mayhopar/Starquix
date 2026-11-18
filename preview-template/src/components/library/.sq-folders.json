@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "roots": [
+    "comp:library/Media.astro",
+    "f_32lpmtr6re",
+    "f_4swxl8r6re",
+    "f_56aqqyr6re",
+    "f_kdjirxr6re",
+    "f_0wppjpr6re",
+    "f_hb4gufr6rf",
+    "f_w2fvlbr6rf",
+    "f_2v3n9kr6rf",
+    "f_rj6b56r6rf",
+    "f_a294lyr6rf",
+    "f_r5zsm3r6rf",
+    "f_c5vxhur6rf",
+    "f_ozb3szr6rf",
+    "f_h5qsh7r6rf",
+    "f_qrk7wmr6rf",
+    "f_dynamic",
+    "f_9rronjr6rf"
+  ],
+  "folders": {
+    "f_32lpmtr6re": {
+      "name": "Pages",
+      "children": [
+        "comp:library/BlogPost.astro"
+      ]
+    },
+    "f_4swxl8r6re": {
+      "name": "Header",
+      "children": [
+        "comp:library/Header.astro"
+      ]
+    },
+    "f_56aqqyr6re": {
+      "name": "Hero",
+      "children": [
+        "comp:library/Hero.astro",
+        "comp:library/Hero2.astro",
+        "comp:library/Hero3.astro",
+        "comp:library/Hero4.astro"
+      ]
+    },
+    "f_kdjirxr6re": {
+      "name": "Logos",
+      "children": [
+        "comp:library/Logos.astro",
+        "comp:library/Logos2.astro",
+        "comp:library/Logos3.astro",
+        "comp:library/Logos4.astro",
+        "comp:library/Logos5.astro"
+      ]
+    },
+    "f_0wppjpr6re": {
+      "name": "Feature",
+      "children": [
+        "comp:library/Feature.astro",
+        "comp:library/Feature2.astro",
+        "comp:library/Feature3.astro",
+        "comp:library/Feature4.astro"
+      ]
+    },
+    "f_hb4gufr6rf": {
+      "name": "Metrics",
+      "children": [
+        "comp:library/Metrics.astro",
+        "comp:library/Metrics2.astro",
+        "comp:library/Metrics3.astro"
+      ]
+    },
+    "f_w2fvlbr6rf": {
+      "name": "Testimonials",
+      "children": [
+        "comp:library/Testimonials.astro",
+        "comp:library/Testimonials2.astro",
+        "comp:library/Testimonials3.astro",
+        "comp:library/Testimonials4.astro"
+      ]
+    },
+    "f_2v3n9kr6rf": {
+      "name": "Team",
+      "children": [
+        "comp:library/Team.astro",
+        "comp:library/Team2.astro",
+        "comp:library/Team3.astro",
+        "comp:library/Team4.astro"
+      ]
+    },
+    "f_rj6b56r6rf": {
+      "name": "Pricing",
+      "children": [
+        "comp:library/Pricing.astro",
+        "comp:library/Pricing2.astro",
+        "comp:library/Pricing3.astro",
+        "comp:library/Pricing4.astro"
+      ]
+    },
+    "f_a294lyr6rf": {
+      "name": "FAQ",
+      "children": [
+        "comp:library/FAQ.astro"
+      ]
+    },
+    "f_r5zsm3r6rf": {
+      "name": "CTA",
+      "children": [
+        "comp:library/CTA.astro"
+      ]
+    },
+    "f_c5vxhur6rf": {
+      "name": "Blog",
+      "children": [
+        "comp:library/BlogCard.astro",
+        "comp:library/BlogPaginationLoadMore.astro",
+        "comp:library/BlogPaginationNumbered.astro",
+        "comp:library/BlogSlot.astro"
+      ]
+    },
+    "f_ozb3szr6rf": {
+      "name": "Media",
+      "children": [
+        "comp:library/Video.astro"
+      ]
+    },
+    "f_h5qsh7r6rf": {
+      "name": "Footer",
+      "children": [
+        "comp:library/Footer.astro"
+      ]
+    },
+    "f_qrk7wmr6rf": {
+      "name": "Navigation",
+      "children": [
+        "comp:library/navigation/GlobalNav.astro",
+        "comp:library/navigation/GlobalNav2.astro"
+      ]
+    },
+    "f_9rronjr6rf": {
+      "name": "Embed",
+      "children": [
+        "comp:library/Embed.astro"
+      ]
+    },
+    "f_dynamic": {
+      "name": "Dynamic",
+      "children": []
+    }
+  }
+}

@@ -1,0 +1,29 @@
+---
+/**
+ * @category Blog
+ * @name BlogCard
+ */
+// Standalone safety: BlogSlot's slot fallback renders <BlogCard /> with no
+// post prop (crashes any real project the file is copied into otherwise).
+// A bound page (task-240) passes `post`; the post LINK is the page's own
+// `<a>` around the card, so this file never links (no nested anchors).
+// The image box is bound to the collection's `image` field out of the box
+// (the scaffold schema declares it); `?.` keeps a post without the field —
+// and this fallback — from crashing the render. The fallback is `any`: once
+// the card is typed to a collection, a typed sample would make every field
+// it lacks an `astro check` error.
+const { post: postProp } = Astro.props;
+const post = postProp ?? ({
+  data: { title: 'Sample post', description: 'A short description of this post.', date: '2026-01-01' },
+} as any);
+---
+<article class="rounded-lg border border-gray-200 overflow-hidden flex flex-col bg-white">
+  <div class="aspect-video bg-gray-100 flex items-center justify-center">
+    <img src={post.data.image?.src ?? post.data.image} alt="" class="w-full h-full object-cover" />
+  </div>
+  <div class="p-4 bg-white h-full">
+    <h3 class="font-semibold text-lg text-black">{post.data.title}</h3>
+    <p class="text-gray-600 text-sm mt-1">{post.data.description}</p>
+    <time class="text-gray-400 text-xs mt-2 block">{post.data.date}</time>
+  </div>
+</article>

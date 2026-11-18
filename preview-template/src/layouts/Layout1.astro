@@ -1,0 +1,22 @@
+---
+import '../styles/global.css';
+interface Props { title?: string; }
+const { title = 'Layout1' } = Astro.props;
+import Header from '../components/library/Header.astro';
+import Footer from '../components/library/Footer.astro';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <slot />
+    <script is:inline src="/scripts/bridge.js"></script>
+    <Header />
+  <Footer />
+</body>
+</html>

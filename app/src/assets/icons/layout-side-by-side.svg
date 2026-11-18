@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="layout-side-by-side">
+  <g class="sq-g16">
+    <rect x="2" y="3.5" width="5" height="9" stroke-linejoin="miter"/>
+    <rect x="9" y="3.5" width="5" height="9" stroke-linejoin="miter"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <rect x="2.5" y="4.5" width="6.5" height="11" stroke-linejoin="miter"/>
+    <rect x="11" y="4.5" width="6.5" height="11" stroke-linejoin="miter"/>
+  </g>
+</svg>

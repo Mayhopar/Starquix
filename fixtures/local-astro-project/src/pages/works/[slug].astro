@@ -1,0 +1,176 @@
+---
+// The route that makes an .mdx post RENDER — the whole point of the markdown
+// pipeline is that the post body comes out of Astro, through the same preview
+// iframe as every other page, with the user's own components looking like
+// themselves. Without this route the collection compiles nowhere and every
+// claim about editing a post on canvas is untestable.
+//
+// The styles below are FIXTURE styles: a plausible case-study layout so the
+// demo reads as a finished page rather than unstyled HTML. A real project ships
+// its own — nothing in the editor depends on these class names.
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const works = await getCollection('works');
+  return works.map((entry) => ({ params: { slug: entry.slug }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+const { title, description, years, role } = entry.data;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title ?? entry.slug}</title>
+  </head>
+  <body>
+    <article class="post-body">
+      <header class="post-head">
+        <h1>{title ?? entry.slug}</h1>
+        {description && <p class="post-lede">{description}</p>}
+        {(years || role) && (
+          <p class="post-meta">{[role, years].filter(Boolean).join(' · ')}</p>
+        )}
+      </header>
+      <Content />
+    </article>
+
+    <style is:global>
+      :root {
+        --ink: #1d1d1f;
+        --ink-soft: #6e6e73;
+        --panel: #f2f2f2;
+        --radius: 18px;
+        --measure: 44rem;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        padding: 0 1.5rem 8rem;
+        color: var(--ink);
+        background: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        font-size: 19px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* THE WIDTH CONTRACT: the post body is a 12-column grid. The editor's
+         width modes write col-span-N wrappers; without this grid they mean
+         nothing and every block renders full width (owner, 2026-08-10).
+         Direct children default to the centered 8-column text measure; the
+         explicit col-span classes win, centered. Mirrors SqPostView. */
+      .post-body {
+        max-width: 68rem;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 1.5rem;
+      }
+      .post-body > * { grid-column: 3 / span 8; min-width: 0; }
+      /* The editor's runtime tagging wraps component blocks in an unclassed
+         div — let the grid see through it so the col-span rules below reach
+         the real block. */
+      .post-body > [data-sq-block] { display: contents; }
+      .post-body > [data-sq-block] > * { grid-column: 3 / span 8; min-width: 0; }
+      /* Descendant (not child) on purpose: the block may sit one wrapper deep.
+         Last so they win the equal-specificity default above. */
+      .post-body .col-span-4 { grid-column: 5 / span 4; }
+      .post-body .col-span-6 { grid-column: 4 / span 6; }
+      .post-body .col-span-8 { grid-column: 3 / span 8; }
+      .post-body .col-span-12 { grid-column: 1 / span 12; }
+      /* Full width = true edge-to-edge viewport bleed, past the container. */
+      .post-body .col-span-full {
+        grid-column: 1 / -1;
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+      }
+
+      /* Header rides the same text columns — not col 1 (owner, 2026-08-10). */
+      .post-head { padding: 5rem 0 3rem; }
+      .post-head h1 { font-size: 3rem; line-height: 1.1; letter-spacing: -0.02em; margin: 0; }
+      .post-lede { font-size: 1.35rem; color: var(--ink-soft); margin: 0.75rem 0 0; }
+      .post-meta { font-size: 0.95rem; color: var(--ink-soft); margin: 1.5rem 0 0; }
+
+      h2 { font-size: 1.6rem; letter-spacing: -0.01em; margin: 3.5rem 0 0.75rem; }
+      h3 { font-size: 1.2rem; margin: 2.5rem 0 0.5rem; }
+      p { margin: 0 0 1.4rem; }
+      a { color: inherit; }
+
+      details {
+        border-top: 1px solid #e5e5e7;
+        border-bottom: 1px solid #e5e5e7;
+        padding: 1rem 0;
+        margin: 2rem auto;
+      }
+      summary { cursor: pointer; font-weight: 600; }
+
+      /* Media blocks — the grey panel + caption look. */
+      .single-image,
+      .double-image {
+        margin: 3rem 0;
+        padding: 0;
+      }
+
+      .single-image > img,
+      .double-image__grid {
+        background: var(--panel);
+        border-radius: var(--radius);
+        padding: 2.5rem;
+      }
+
+      .single-image > img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .double-image__grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2.5rem;
+      }
+
+      .double-image__grid > img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+
+      figcaption {
+        font-size: 0.95rem;
+        color: var(--ink-soft);
+        margin-top: 0.9rem;
+        max-width: var(--measure);
+        margin-inline: auto;
+      }
+
+      .credit-wrapper {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 1.5rem 3rem;
+        max-width: var(--measure);
+        margin: 3rem auto;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e5e7;
+      }
+      .credit { font-size: 0.95rem; }
+      .credit-role { display: block; color: var(--ink-soft); }
+      .credit-name { font-weight: 500; }
+      .credit-wrapper h4 { grid-column: 1 / -1; margin: 0; font-size: 0.95rem; color: var(--ink-soft); font-weight: 600; }
+      .credit-wrapper ul { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 1.25rem 3rem; list-style: none; margin: 0; padding: 0; }
+
+      @media (max-width: 700px) {
+        .double-image__grid { grid-template-columns: 1fr; gap: 1.25rem; padding: 1.25rem; }
+        .single-image > img { padding: 1.25rem; }
+        .post-head h1 { font-size: 2.25rem; }
+      }
+    </style>
+  </body>
+</html>

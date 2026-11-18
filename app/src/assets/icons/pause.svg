@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="pause">
+  <g class="sq-g16">
+    <rect x="4" y="3" width="2.5" height="10" rx="0.5" fill="currentColor" stroke="none"/>
+    <rect x="9.5" y="3" width="2.5" height="10" rx="0.5" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <rect x="5" y="4" width="3" height="12" rx="0.625" fill="currentColor" stroke="none"/>
+    <rect x="12" y="4" width="3" height="12" rx="0.625" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

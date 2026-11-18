@@ -1,0 +1,18 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="grip">
+  <g class="sq-g16">
+    <circle cx="5.5" cy="3.5" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="5.5" cy="8" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="5.5" cy="12.5" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="10.5" cy="3.5" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="10.5" cy="8" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="10.5" cy="12.5" r="1" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <circle cx="6.875" cy="4.375" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="6.875" cy="10" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="6.875" cy="15.625" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="13.125" cy="4.375" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="13.125" cy="10" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="13.125" cy="15.625" r="1.25" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="gear">
+  <g class="sq-g16">
+    <path d="M6.5 2L6 3.5L4.5 4.25L3 4L2 6L3.5 7V9L2 10L3 12L4.5 11.75L6 12.5L6.5 14H9.5L10 12.5L11.5 11.75L13 12L14 10L12.5 9V7L14 6L13 4L11.5 4.25L10 3.5L9.5 2Z"/>
+    <circle cx="8" cy="8" r="2"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M8.125 2.5L7.5 4.375L5.625 5.312L3.75 5L2.5 7.5L4 8.75V11.25L2.5 12.5L3.75 15L5.625 14.688L7.5 15.625L8.125 17.5H11.875L12.5 15.625L14.375 14.688L16.25 15L17.5 12.5L16 11.25V8.75L17.5 7.5L16.25 5L14.375 5.312L12.5 4.375L11.875 2.5Z"/>
+    <circle cx="10" cy="10" r="2.5"/>
+  </g>
+</svg>

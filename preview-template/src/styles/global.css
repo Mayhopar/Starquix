@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Make <slot> a visible block so the editor's React overlay
+ * ("+ Choose Component" button) has a sized target. Border is rendered by
+ * the overlay, not here. */
+slot {
+  display: block;
+  min-height: 120px;
+}
+
+/* BlogSlot's named slots are always filled (either fallback BlogCard or
+ * Phase 5–expanded posts) — they never need the "Choose Component" target.
+ * Their parent <div data-blog-source="posts"> applies `grid grid-cols-3`,
+ * which only works if the cards are *direct* grid children. With the global
+ * `slot { display: block }` rule above, the slot would become a single grid
+ * item and all cards would stack inside it. `display: contents` makes the
+ * slot layout-transparent so each card becomes its own grid item while the
+ * slot element itself stays in the DOM (still selectable in the layers panel). */
+[data-blog-source] > slot {
+  display: contents;
+  min-height: 0;
+}
+
+/* `<layout>` is the editor proxy for an Astro `<Layout>` component (see
+ * `inlineTopLevelLayout` in app/src/utils/canvasHtml.ts). HTMLUnknownElement
+ * defaults to `display: inline`, which would collapse the wrapper around its
+ * children and make class edits (bg, padding, height) invisible. Force block
+ * so the wrapper behaves as a page surface. */
+layout {
+  display: block;
+}

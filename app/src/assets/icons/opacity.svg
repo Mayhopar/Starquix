@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="opacity">
+  <g class="sq-g16">
+    <circle cx="8" cy="8" r="5.5"/>
+    <path d="M8 2.5A5.5 5.5 0 0 1 8 13.5Z" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <circle cx="10" cy="10" r="6.875"/>
+    <path d="M10 3.125A6.875 6.875 0 0 1 10 16.875Z" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

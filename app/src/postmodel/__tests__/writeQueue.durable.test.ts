@@ -1,0 +1,62 @@
+import 'fake-indexeddb/auto';
+import { webcrypto } from 'node:crypto';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { db } from '@/db';
+import { projectFsRuntime } from '@/test/projectFsRuntime';
+import { markFilesTruth } from '@/utils/localMode';
+import { setActiveSaveProjectId } from '@/services/pendingProjectMutations';
+import { PostWriteQueue } from '../writeQueue';
+import { parsePostBody } from '../postModel';
+import { flushDurableSourceWrites } from '@/services/durableEdits/sourceMaterialization';
+import { awaitAccepted, hasPendingUserAcceptance } from '@/services/durableEdits/acceptance';
+let projectId: string;
+let runtime: ReturnType<typeof projectFsRuntime>;
+const file = 'src/content/posts/a.md';
+beforeEach(async () => {
+  vi.stubGlobal('crypto', webcrypto); await db.delete(); await db.open();
+  projectId = `post_queue_${crypto.randomUUID()}`; markFilesTruth(projectId); setActiveSaveProjectId(projectId);
+  runtime = projectFsRuntime(projectId, { [file]: '---\ntitle: Old\n---\nOld' });
+});
+afterEach(() => { runtime.close(); setActiveSaveProjectId(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it('accepts two body revisions before writer dispatch and retains them after queue disposal/reopen', async () => {
+  const queue = new PostWriteQueue({ projectId, collection: 'posts', slug: 'a', format: 'md', baseline: { frontmatter: { title: 'Old' }, body: 'Old' } });
+  const one = queue.enqueue(parsePostBody('One', 'md'), { title: 'Old' });
+  const two = queue.enqueue(parsePostBody('Two', 'md'), { title: 'Old' });
+  await Promise.all([one, two]);
+  expect(await db.durableEdits.count()).toBe(2); expect(runtime.read(file)).toContain('Old');
+  queue.dispose(); runtime.restart(); db.close(); await db.open(); await flushDurableSourceWrites(projectId);
+  expect(runtime.read(file)).toBe('---\ntitle: Old\n---\nTwo');
+});
+it('registers the acceptance boundary synchronously and keeps enqueued input through owner disposal', async () => {
+  const queue = new PostWriteQueue({ projectId, collection: 'posts', slug: 'a', format: 'md', baseline: { frontmatter: { title: 'Old' }, body: 'Old' } });
+  const accepted = queue.enqueue(parsePostBody('Captured', 'md'), { title: 'Old' });
+  expect(hasPendingUserAcceptance(projectId)).toBe(true);
+  const boundary = awaitAccepted(projectId); queue.dispose();
+  await accepted; expect(await boundary).toBe(1);
+  expect(await db.durableEdits.count()).toBe(1);
+});
+it('retries rejected storage with the original operation identity and does not duplicate unchanged input', async () => {
+  const queue = new PostWriteQueue({ projectId, collection: 'posts', slug: 'a', format: 'md' });
+  const rejection = vi.spyOn(db.durableEditCheckpoints, 'add').mockRejectedValue(new Error('quota'));
+  const body = parsePostBody('New', 'md');
+  await expect(queue.enqueue(body, { title: 'Old' }, 'retry-original')).rejects.toThrow('quota');
+  rejection.mockRestore(); await queue.flushNow(); await queue.enqueue(body, { title: 'Old' });
+  const rows = await db.durableEdits.toArray(); expect(rows).toHaveLength(1); expect(rows[0].operationId).toBe('retry-original');
+  queue.dispose();
+});
+it('shares complete accepted candidates and rolls back only the latest candidate across body and property owners', async () => {
+  const queue = new PostWriteQueue({ projectId, collection: 'posts', slug: 'a', format: 'md', baseline: { frontmatter: { title: 'Old' }, body: 'Old' } });
+  const outcomes: unknown[] = [];
+  const unsubscribe = queue.subscribeDraftOutcome(outcome => outcomes.push(outcome));
+  const add = db.durableEditCheckpoints.add.bind(db.durableEditCheckpoints);
+  vi.spyOn(db.durableEditCheckpoints, 'add').mockRejectedValueOnce(new Error('first quota')).mockImplementation(add);
+  const first = queue.enqueue(parsePostBody('Body candidate', 'md'), { title: 'Old' });
+  const second = queue.enqueue(parsePostBody('Body candidate', 'md'), { title: 'New' });
+  expect(queue.draftRevision).toBe(2);
+  await expect(first).rejects.toThrow('first quota'); await second;
+  expect(outcomes).toMatchObject([{ status: 'accepted', revision: 2, frontmatter: { title: 'New' } }]);
+  vi.spyOn(db.durableEditCheckpoints, 'add').mockRejectedValue(new Error('last quota'));
+  await expect(queue.enqueue(parsePostBody('Rejected', 'md'), { title: 'Rejected' })).rejects.toThrow('last quota');
+  expect(outcomes).toMatchObject([{ status: 'accepted' }, { status: 'rejected', revision: 3 }]);
+  unsubscribe(); queue.dispose();
+});

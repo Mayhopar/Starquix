@@ -1,0 +1,26 @@
+---
+/**
+ * @category Blog
+ * @name BlogSlot
+ * @sq-chrome 2
+ * @default-children BlogCard:posts, BlogPaginationNumbered:pagination
+ */
+// Layout-proof slot (owner 2026-09-20): the posts grid and the pagination
+// each take a FULL ROW whatever layout the section is given in the editor —
+// `w-full` (block), `basis-full` + the section's `flex-wrap` (flex row),
+// `col-span-full` (grid). Pagination is chrome: always below the cards,
+// full width, configured only through the binding options.
+// Each instance's layout is a page prop (sectionClass / postsClass /
+// paginationClass, task-244) — the literal is the fallback.
+import BlogCard from './BlogCard.astro';
+---
+<section class={Astro.props.sectionClass ?? "bg-stone-100 w-full p-10 flex-wrap"}>
+  <div class={Astro.props.postsClass ?? "grid grid-cols-3 gap-4 w-full basis-full col-span-full"} data-blog-source="posts">
+    <slot name="posts">
+      <BlogCard />
+    </slot>
+  </div>
+  <div class={Astro.props.paginationClass ?? "w-full basis-full col-span-full"} data-blog-source="pagination">
+    <slot name="pagination" />
+  </div>
+</section>

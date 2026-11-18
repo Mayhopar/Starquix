@@ -1,0 +1,105 @@
+name: Windows
+
+# The Windows release on a real Windows machine: the installer (unsigned NSIS, x64), the desktop
+# unit tests, the installed app's runtime e2e, then the whole Electron e2e suite. Runs on demand
+# (Actions → Windows → Run workflow, or `gh workflow run windows.yml --ref dev`) and on feat/windows-** pushes.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feat/windows-**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      # The shipped template/plugin files must stay LF, as on macOS (Windows runners default to CRLF checkouts).
+      - run: git config --global core.autocrlf false
+      # Long-form temp: the runner's TEMP is an 8.3 name (C:\Users\RUNNER~1), and Vite 8 refuses to serve any 8.3-looking
+      # path on Windows (looksLikeWindowsShortNamePath). A user's projects live under their long home path instead.
+      - run: |
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            preview-template/package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - name: Install preview template and desktop
+        run: |
+          npm ci --prefix preview-template
+          npm ci --prefix desktop
+      - name: Editor build (the desktop app bundles it)
+        id: editor
+        run: npm run build --workspace=app
+      - name: Runtime deps (Windows natives) + relay bundle
+        id: deps
+        run: |
+          npm run deps --prefix desktop
+          npm run mcp --prefix desktop
+      - name: Desktop unit tests
+        run: npm test --prefix desktop
+      - name: Instance paths on a Windows disk + relay unit tests
+        if: ${{ !cancelled() }}
+        run: |
+          npx vitest run src/vite-plugin/__tests__/windows-paths.test.ts src/vite-plugin/__tests__/windows-paths.fs.test.ts --root app
+          npm run test:run --prefix mcp
+      - name: Snapshot is the same on Windows (POSIX keys, OS-independent version)
+        if: ${{ !cancelled() }}
+        run: node scripts/build-snapshot.js --check
+      # Only a complete build is packaged: a skipped editor/deps step must never ship a half-empty installer.
+      - name: Installer
+        id: installer
+        if: ${{ !cancelled() && steps.editor.outcome == 'success' && steps.deps.outcome == 'success' }}
+        working-directory: desktop
+        run: npx electron-builder --win nsis --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.installer.outcome == 'success' }}
+        with:
+          name: starquix-windows-installer
+          path: desktop/dist/*.exe
+          if-no-files-found: error
+      - name: Install it (silent, per-user — what a double-click does)
+        if: ${{ !cancelled() && steps.installer.outcome == 'success' }}
+        working-directory: desktop
+        run: |
+          $setup = Get-ChildItem dist -Filter '*Setup*.exe' | Select-Object -First 1
+          Start-Process -Wait -FilePath $setup.FullName -ArgumentList '/S'
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Starquix.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Starquix.exe was not installed' }
+          "SQ_INSTALLED=$($exe.FullName)" >> $env:GITHUB_ENV
+          Write-Output "installed: $($exe.FullName)"
+      - name: E2E — the installed app (runtime)
+        if: ${{ !cancelled() && env.SQ_INSTALLED != '' }}
+        working-directory: desktop
+        env:
+          SQ_E2E_APP: ${{ env.SQ_INSTALLED }}
+        run: npx playwright test e2e/runtime.spec.mjs --output test-results/installed
+      - name: E2E — every spec (dev editor + unpacked app)
+        if: ${{ !cancelled() && steps.editor.outcome == 'success' && steps.deps.outcome == 'success' }}
+        working-directory: desktop
+        run: npx playwright test --output test-results/all
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: e2e-results
+          path: |
+            desktop/test-results
+            desktop/playwright-report
+          if-no-files-found: ignore

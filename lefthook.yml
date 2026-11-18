@@ -1,0 +1,34 @@
+# Lefthook config — git hooks for hygiene gates.
+#
+# Pre-push runs the full test suite + test-coverage lint. Catches "I forgot
+# to add a test" before code leaves the laptop. Remote CI (.github/workflows/ci.yml)
+# repeats these gates and adds the editor build + desktop unit tests.
+#
+# To skip in an emergency: `git push --no-verify`.
+
+pre-push:
+  parallel: false
+  jobs:
+    - name: snapshot-freshness
+      run: node scripts/build-snapshot.js --check
+      fail_text: |
+        app/public/astro-snapshot.json is STALE relative to preview-template/.
+        Library inserts read the snapshot — pushing a stale one ships old library
+        components to everyone who pulls.
+
+        Fix:
+          node scripts/build-snapshot.js
+          git add app/public/astro-snapshot.json
+          (amend or add a commit, then push again)
+    - name: test-and-lint
+      run: cd app && npm run test:run
+      fail_text: |
+        Tests or lint:test-coverage failed.
+
+        - If a test fails, fix it (or revert).
+        - If lint:test-coverage failed: a new command in commands.ts or new
+          IFrameBridge.prototype.handleX needs at least an `it.todo(...)` in
+          app/src/store/__tests__/commands-test-coverage-stubs.test.ts or
+          app/src/bridge/__tests__/handler-coverage-stubs.test.ts — or, better,
+          a real test.
+

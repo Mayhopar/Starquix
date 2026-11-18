@@ -1,0 +1,24 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="blur">
+  <g class="sq-g16">
+    <circle cx="8" cy="8" r="2" fill="currentColor" stroke="none"/>
+    <circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="3.5" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="12.5" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="4.5" cy="4.5" r="0.65" fill="currentColor" stroke="none"/>
+    <circle cx="11.5" cy="4.5" r="0.65" fill="currentColor" stroke="none"/>
+    <circle cx="4.5" cy="11.5" r="0.65" fill="currentColor" stroke="none"/>
+    <circle cx="11.5" cy="11.5" r="0.65" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <circle cx="10" cy="10" r="2.5" fill="currentColor" stroke="none"/>
+    <circle cx="4.375" cy="10" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="15.625" cy="10" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="10" cy="4.375" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="10" cy="15.625" r="1.25" fill="currentColor" stroke="none"/>
+    <circle cx="5.625" cy="5.625" r="0.812" fill="currentColor" stroke="none"/>
+    <circle cx="14.375" cy="5.625" r="0.812" fill="currentColor" stroke="none"/>
+    <circle cx="5.625" cy="14.375" r="0.812" fill="currentColor" stroke="none"/>
+    <circle cx="14.375" cy="14.375" r="0.812" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

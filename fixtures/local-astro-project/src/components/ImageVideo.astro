@@ -1,0 +1,7 @@
+---
+const { src, video, alt = '' } = Astro.props;
+---
+<div class="image-video">
+  <img src={src} alt={alt} />
+  <video src={video} controls muted playsinline></video>
+</div>

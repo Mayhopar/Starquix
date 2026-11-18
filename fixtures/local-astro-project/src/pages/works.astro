@@ -1,0 +1,26 @@
+---
+// The listing page. Not decoration: concrete instances of /works/[slug] are
+// discovered by scanning static pages for links that match the dynamic route
+// (useLocalInstance.discoverDynamicInstances), so without a page that LINKS to
+// its posts the collection stays a bare [slug] placeholder — no post ever gets
+// a page of its own, and the Design view of a post has nothing to open. Every
+// real project has this page; the fixture was missing it.
+import { getCollection } from 'astro:content';
+
+const works = await getCollection('works');
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Works</title>
+  </head>
+  <body>
+    <h1>Works</h1>
+    <ul>
+      {works.map((entry) => (
+        <li><a href={`/works/${entry.slug}`}>{entry.data.role}</a></li>
+      ))}
+    </ul>
+  </body>
+</html>

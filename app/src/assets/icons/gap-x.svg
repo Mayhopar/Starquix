@@ -1,0 +1,12 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="gap-x">
+  <g class="sq-g16">
+    <rect x="2" y="3" width="3" height="10" stroke-linejoin="miter"/>
+    <rect x="11" y="3" width="3" height="10" stroke-linejoin="miter"/>
+    <path d="M8 5V11" stroke-dasharray="1 2" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <rect x="2.5" y="4" width="4" height="12" stroke-linejoin="miter"/>
+    <rect x="13.5" y="4" width="4" height="12" stroke-linejoin="miter"/>
+    <path d="M10 6.5V13.5" stroke-dasharray="1 2" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+</svg>

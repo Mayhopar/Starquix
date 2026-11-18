@@ -1,0 +1,13 @@
+Keeps src/content/ in the snapshot so the directory EXISTS when `astro dev`
+starts.
+
+Astro 4 attaches its content pipeline only when the directory is already there
+(node_modules/astro/dist/content/server-listeners.js: `if
+(fs.existsSync(contentPaths.contentDir))`); otherwise it depends on a later
+chokidar `addDir` event for the mkdir that contentOps does at edit time. When
+that event was missed (2026-08-12) the collection stayed invisible for the whole
+session: /__sq_post_view/{col}/{slug} rendered `No entry {col}/{slug}`.
+
+Deliberately no config.ts: Astro 4 legacy collections are discovered by folder,
+and a config that does not declare a user's collection would make getCollection
+return [] for it.

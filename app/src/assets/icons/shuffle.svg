@@ -1,0 +1,8 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="shuffle">
+  <g class="sq-g16">
+    <path d="M2.5 4H4.25C7.75 4 8.25 12 11.75 12H13.5M10.5 9L13.5 12L10.5 15M2.5 12H4.25C7.75 12 8.25 4 11.75 4H13.5M10.5 1L13.5 4L10.5 7" stroke-linecap="square"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M3 5H5.312C9.688 5 10.312 15 14.688 15H17M13 11L17 15L13 19M3 15H5.312C9.688 15 10.312 5 14.688 5H17M13 1L17 5L13 9" stroke-linecap="square"/>
+  </g>
+</svg>

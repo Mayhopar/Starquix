@@ -1,0 +1,4 @@
+/* Classes Tab styles - imports shared code editor styles */
+@import './CodeEditor.css';
+
+/* Classes-specific overrides can go here if needed */

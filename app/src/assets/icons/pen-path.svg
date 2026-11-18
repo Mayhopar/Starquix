@@ -1,0 +1,14 @@
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" data-sq-icon="pen-path">
+  <g class="sq-g16">
+    <path d="M3 12C4 2 12 2 13 12"/>
+    <rect x="2" y="11" width="2" height="2" rx="0" fill="currentColor" stroke="none"/>
+    <rect x="12" y="11" width="2" height="2" rx="0" fill="currentColor" stroke="none"/>
+    <rect x="7" y="3" width="2" height="2" rx="0" fill="currentColor" stroke="none"/>
+  </g>
+  <g class="sq-g24" transform="scale(.8)">
+    <path d="M3.75 15C5 2.5 15 2.5 16.25 15"/>
+    <rect x="2.5" y="13.5" width="2.5" height="2.5" rx="0" fill="currentColor" stroke="none"/>
+    <rect x="15" y="13.5" width="2.5" height="2.5" rx="0" fill="currentColor" stroke="none"/>
+    <rect x="9" y="4" width="2" height="2.5" rx="0" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

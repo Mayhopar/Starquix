@@ -1,0 +1,27 @@
+{
+  "name": "starquix",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "app",
+    "mcp"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=app",
+    "test": "npm run test --workspace=app",
+    "build:snapshot": "node scripts/build-snapshot.js"
+  },
+  "dependencies": {
+    "@plausible-analytics/tracker": "^0.4.4"
+  },
+  "devDependencies": {
+    "lefthook": "^2.1.6",
+    "vitest": "4.0.16",
+    "jsdom": "27.4.0"
+  },
+  "overrides": {
+    "vitest": "4.0.16",
+    "jsdom": "27.4.0"
+  }
+}

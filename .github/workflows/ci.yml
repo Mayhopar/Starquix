@@ -1,0 +1,51 @@
+name: CI
+
+# Starquix is a desktop (Electron) app only — the browser WebContainer runtime
+# and its Chromium release acceptance were removed 2026-10-07. Electron e2e
+# (desktop/e2e) runs locally until a macOS runner is added.
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev, 'feat/**', 'fix/**', 'merge/**', 'spike/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            preview-template/package-lock.json
+            fixtures/local-astro-project/package-lock.json
+            desktop/package-lock.json
+      - name: Native dependency lockfile coverage
+        run: node scripts/check-native-lockfile.mjs
+      - run: npm ci
+      - name: Install preview template, Astro fixture and desktop
+        run: |
+          npm ci --prefix preview-template
+          npm ci --prefix fixtures/local-astro-project
+          npm ci --prefix desktop
+      - name: Snapshot freshness
+        run: node scripts/build-snapshot.js --check
+      - name: Editor build (the desktop app bundles it)
+        run: npm run build --workspace=app
+      - name: App unit, integration and lint gates
+        run: npm run test:run --workspace=app
+      - name: Desktop runtime deps + unit tests
+        run: |
+          npm run deps --prefix desktop
+          npm test --prefix desktop
