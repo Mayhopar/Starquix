@@ -16,6 +16,7 @@
   <a href="LICENSE"><img src=".github/readme/badge-license.svg" alt="MIT license" height="22"></a>
   <img src=".github/readme/badge-platform.svg" alt="macOS, Apple Silicon" height="22">
   <a href="https://astro.build"><img src=".github/readme/badge-stack.svg" alt="Astro" height="22"></a>
+  <a href="https://discord.gg/Fpuwzbd48V"><img src=".github/readme/badge-discord.svg" alt="Discord" height="22"></a>
 </p>
 
 <p align="center">
