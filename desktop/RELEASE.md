@@ -1,4 +1,4 @@
-# Desktop release (macOS)
+# Desktop release
 
 ## Build
 
@@ -9,6 +9,21 @@ npm run dist:x64    # Intel: same, with x64 natives (esbuild, rollup)
 ```
 
 `npm run dist:x64` replaces `runtime-deps/` with x64 natives; run `npm run deps` before unpacked e2e afterwards.
+
+## Windows + Linux (CI only — natives don't cross-build from a Mac)
+
+`.github/workflows/windows.yml` and `linux.yml` build, unit-test, install and e2e each package on its own runner
+(x64 + arm64; the arm64 runners are free only while the repo is public). Run them on the release commit:
+
+```sh
+gh workflow run windows.yml --ref <branch>
+gh workflow run linux.yml --ref <branch>
+gh run download <run-id> --dir dist/ci   # one artifact per OS + arch
+```
+
+Outputs: `Starquix-Setup-<V>-{x64,arm64}.exe` (NSIS, per-user, **unsigned** until `docs/plans/2026-11-19-windows-signing-plan.md`
+lands), `Starquix-<V>-{x86_64,arm64}.AppImage`, `Starquix-<V>-{amd64,arm64}.deb`. The update notifier
+(`src/update-check.mjs`) matches these suffixes — rename an artifact and its row there with it.
 
 Version: `version` in `desktop/package.json`. Icon: `desktop/build/icon.png` (1024², placeholder).
 
@@ -94,4 +109,4 @@ The "Source code" archives are added by GitHub automatically and do not contain 
 
 ## Not in this release
 
-Auto-update, Windows/Linux packages, native production build.
+Auto-update, Windows code signing, native production build.

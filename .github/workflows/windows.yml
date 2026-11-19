@@ -1,7 +1,7 @@
 name: Windows
 
-# The Windows release on a real Windows machine: the installer (unsigned NSIS, x64), the desktop
-# unit tests, the installed app's runtime e2e, then the whole Electron e2e suite. Runs on demand
+# The Windows release on real Windows machines, one per CPU (natives can't cross-build): the installer (unsigned NSIS),
+# the desktop unit tests, the installed app's runtime e2e, then the whole Electron e2e suite. Runs on demand
 # (Actions → Windows → Run workflow, or `gh workflow run windows.yml --ref dev`) and on feat/windows-** pushes.
 
 on:
@@ -18,7 +18,13 @@ concurrency:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: windows-latest }
+          - { arch: arm64, runner: windows-11-arm } # free on public repos only
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     defaults:
       run:
@@ -68,11 +74,11 @@ jobs:
         id: installer
         if: ${{ !cancelled() && steps.editor.outcome == 'success' && steps.deps.outcome == 'success' }}
         working-directory: desktop
-        run: npx electron-builder --win nsis --x64 --publish never
+        run: npx electron-builder --win nsis --${{ matrix.arch }} --publish never
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() && steps.installer.outcome == 'success' }}
         with:
-          name: starquix-windows-installer
+          name: starquix-windows-${{ matrix.arch }}
           path: desktop/dist/*.exe
           if-no-files-found: error
       - name: Install it (silent, per-user — what a double-click does)
@@ -98,7 +104,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
-          name: e2e-results
+          name: e2e-results-windows-${{ matrix.arch }}
           path: |
             desktop/test-results
             desktop/playwright-report

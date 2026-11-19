@@ -1,0 +1,99 @@
+name: Linux
+
+# The Linux release on real Linux machines, one per CPU (node-pty has no Linux prebuilds, so it compiles here): the
+# AppImage + .deb (unsigned), the desktop unit tests, the installed .deb's runtime e2e, then the whole Electron e2e suite.
+# Runs on demand (Actions → Linux → Run workflow) and on feat/linux-** / feat/windows-linux pushes.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feat/linux-**', 'feat/windows-linux']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm } # free on public repos only
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      # xvfb: Electron needs a display. build-essential + python3: node-gyp compiles node-pty.
+      # Ubuntu 24.04's AppArmor blocks the unprivileged user namespaces Chromium's sandbox needs; the .deb installs its own
+      # AppArmor profile, the unpacked dev Electron has none.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb build-essential python3
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            preview-template/package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - name: Install preview template and desktop
+        run: |
+          npm ci --prefix preview-template
+          npm ci --prefix desktop
+      - name: Editor build (the desktop app bundles it)
+        id: editor
+        run: npm run build --workspace=app
+      - name: Runtime deps (Linux natives) + relay bundle
+        id: deps
+        run: |
+          npm run deps --prefix desktop
+          npm run mcp --prefix desktop
+      - name: Desktop unit tests
+        run: npm test --prefix desktop
+      # Only a complete build is packaged: a skipped editor/deps step must never ship a half-empty package.
+      - name: Packages
+        id: packages
+        if: ${{ !cancelled() && steps.editor.outcome == 'success' && steps.deps.outcome == 'success' }}
+        working-directory: desktop
+        run: npx electron-builder --linux AppImage deb --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        with:
+          name: starquix-linux-${{ matrix.arch }}
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+          if-no-files-found: error
+      - name: Install the .deb (what a user's `apt install ./Starquix-*.deb` does)
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        working-directory: desktop
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          test -x /opt/Starquix/starquix
+          echo "SQ_INSTALLED=/opt/Starquix/starquix" >> "$GITHUB_ENV"
+      - name: E2E — the installed app (runtime)
+        if: ${{ !cancelled() && env.SQ_INSTALLED != '' }}
+        working-directory: desktop
+        env:
+          SQ_E2E_APP: ${{ env.SQ_INSTALLED }}
+        run: xvfb-run -a npx playwright test e2e/runtime.spec.mjs --output test-results/installed
+      - name: E2E — every spec (dev editor + unpacked app)
+        if: ${{ !cancelled() && steps.editor.outcome == 'success' && steps.deps.outcome == 'success' }}
+        working-directory: desktop
+        run: xvfb-run -a npx playwright test --output test-results/all
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: e2e-results-linux-${{ matrix.arch }}
+          path: |
+            desktop/test-results
+            desktop/playwright-report
+          if-no-files-found: ignore

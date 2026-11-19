@@ -42,11 +42,15 @@ describe('which release counts', () => {
   });
   it('the installer suffixes are electron-builder\'s artifact names in desktop/package.json (row 42)', () => {
     const { build } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-    const name = (pattern, arch) => pattern.replace('${productName}', 'Starquix').replace('${version}', '0.3.3').replace('${arch}', arch).replace('${ext}', arch === 'win' ? 'exe' : 'dmg');
-    expect(name(build.mac.artifactName, 'arm64').endsWith(installerSuffix('darwin', 'arm64'))).toBe(true);
-    expect(name(build.mac.artifactName, 'x64').endsWith(installerSuffix('darwin', 'x64'))).toBe(true);
-    expect(name(build.nsis.artifactName, 'win').endsWith(installerSuffix('win32', 'x64'))).toBe(true);
-    expect([installerSuffix('linux', 'x64'), installerSuffix('win32', 'arm64')]).toEqual([null, null]);
+    const name = (pattern, arch, ext) => pattern.replace('${productName}', 'Starquix').replace('${version}', '0.3.3').replace('${arch}', arch).replace('${ext}', ext);
+    expect(name(build.mac.artifactName, 'arm64', 'dmg').endsWith(installerSuffix('darwin', 'arm64'))).toBe(true);
+    expect(name(build.mac.artifactName, 'x64', 'dmg').endsWith(installerSuffix('darwin', 'x64'))).toBe(true);
+    expect(name(build.nsis.artifactName, 'x64', 'exe').endsWith(installerSuffix('win32', 'x64'))).toBe(true);
+    expect(name(build.nsis.artifactName, 'arm64', 'exe').endsWith(installerSuffix('win32', 'arm64'))).toBe(true);
+    expect(name(build.nsis.artifactName, 'arm64', 'exe').endsWith(installerSuffix('win32', 'x64'))).toBe(false);
+    expect(name(build.linux.artifactName, 'x86_64', 'AppImage').endsWith(installerSuffix('linux', 'x64'))).toBe(true); // ${arch} of an x64 AppImage
+    expect(name(build.linux.artifactName, 'arm64', 'AppImage').endsWith(installerSuffix('linux', 'arm64'))).toBe(true);
+    expect(installerSuffix('linux', 'ia32')).toBe(null);
   });
 });
 
@@ -134,7 +138,7 @@ describe('when there is no check at all (rows 3-5, 9-10)', () => {
   });
   for (const [name, options] of Object.entries({
     'no feed (unpacked)': { feed: null },
-    'no installer for this machine (Linux)': { platform: 'linux', arch: 'x64' },
+    'no installer for this machine (FreeBSD)': { platform: 'freebsd', arch: 'x64' },
     'a version that is not plain x.y.z': { current: '0.4.0-beta.1' },
   })) {
     it(`${name}: no request, no timer, the state still carries the version`, async () => {

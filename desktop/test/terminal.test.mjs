@@ -33,6 +33,7 @@ it('bash: our --rcfile, interactive; other shells: login + PATH only; no hook: a
   expect(fish.args).toEqual(['-l']); expect(fish.env.ZDOTDIR).toBeUndefined(); expect(fish.env.PATH).toBe('/R/shims:/p');
   const plain = shellSpec({ PATH: '/p' }, null, 'darwin');
   expect(plain).toMatchObject({ file: '/bin/zsh', args: ['-l'], env: { PATH: '/p' } }); expect(plain.env.ZDOTDIR).toBeUndefined();
+  expect(shellSpec({ PATH: '/p' }, null, 'linux').file).toBe('/bin/bash');
 });
 
 // Real shells against the real hook files: the user's own startup files run, then the shims are first.

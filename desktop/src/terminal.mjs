@@ -56,7 +56,7 @@ export function shellSpec(env, hook, platform = process.platform) {
     return { ...shell, env: { ...own, [key]: `${hook.shims};${own[key] ?? ''}`, SQ_SHIMS: hook.shims,
       OPENCODE_CONFIG_CONTENT: env.OPENCODE_CONFIG_CONTENT ?? hook.opencode } };
   }
-  const file = env.SHELL || '/bin/zsh';
+  const file = env.SHELL || (platform === 'darwin' ? '/bin/zsh' : '/bin/bash'); // most Linux installs have no zsh
   const base = { ...own, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: env.LANG || 'en_US.UTF-8' };
   if (!hook) return { file, args: ['-l'], env: base };
   const hooked = { ...base, PATH: `${hook.shims}:${env.PATH || '/usr/bin:/bin'}`, SQ_SHIMS: hook.shims,
