@@ -15,7 +15,8 @@ test('a newer release with this machine\'s installer shows "Update to" on the Pr
     requests.push({ url: request.url, cookie: request.headers.cookie ?? null, agent: request.headers['user-agent'] });
     response.setHeader('content-type', 'application/json');
     response.end(JSON.stringify([{ tag_name: 'v9.9.9', draft: false, prerelease: false,
-      assets: ['Starquix-9.9.9-arm64.dmg', 'Starquix-9.9.9-x64.dmg', 'Starquix-Setup-9.9.9.exe'].map(name => ({ name })) }]));
+      assets: ['Starquix-9.9.9-arm64.dmg', 'Starquix-9.9.9-x64.dmg', 'Starquix-Setup-9.9.9-x64.exe', 'Starquix-Setup-9.9.9-arm64.exe',
+        'Starquix-9.9.9-x86_64.AppImage', 'Starquix-9.9.9-arm64.AppImage'].map(name => ({ name })) }]));
   });
   await new Promise(resolve => feed.listen(0, '127.0.0.1', resolve));
   const { version } = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));

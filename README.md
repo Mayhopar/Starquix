@@ -5,16 +5,18 @@
   </picture>
 </p>
 
-<p align="center">Free visual editor for Astro websites. Mac app.</p>
+<p align="center">Free visual editor for Astro websites. Desktop app for macOS, Windows and Linux.</p>
 
 <p align="center">
-  <a href="https://github.com/Mayhopar/Starquix-releases/releases/latest"><img src=".github/readme/btn-download.svg" alt="Download for Mac" height="36"></a>
-  <a href="https://github.com/Mayhopar/Starquix-releases/releases"><img src=".github/readme/btn-releases.svg" alt="Releases" height="36"></a>
+  <a href="https://github.com/Mayhopar/Starquix/releases/latest"><img src=".github/readme/btn-download.svg" alt="Download for Mac" height="36"></a>
+  <a href="https://github.com/Mayhopar/Starquix/releases/latest"><img src=".github/readme/btn-download-windows.svg" alt="Download for Windows" height="36"></a>
+  <a href="https://github.com/Mayhopar/Starquix/releases/latest"><img src=".github/readme/btn-download-linux.svg" alt="Download for Linux" height="36"></a>
+  <a href="https://github.com/Mayhopar/Starquix/releases"><img src=".github/readme/btn-releases.svg" alt="Releases" height="36"></a>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src=".github/readme/badge-license.svg" alt="MIT license" height="22"></a>
-  <img src=".github/readme/badge-platform.svg" alt="macOS, Apple Silicon" height="22">
+  <img src=".github/readme/badge-platform.svg" alt="macOS, Windows, Linux" height="22">
   <a href="https://astro.build"><img src=".github/readme/badge-stack.svg" alt="Astro" height="22"></a>
   <a href="https://discord.gg/Fpuwzbd48V"><img src=".github/readme/badge-discord.svg" alt="Discord" height="22"></a>
 </p>
@@ -73,7 +75,7 @@ Then, in a second terminal:
 cd desktop && npm run deps && npm start      # desktop app
 ```
 
-Requires Node.js 22+ and npm 10. The desktop app runs on macOS.
+Requires Node.js 22+ and npm 10. The desktop app runs on macOS, Windows and Linux.
 
 Tests: `cd app && npm run test:run` and `cd desktop && npm test`.
 

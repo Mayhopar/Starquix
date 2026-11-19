@@ -1,0 +1,101 @@
+name: Release
+
+# Push a tag vX.Y.Z equal to desktop/package.json's version → Windows (x64, arm64), Linux (AppImage + .deb, x64, arm64)
+# and macOS (arm64 dmg) installers, each tested by its own workflow, published as this repo's GitHub Release.
+# macOS signs + notarizes only when its secrets are set (desktop/RELEASE.md); without them the release has no dmg.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Tag = desktop/package.json version (the app's update notifier compares that version)
+        run: |
+          V=$(node -p "require('./desktop/package.json').version")
+          [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME, desktop/package.json says $V"; exit 1; }
+
+  windows:
+    needs: version
+    uses: ./.github/workflows/windows.yml
+
+  linux:
+    needs: version
+    uses: ./.github/workflows/linux.yml
+
+  mac:
+    needs: version
+    runs-on: macos-latest # Apple Silicon
+    timeout-minutes: 150 # a team's first notarization can take ~95 min
+    env:
+      CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+    steps:
+      - if: env.CSC_LINK == ''
+        run: echo "::warning::No macOS signing secrets — this release ships without a dmg (desktop/RELEASE.md)"
+      - if: env.CSC_LINK != ''
+        uses: actions/checkout@v7.0.1
+      - if: env.CSC_LINK != ''
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            preview-template/package-lock.json
+            desktop/package-lock.json
+      - name: Build, sign + notarize the app, then sign + notarize + staple the dmg
+        if: env.CSC_LINK != ''
+        run: |
+          npm ci && npm ci --prefix preview-template && npm ci --prefix desktop
+          npm run build --workspace=app
+          cd desktop && npm run deps && npm run mcp
+          export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"; printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY"
+          npx electron-builder --mac dmg --arm64 --publish never -c.dmg.sign=true
+          APP=dist/mac-arm64/Starquix.app
+          [ -z "$(find "$APP/Contents/Resources/editor/fonts" "$APP/Contents/Resources/editor/videos" -type f 2>/dev/null)" ] ||
+            { echo "::error::the bundle carries editor/fonts or editor/videos (local-only assets)"; exit 1; }
+          DMG=$(ls dist/*.dmg)
+          xcrun notarytool submit "$DMG" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait
+          xcrun stapler staple "$DMG"
+          spctl -a -vv -t exec "$APP"
+          spctl -a -vv -t open --context context:primary-signature "$DMG"
+      - if: env.CSC_LINK != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: starquix-mac-arm64
+          path: desktop/dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: [windows, linux, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: starquix-*
+          merge-multiple: true
+          path: out
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=${GITHUB_REF_NAME#v}
+          (cd out && sha256sum * > SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Starquix $V" --generate-notes --notes "**Install**
+          - **macOS** (Apple Silicon, 13+): \`Starquix-$V-arm64.dmg\` — open it, drag Starquix to Applications.
+          - **Windows** 10/11: \`Starquix-Setup-$V-x64.exe\` (ARM PCs: \`-arm64.exe\`). Not code-signed yet: SmartScreen → More info → Run anyway.
+          - **Linux**: Ubuntu/Debian \`sudo apt install ./Starquix-$V-amd64.deb\` (ARM: \`-arm64.deb\`); other distros \`Starquix-$V-x86_64.AppImage\` (needs libfuse2).
+
+          Checksums: \`SHA256SUMS\`." out/*

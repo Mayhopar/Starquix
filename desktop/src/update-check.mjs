@@ -1,13 +1,14 @@
 // Update notifier, notify only (docs/plans/2026-11-10-update-notifier-design.md): main asks the public releases repo for
 // the newest release that carries an installer for THIS machine and tells the editor. Nothing is stored; a failed
 // check changes nothing and retries an hour later. Auto-install is task-251.
-const REPO = 'Mayhopar/Starquix-releases';
+const REPO = 'Mayhopar/Starquix'; // releases live in the source repo since v0.0.2 (v0.0.1 still polls Mayhopar/Starquix-releases)
 export const RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=10`;
 const HOUR = 3_600_000; const EVERY = 6 * HOUR; const TIMEOUT = 15_000;
 const parse = version => { const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(version); return m && m.slice(1).map(Number); };
 const above = (a, b) => { for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
 /** The asset suffix a release must carry for this machine (electron-builder's artifactName); null = nothing ships here. */
-const INSTALLERS = { 'darwin-arm64': '-arm64.dmg', 'darwin-x64': '-x64.dmg', 'win32-x64': '.exe' };
+const INSTALLERS = { 'darwin-arm64': '-arm64.dmg', 'darwin-x64': '-x64.dmg', 'win32-x64': '-x64.exe', 'win32-arm64': '-arm64.exe',
+  'linux-x64': '-x86_64.AppImage', 'linux-arm64': '-arm64.AppImage' }; // AppImage names x64 "x86_64" (builder-util getArtifactArchName)
 export const installerSuffix = (platform, arch) => INSTALLERS[`${platform}-${arch}`] ?? null;
 /** SQ_UPDATE_FEED: an http(s) URL replaces the feed in any build, anything else turns the check off; unset = the releases
  *  repo, packaged builds only (dev and e2e stay off the network). */
