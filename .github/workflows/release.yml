@@ -95,7 +95,7 @@ jobs:
           (cd out && sha256sum * > SHA256SUMS)
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Starquix $V" --generate-notes --notes "**Install**
           - **macOS** (Apple Silicon, 13+): \`Starquix-$V-arm64.dmg\` — open it, drag Starquix to Applications.
-          - **Windows** 10/11: \`Starquix-Setup-$V-x64.exe\` (ARM PCs: \`-arm64.exe\`). Not code-signed yet: SmartScreen → More info → Run anyway.
+          - **Windows** 10/11: \`Starquix-Setup-$V-x64.exe\` (also runs on Windows on ARM). Not code-signed yet: SmartScreen → More info → Run anyway.
           - **Linux**: Ubuntu/Debian \`sudo apt install ./Starquix-$V-amd64.deb\` (ARM: \`-arm64.deb\`); other distros \`Starquix-$V-x86_64.AppImage\` (needs libfuse2).
 
           Checksums: \`SHA256SUMS\`." out/*
