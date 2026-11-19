@@ -42,11 +42,15 @@ describe('verify_layout tool', () => {
       meta.set('currentBreakpoint', 'md');
       let rendered = 'md';
       const answeredAt: string[] = [];
-      meta.observe(() => {
+      // The move back home is not awaited by verify_layout, so its render timer can
+      // outlive the test (and the jsdom window: CI flake); done() clears them.
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      const onMeta = () => {
         const next = meta.get('currentBreakpoint') as string;
         if (frame === 'never gets there') return;
-        setTimeout(() => { rendered = next; window.dispatchEvent(new CustomEvent('sq:ai-verify-ready', { detail: { breakpoint: next } })); }, 20);
-      });
+        timers.push(setTimeout(() => { rendered = next; window.dispatchEvent(new CustomEvent('sq:ai-verify-ready', { detail: { breakpoint: next } })); }, 20));
+      };
+      meta.observe(onMeta);
       const onAsk = (e: Event) => {
         const detail = (e as CustomEvent).detail;
         if (frame !== 'answers' || detail.breakpoint !== rendered) return;
@@ -55,7 +59,8 @@ describe('verify_layout tool', () => {
       };
       window.addEventListener('sq:ai-verify-layout', onAsk);
       const verify = (generateCommandTools(ctx) as never as Record<'verify_layout', ExecTool>).verify_layout;
-      return { meta, answeredAt, verify, done: () => window.removeEventListener('sq:ai-verify-layout', onAsk) };
+      const done = () => { window.removeEventListener('sq:ai-verify-layout', onAsk); meta.unobserve(onMeta); timers.forEach(clearTimeout); };
+      return { meta, answeredAt, verify, done };
     }
 
     it('moves the canvas there, checks, and puts it back', async () => {

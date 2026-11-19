@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { webcrypto } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import * as Y from 'yjs';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -50,6 +50,16 @@ function fixture(kind: 'layout-append' | 'variables-css' | 'post-write' | 'folde
   return { file, beforeSource, afterSource, command: command as MaterializationCommand };
 }
 
+// An outside writer landing after the edit's acceptance. Linux stamps mtime from a
+// coarse kernel clock that can read a few ms behind Date.now(), which made the
+// write look older than the edit (CI flake); pin its mtime clearly after acceptance.
+function writeOutside(file: string, bytes: string) {
+  const path = join(runtime.root, file);
+  writeFileSync(path, bytes);
+  const later = new Date(Date.now() + 1000);
+  utimesSync(path, later, later);
+}
+
 it.each(['layout-append', 'variables-css', 'post-write', 'folder-manifest'] as const)('%s resumes accepted intent after database/runtime reopen and reconciles a lost ACK exactly once', async kind => {
   const { file, beforeSource, afterSource, command } = fixture(kind);
   const input = { projectId, operationId: 'feature', commands: [command], mutate: () => {} };
@@ -73,7 +83,7 @@ it.each(['layout-append', 'variables-css', 'post-write', 'folder-manifest'] as c
   // Force original preparation before an external edit, including layout append.
   const { prepareSourceCommand } = await import('../commandReceipts');
   await prepareSourceCommand(projectId, JSON.stringify(['conflict', 0]), command as Parameters<typeof prepareSourceCommand>[2]);
-  writeFileSync(join(runtime.root, file), 'external');
+  writeOutside(file, 'external');
   registerSourceMaterializers();
   const worker = createMaterializer({ store, registry: materializerRegistry, scheduleRetry: () => () => {} });
   const stop = worker.startMaterializer(projectId);
@@ -88,7 +98,7 @@ it.each(['layout-append', 'variables-css', 'post-write', 'folder-manifest'] as c
 it.each(['layout-append', 'variables-css', 'post-write', 'folder-manifest'] as const)('%s yields to a newer outside rewrite that landed before its first preparation', async kind => {
   const { file, command } = fixture(kind);
   await acceptProjectEdit(doc, { projectId, operationId: 'refusal', commands: [command], mutate: () => {} });
-  writeFileSync(join(runtime.root, file), 'external');
+  writeOutside(file, 'external');
   await flushDurableSourceWrites(projectId);
   expect(runtime.read(file)).toBe('external'); expect(dispatches).toBe(0);
   expect(await db.durableEdits.count()).toBe(1);
