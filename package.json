@@ -16,9 +16,10 @@
     "@plausible-analytics/tracker": "^0.4.4"
   },
   "devDependencies": {
+    "jsdom": "27.4.0",
     "lefthook": "^2.1.6",
-    "vitest": "4.0.16",
-    "jsdom": "27.4.0"
+    "pngjs": "^7.0.0",
+    "vitest": "4.0.16"
   },
   "overrides": {
     "vitest": "4.0.16",

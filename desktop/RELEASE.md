@@ -74,34 +74,30 @@ Then by hand on a Mac without Node/npm: open the dmg, drag to Applications, laun
 
 ## Publish
 
-Public downloads live in [Mayhopar/Starquix-releases](https://github.com/Mayhopar/Starquix-releases); its `main` holds only the README, security policy and issue forms. Releases there are immutable once published: the assets and the tag are locked, only the title and notes stay editable. So one version = one tag = one dmg — everything goes into the draft, and a bad build gets a new patch version, never a replaced file.
-
-After the release gate, on the commit the dmg was built from:
+Releases live in this repo (since v0.0.2; v0.0.1 is in the old [Mayhopar/Starquix-releases](https://github.com/Mayhopar/Starquix-releases),
+which v0.0.1 apps still poll for updates). `.github/workflows/release.yml` builds, tests and publishes on a version tag:
 
 ```sh
-cd desktop
-V=$(node -p "require('./package.json').version")
-DMG=dist/signed/Starquix-$V-arm64.dmg
-git tag -a "v$V" -m "Starquix $V" && git push origin "refs/tags/v$V"   # source tag in this repo; the notes come from `git log v<previous>..v$V`
-gh release create "v$V" --repo Mayhopar/Starquix-releases --draft --title "Starquix $V" --notes-file notes.md "$DMG"
-gh release edit "v$V" --repo Mayhopar/Starquix-releases --draft=false   # only after reading the draft page
+cd desktop && npm version <X.Y.Z> --no-git-tag-version && cd ..   # the tag must equal this version
+git commit -am "Starquix <X.Y.Z>" && git push
+git tag -a v<X.Y.Z> -m "Starquix <X.Y.Z>" && git push origin refs/tags/v<X.Y.Z>
 ```
 
-`notes.md` says what changed in user words, then ends with the fixed tail:
+It publishes `Starquix <X.Y.Z>` with the Windows, Linux and (if its secrets are set) macOS installers, `SHA256SUMS`, install
+notes and GitHub's generated changelog. A failed build or e2e publishes nothing. A bad release gets a new patch version.
 
-```md
-## New
-- …
+macOS in CI needs these repo secrets (set once, by the account owner):
 
-## Fixed
-- …
-
-**Install:** download `Starquix-<V>-arm64.dmg` below, open it and drag Starquix to Applications. macOS 13 or later, Apple Silicon. Signed and notarized by Apple.
-
-SHA-256: `<shasum -a 256 "$DMG">`
-
-The "Source code" archives are added by GitHub automatically and do not contain the app.
+```sh
+base64 -i DeveloperID.p12 | gh secret set MAC_CERT_P12_BASE64   # Keychain Access → "Developer ID Application: …" → Export (.p12)
+gh secret set MAC_CERT_PASSWORD                                  # the .p12 export password
+gh secret set APPLE_API_KEY_P8 < AuthKey_<KEYID>.p8              # App Store Connect → Users and Access → Integrations → Team Keys (Developer)
+gh secret set APPLE_API_KEY_ID
+gh secret set APPLE_API_ISSUER
 ```
+
+Without them the release has no dmg: build it locally with `notarize.sh`, then `gh release upload v<X.Y.Z> dist/signed/Starquix-<X.Y.Z>-arm64.dmg`.
+
 ## Where things live
 
 - Projects: `~/Starquix/<id>/` (real Astro folders; `node_modules` is a link into the app bundle, re-linked on every open).

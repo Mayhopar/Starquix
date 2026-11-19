@@ -72,7 +72,7 @@ it.runIf(process.platform === 'win32')('Windows: the real PowerShell starts with
   const { file, args, env } = shellSpec(process.env, hook);
   const first = execFileSync(file, [...args, '-NoProfile', '-Command', "$env:Path.Split(';')[0]"], { env }).toString().trim();
   expect(first).toBe(hook.shims);
-});
+}, 30_000); // a cold PowerShell on the windows-11-arm runner took 6 s
 
 function fakePty(cwd) {
   const p = { cwd, writes: [], sizes: [], killed: 0, write: d => p.writes.push(d), resize: (c, r) => p.sizes.push([c, r]),

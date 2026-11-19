@@ -6,8 +6,9 @@ name: Linux
 
 on:
   workflow_dispatch:
+  workflow_call: # release.yml
   push:
-    branches: ['feat/linux-**', 'feat/windows-linux']
+    branches: [main, 'feat/linux-**', 'feat/windows-linux']
 
 permissions:
   contents: read

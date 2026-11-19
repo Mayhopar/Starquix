@@ -6,8 +6,9 @@ name: Windows
 
 on:
   workflow_dispatch:
+  workflow_call: # release.yml
   push:
-    branches: ['feat/windows-**']
+    branches: [main, 'feat/windows-**']
 
 permissions:
   contents: read
@@ -86,9 +87,13 @@ jobs:
         working-directory: desktop
         run: |
           $setup = Get-ChildItem dist -Filter '*Setup*.exe' | Select-Object -First 1
-          Start-Process -Wait -FilePath $setup.FullName -ArgumentList '/S'
+          $run = Start-Process -Wait -PassThru -FilePath $setup.FullName -ArgumentList '/S'
+          Write-Output "$($setup.Name) exited $($run.ExitCode)"
           $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Starquix.exe' | Select-Object -First 1
-          if (-not $exe) { throw 'Starquix.exe was not installed' }
+          if (-not $exe) {
+            Get-ChildItem "$env:LOCALAPPDATA\Programs", "$env:ProgramFiles" -Depth 1 -ErrorAction SilentlyContinue | Out-Host
+            throw 'Starquix.exe was not installed'
+          }
           "SQ_INSTALLED=$($exe.FullName)" >> $env:GITHUB_ENV
           Write-Output "installed: $($exe.FullName)"
       - name: E2E — the installed app (runtime)
