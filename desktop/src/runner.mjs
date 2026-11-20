@@ -15,6 +15,8 @@ async function stop() {
 }
 process.on('message', message => { if (message?.type === 'stop') void stop(); });
 process.on('disconnect', () => void stop());
+// Node emits no 'disconnect' when main left before this process started (quit right after the fork): check once too.
+if (process.send && !process.connected) void stop();
 process.on('SIGTERM', () => void stop());
 
 const importAstro = dir => import(pathToFileURL(createRequire(path.join(dir, 'package.json')).resolve('astro')).href);
