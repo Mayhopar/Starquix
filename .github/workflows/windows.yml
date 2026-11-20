@@ -24,11 +24,10 @@ jobs:
       matrix:
         include:
           - { arch: x64, runner: windows-latest }
-          - { arch: arm64, runner: windows-11-arm } # free on public repos only
+          # shortcut: arm64 (windows-11-arm) dropped — its installed folder loses every .exe/.dll from the payload
+          # (2026-11-19, cause unknown) and a continue-on-error job still marks the commit red. The x64 installer runs on
+          # ARM PCs under emulation; re-add `{ arch: arm64, runner: windows-11-arm }` once that's fixed.
     runs-on: ${{ matrix.runner }}
-    # shortcut: on windows-11-arm the installed folder loses every .exe/.dll the installer's payload carries (2026-11-19,
-    # cause unknown) — arm64 can't block a release until fixed; the x64 installer runs on ARM PCs under emulation.
-    continue-on-error: ${{ matrix.arch == 'arm64' }}
     timeout-minutes: 120
     defaults:
       run:

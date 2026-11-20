@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag vX.Y.Z equal to desktop/package.json's version → Windows (x64, arm64), Linux (AppImage + .deb, x64, arm64)
+# Push a tag vX.Y.Z equal to desktop/package.json's version → Windows (x64), Linux (AppImage + .deb, x64, arm64)
 # and macOS (arm64 dmg) installers, each tested by its own workflow, published as this repo's GitHub Release.
 # macOS signs + notarizes only when its secrets are set (desktop/RELEASE.md); without them the release has no dmg.
 
