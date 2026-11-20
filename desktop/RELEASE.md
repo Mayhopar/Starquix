@@ -75,7 +75,8 @@ Then by hand on a Mac without Node/npm: open the dmg, drag to Applications, laun
 ## Publish
 
 Releases live in this repo (since v0.0.2; v0.0.1 is in the old [Mayhopar/Starquix-releases](https://github.com/Mayhopar/Starquix-releases),
-which v0.0.1 apps still poll for updates). `.github/workflows/release.yml` builds, tests and publishes on a version tag:
+which v0.0.1 apps still poll for updates). `.github/workflows/release.yml` builds, tests and publishes on a version tag
+pushed on a commit in `main` (a tag anywhere else fails the run):
 
 ```sh
 cd desktop && npm version <X.Y.Z> --no-git-tag-version && cd ..   # the tag must equal this version
@@ -83,10 +84,16 @@ git commit -am "Starquix <X.Y.Z>" && git push
 git tag -a v<X.Y.Z> -m "Starquix <X.Y.Z>" && git push origin refs/tags/v<X.Y.Z>
 ```
 
-It publishes `Starquix <X.Y.Z>` with the Windows, Linux and (if its secrets are set) macOS installers, `SHA256SUMS`, install
-notes and GitHub's generated changelog. A failed build or e2e publishes nothing. A bad release gets a new patch version.
+The run checks the tag is on `main` and equals that version, runs the CI gates (`ci.yml`) on the tagged commit, then builds
+every installer on its own runner. Each one ships only after the installed (Windows, Linux) or signed (macOS) app passed
+`e2e/runtime.spec.mjs`. Then it publishes `Starquix <X.Y.Z>` with the Windows, Linux and macOS installers, `SHA256SUMS`,
+install notes and GitHub's generated changelog. Any failed gate, build or e2e publishes nothing; fix it on `main`, then
+move the tag (`git push --delete origin v<X.Y.Z>`, re-tag, push). A published bad release gets a new patch version.
 
-macOS in CI needs these repo secrets (set once, by the account owner):
+Only maintainers should be able to create `v*` tags: Settings → Rules → Rulesets → New tag ruleset, target `v*`, restrict
+creations, updates and deletions to the maintainers (bypass list).
+
+macOS in CI needs these repo secrets (set once, by the account owner); without them the run fails before building:
 
 ```sh
 base64 -i DeveloperID.p12 | gh secret set MAC_CERT_P12_BASE64   # Keychain Access → "Developer ID Application: …" → Export (.p12)
@@ -96,7 +103,7 @@ gh secret set APPLE_API_KEY_ID
 gh secret set APPLE_API_ISSUER
 ```
 
-Without them the release has no dmg: build it locally with `notarize.sh`, then `gh release upload v<X.Y.Z> dist/signed/Starquix-<X.Y.Z>-arm64.dmg`.
+`notarize.sh` still builds a signed dmg locally, e.g. to test one before tagging.
 
 ## Where things live
 

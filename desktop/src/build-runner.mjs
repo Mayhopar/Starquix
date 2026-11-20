@@ -6,6 +6,8 @@ import path from 'node:path';
 import { sqAstroCompat, SQ_ASTRO_LEGACY } from '../../preview-template/src/plugins/sq-astro-compat.js';
 if (process.env.SQ_COMPILE_CACHE) enableCompileCache?.(process.env.SQ_COMPILE_CACHE);
 process.on('disconnect', () => process.exit(1)); // main went away (app quit): never build on for nobody
+// Node emits no 'disconnect' when main left before this process started (quit right after the fork): check once too.
+if (process.send && !process.connected) process.exit(1);
 const root = process.cwd(); const out = process.env.SQ_BUILD_OUT;
 const NOT_STATIC = 'SQ_NOT_STATIC';
 // Exit only once the message is on the wire (Astro/esbuild may leave handles open).
