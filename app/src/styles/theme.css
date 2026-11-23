@@ -92,6 +92,8 @@
   --color-overlay-component:            var(--color-cyan-500);
   --color-overlay-ai:                   var(--color-purple-500);
   --color-overlay-grid:                 var(--color-red-500);
+  --color-overlay-measure:              var(--color-red-500);  /* Option-hover distance lines (MeasureOverlay) */
+  --color-overlay-measure-text:         var(--color-white);
 
   /* === TERMINAL — the 16 ANSI colors of the MCP-mode terminal (TerminalView reads them). xterm's own palette is made for
          a dark screen: on the light Bg its white / bright-white / bright-yellow / bright-green / bright-cyan are 1.1–1.6:1.

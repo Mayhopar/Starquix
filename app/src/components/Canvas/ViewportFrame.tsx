@@ -52,6 +52,7 @@ import { LINK_MARKUP_FIELD } from '@/store/sourceOverrideEntries';
 import { isLocalProjectId, findLocalProjectEntry } from '@/utils/localMode';
 import { deriveLockTier, lockLabel } from '@/components/DesignBar/lockTier';
 import { hoverRectStore } from './hoverRectStore';
+import { altKeyStore } from './altKeyStore';
 import { isGridRelevantSelection } from './gridRequestGate';
 import { BootCoverOverlay } from './BootCoverOverlay';
 import { SQ_BOUNDARY_PARAM } from '@/bridge/boundaryParam';
@@ -1744,6 +1745,26 @@ export function ViewportFrame({ breakpoint, scale = 1, isDragging = false, isDra
   onZoomRef.current = onZoom;
   onPanRef.current = onPan;
   scalePropsRef.current = scale;
+
+  // The overlay covering the iframe forwards hover only in AI-context mode or while Option is held
+  // (Option-hover measuring: `deep` = the element under the cursor, like ⌘-click). Pressing or
+  // releasing Option re-hovers / clears at the last pointer spot.
+  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const forwardHover = useCallback((p: { clientX: number; clientY: number } | null) => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    let payload: { x: number; y: number; deep?: true } | null = null;
+    if (p) {
+      const rect = iframe.getBoundingClientRect();
+      const s = scalePropsRef.current;
+      payload = { x: (p.clientX - rect.left) / s, y: (p.clientY - rect.top) / s };
+      if (!aiContextModeRef.current) payload.deep = true;
+    }
+    iframe.contentWindow.postMessage({ type: 'SIMULATE_HOVER', payload }, '*');
+  }, [iframeRef]);
+  useEffect(() => altKeyStore.subscribe(() => {
+    if (!aiContextModeRef.current) forwardHover(altKeyStore.get() ? lastPointerRef.current : null);
+  }), [forwardHover]);
   selectInContextRef.current = selectInContext;
   toggleInSelectionRef.current = toggleInSelection;
   patchSelectionRef.current = patchSelection;
@@ -2312,23 +2333,13 @@ export function ViewportFrame({ breakpoint, scale = 1, isDragging = false, isDra
 
           }}
           onMouseMove={(e) => {
-            if (!aiContextModeRef.current) return;
-            const iframe = iframeRef.current;
-            if (!iframe?.contentWindow) return;
-            const iframeRect = iframe.getBoundingClientRect();
-            iframe.contentWindow.postMessage({
-              type: 'SIMULATE_HOVER',
-              payload: {
-                x: (e.clientX - iframeRect.left) / scale,
-                y: (e.clientY - iframeRect.top) / scale,
-              }
-            }, '*');
+            lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+            altKeyStore.set(e.altKey); // mouse events carry Option too: heals a missed keyup
+            if (aiContextModeRef.current || e.altKey) forwardHover(lastPointerRef.current);
           }}
           onMouseLeave={() => {
-            if (!aiContextModeRef.current) return;
-            iframeRef.current?.contentWindow?.postMessage(
-              { type: 'SIMULATE_HOVER', payload: null }, '*'
-            );
+            lastPointerRef.current = null;
+            if (aiContextModeRef.current || altKeyStore.get()) forwardHover(null);
           }}
           style={{
             pointerEvents: !isIframeReady || isEditingText ? 'none' : 'auto',

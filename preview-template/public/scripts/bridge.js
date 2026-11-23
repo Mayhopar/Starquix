@@ -3349,7 +3349,8 @@ IFrameBridge.prototype.toggleDesignModeListeners = function(add) {
     }
 
     var element = document.elementFromPoint(payload.x, payload.y);
-    var target = element ? this.findEditableElement(element, true) : null;
+    // deep: Option-hover measuring targets the element right under the cursor (like ⌘-click)
+    var target = element ? this.findEditableElement(element, true, !!payload.deep) : null;
     if (!target) {
       this._clearHover();
       return;
