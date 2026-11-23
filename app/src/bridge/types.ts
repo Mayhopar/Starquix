@@ -602,6 +602,12 @@ export interface AIPreviewRectMessage {
   payload: { rect: ElementRect | null };
 }
 
+/** Option/Alt held inside the iframe (MeasureOverlay); sent on change only. */
+export interface AltKeyMessage {
+  type: 'ALT_KEY';
+  payload: { down: boolean };
+}
+
 export interface KeyboardEventMessage {
   type: 'KEYBOARD_EVENT';
   payload: KeyboardEventPayload;
@@ -694,6 +700,7 @@ export type IframeToParentMessage =
   | AIActiveRectsMessage
   | AIPreviewRectMessage
   | KeyboardEventMessage
+  | AltKeyMessage
   | TextSelectionChangedMessage
   | MarkupChangedMessage
   | ScreenshotCapturedMessage

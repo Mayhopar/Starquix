@@ -2782,6 +2782,9 @@ IFrameBridge.prototype.toggleDesignModeListeners = function(add) {
       document[method](event, handlers[event], true);
     });
 
+    document[method]('keyup', handlers.altKey, true);
+    window[method]('blur', handlers.altKey);
+
     // Wheel needs special options - capture must match for removal
     if (add) {
       document.addEventListener('wheel', handlers.wheel, { passive: false, capture: true });
@@ -3349,7 +3352,8 @@ IFrameBridge.prototype.toggleDesignModeListeners = function(add) {
     }
 
     var element = document.elementFromPoint(payload.x, payload.y);
-    var target = element ? this.findEditableElement(element, true) : null;
+    // deep: Option-hover measuring targets the element right under the cursor (like ⌘-click)
+    var target = element ? this.findEditableElement(element, true, !!payload.deep) : null;
     if (!target) {
       this._clearHover();
       return;
@@ -5227,6 +5231,7 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
       click: this.handleNativeClick.bind(this),
       wheel: this.handleWheel.bind(this),
       keydown: this.handleKeyDown.bind(this),
+      altKey: this.handleAltKey.bind(this),
       dragover: this.handleFileDragOver.bind(this),
       drop: this.handleFileDrop.bind(this)
     };
@@ -5236,7 +5241,19 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     }
   };
 
+  // Option held → the parent's MeasureOverlay draws distances (Figma-style).
+  // With focus in here the parent never sees the key, so relay its state on
+  // change; window blur clears it (a keyup elsewhere would never arrive).
+  IFrameBridge.prototype.handleAltKey = function(event) {
+    var down = event.type === 'blur' ? false
+      : event.key === 'Alt' ? event.type === 'keydown' : !!event.altKey;
+    if (down === !!this._altDown) return;
+    this._altDown = down;
+    this.sendToParent({ type: 'ALT_KEY', payload: { down: down } });
+  };
+
   IFrameBridge.prototype.handleKeyDown = function(event) {
+    this.handleAltKey(event);
     // Handle Escape to cancel flow drag
     if (event.key === 'Escape' && this._flowDrag._state) {
       this._flowDrag.handleCancel();

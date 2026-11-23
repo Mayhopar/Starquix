@@ -16,7 +16,8 @@ import { BRIDGE_SCREENSHOTS } from '../screenshots';
 type HoverBridge = {
   lastHoveredKey: string | null;
   sendToParent: ReturnType<typeof vi.fn>;
-  handleSimulateHover: (payload: { x: number; y: number } | null) => void;
+  handleSimulateHover: (payload: { x: number; y: number; deep?: boolean } | null) => void;
+  findEditableElement: (t: Element, forSelection: boolean, directSelect?: boolean) => Element | null;
   _clearHover: () => void;
 };
 
@@ -71,5 +72,17 @@ describe('SIMULATE_HOVER', () => {
     const msg = bridge.sendToParent.mock.calls.map((c) => c[0]).find(
       (m: { type: string }) => m.type === 'ELEMENT_HOVER_END');
     expect(msg).toBeTruthy();
+  });
+
+  it('deep (Option-hover measuring) resolves the element under the cursor like ⌘-click', () => {
+    document.body.innerHTML = '<p>x</p>';
+    const p = document.querySelector('p')!;
+    document.elementFromPoint = () => p;
+    const bridge = mountHoverBridge();
+    const find = vi.fn(() => null);
+    bridge.findEditableElement = find;
+    bridge.handleSimulateHover({ x: 1, y: 1, deep: true });
+    bridge.handleSimulateHover({ x: 1, y: 1 });
+    expect(find.mock.calls.map((c) => c[2])).toEqual([true, false]);
   });
 });

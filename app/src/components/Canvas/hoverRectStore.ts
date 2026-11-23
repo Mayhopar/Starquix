@@ -36,3 +36,39 @@ export const hoverRectStore = {
     return () => listeners.delete(listener);
   },
 };
+
+/**
+ * Option (Alt) held → MeasureOverlay shows distances from the selection to the
+ * hovered box. Parent key events feed it directly; with focus inside the preview
+ * iframe the bridge relays ALT_KEY instead. Window listeners live only while
+ * someone subscribes. Any key event carries altKey, so a missed keyup self-heals.
+ */
+let altDown = false;
+const altListeners = new Set<() => void>();
+function setAlt(down: boolean): void {
+  if (down === altDown) return;
+  altDown = down;
+  altListeners.forEach((l) => l());
+}
+const onKey = (e: KeyboardEvent) => setAlt(e.key === 'Alt' ? e.type === 'keydown' : e.altKey);
+const onBlur = () => setAlt(false);
+
+export const altKeyStore = {
+  get: (): boolean => altDown,
+  set: setAlt,
+  subscribe(listener: () => void): () => void {
+    if (altListeners.size === 0) {
+      window.addEventListener('keydown', onKey, true);
+      window.addEventListener('keyup', onKey, true);
+      window.addEventListener('blur', onBlur);
+    }
+    altListeners.add(listener);
+    return () => {
+      altListeners.delete(listener);
+      if (altListeners.size > 0) return;
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keyup', onKey, true);
+      window.removeEventListener('blur', onBlur);
+    };
+  },
+};

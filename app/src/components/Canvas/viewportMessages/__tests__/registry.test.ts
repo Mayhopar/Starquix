@@ -10,6 +10,7 @@ describe('viewport message registry', () => {
     expect(Object.keys(buildMessageHandlers()).sort()).toEqual([
       'AI_ACTIVE_RECTS',
       'AI_PREVIEW_RECT',
+      'ALT_KEY',
       'ASSETS_OWNED',
       'BG_IMAGE_PREVIEW',
       'CANVAS_FILE_DROP',

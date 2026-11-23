@@ -61,7 +61,7 @@ applies to icon AND label together on Assets/Layers rows — never icon-only. Th
 heading is deliberately NEUTRAL (`text-text`) for every selection kind.
 
 ## Canvas overlays
-`overlay-selection` (yellow-500) · `overlay-component` (cyan-500) · `overlay-ai` (purple-500) · `overlay-grid` (red-500 — the alignment grid, `LayoutGridOverlay`; always translucent: `bg-overlay-grid/15`)
+`overlay-selection` (yellow-500) · `overlay-component` (cyan-500) · `overlay-ai` (purple-500) · `overlay-grid` (red-500 — the alignment grid, `LayoutGridOverlay`; always translucent: `bg-overlay-grid/15`) · `overlay-measure` (red-500) + `overlay-measure-text` (white) — Option-hover distance lines and their labels, `MeasureOverlay`
 
 ## Terminal (the MCP-mode xterm — read by `TerminalView.themeOf`)
 `term-black … term-white` + `term-bright-black … term-bright-white` — the 16 ANSI colors, one `light-dark()` of palette steps each. xterm's own palette is made for a dark screen (white 1.4:1, bright-white 1.1:1 on the light Bg). Light = the 600/700 steps (≥3:1 on Bg); dark = the 300/400 steps; `white` = muted text, `bright-white` = the strongest. Guard: `styles/__tests__/themeTerminal.test.ts`.

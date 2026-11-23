@@ -51,7 +51,7 @@ import { diffSourceText } from './sourceTextSync';
 import { LINK_MARKUP_FIELD } from '@/store/sourceOverrideEntries';
 import { isLocalProjectId, findLocalProjectEntry } from '@/utils/localMode';
 import { deriveLockTier, lockLabel } from '@/components/DesignBar/lockTier';
-import { hoverRectStore } from './hoverRectStore';
+import { hoverRectStore, altKeyStore } from './hoverRectStore';
 import { isGridRelevantSelection } from './gridRequestGate';
 import { BootCoverOverlay } from './BootCoverOverlay';
 import { SQ_BOUNDARY_PARAM } from '@/bridge/boundaryParam';
@@ -736,6 +736,16 @@ export function ViewportFrame({ breakpoint, scale = 1, isDragging = false, isDra
 
   // Track AI context mode (set from AIPanel via sq:ai-context-mode event)
   const aiContextModeRef = useRef(false);
+  // Option-hover measuring: the overlay over the iframe forwards hover only in AI mode or
+  // while Option is held. Pressing/releasing Option re-hovers/clears at the last pointer spot.
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => altKeyStore.subscribe(() => {
+    if (aiContextModeRef.current) return;
+    const p = lastPointerRef.current;
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'SIMULATE_HOVER', payload: altKeyStore.get() && p ? { ...p, deep: true } : null }, '*',
+    );
+  }), [iframeRef]);
   const [isAIContextMode, setIsAIContextMode] = useState(false);
   useEffect(() => {
     const handler = (e: Event) => {
@@ -2312,20 +2322,21 @@ export function ViewportFrame({ breakpoint, scale = 1, isDragging = false, isDra
 
           }}
           onMouseMove={(e) => {
-            if (!aiContextModeRef.current) return;
             const iframe = iframeRef.current;
             if (!iframe?.contentWindow) return;
             const iframeRect = iframe.getBoundingClientRect();
+            const point = { x: (e.clientX - iframeRect.left) / scale, y: (e.clientY - iframeRect.top) / scale };
+            lastPointerRef.current = point;
+            altKeyStore.set(e.altKey); // mouse events carry Option too: heals a missed keyup
+            if (!aiContextModeRef.current && !e.altKey) return;
             iframe.contentWindow.postMessage({
               type: 'SIMULATE_HOVER',
-              payload: {
-                x: (e.clientX - iframeRect.left) / scale,
-                y: (e.clientY - iframeRect.top) / scale,
-              }
+              payload: aiContextModeRef.current ? point : { ...point, deep: true },
             }, '*');
           }}
           onMouseLeave={() => {
-            if (!aiContextModeRef.current) return;
+            lastPointerRef.current = null;
+            if (!aiContextModeRef.current && !altKeyStore.get()) return;
             iframeRef.current?.contentWindow?.postMessage(
               { type: 'SIMULATE_HOVER', payload: null }, '*'
             );
