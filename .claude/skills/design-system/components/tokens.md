@@ -40,6 +40,12 @@ Inputs (ours; override: in dark mode an input's fill is half a step lighter than
 Ours (no Figma variable): `bg-input-editing` `border-stroke-component` (purple) · `dynamic` (yellow) ·
 `slot` (cyan) identities.
 
+Text selection (ours): `bg-text-selection` = `accent` @ 45% — the platform's accent tint, one recipe for both modes.
+`::selection` (globals.css) paints it and draws the selected text in `text`; the terminal's selection reads the same pair
+(`TerminalView.themeOf`). A block with its own fill + ink (the post editor's code block, a colored band) keeps that ink:
+`::selection { color: currentColor }`. Guard: `styles/__tests__/themeSelection.test.ts` — on every surface the tint is
+≥ 20 ΔE from the surface and the text ≥ 4.5:1 on the tint; a new surface that holds selectable text joins its list.
+
 ## Buttons
 Named after the Figma variables `Buttons/{Style}/{Fill|Text|Stroke}/{State}`:
 `btn-primary-fill-{default|hover|disabled}` `btn-primary-text-{default|disabled}` ·

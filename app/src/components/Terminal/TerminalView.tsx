@@ -9,23 +9,24 @@ import { desktopDriver, isDesktop } from '@/services/desktopDriver';
 const SETTLE_MS = 120;
 
 /** xterm wants concrete colors; a computed color may be any CSS color (oklch…), so paint one pixel and read it back. */
-function rgba(css: string, alpha = 1): string {
+function rgba(css: string): string {
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
   if (!ctx || !css) return css;
   ctx.fillStyle = css; ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
 }
 /** Tokens are light-dark(): only a computed `color` resolves one to this scheme's value. A canvas can't parse the raw
  * token and kept its default black — the terminal painted black on black. */
 export function themeOf(el: HTMLElement): ITheme {
   const probe = el.appendChild(document.createElement('span'));
-  const token = (name: string, alpha?: number): string => { probe.style.color = `var(${name})`; return rgba(getComputedStyle(probe).color, alpha); };
+  const token = (name: string): string => { probe.style.color = `var(${name})`; return rgba(getComputedStyle(probe).color); };
   // xterm's default ANSI palette is made for a dark screen (white / bright-white are ~1.2:1 on the light Bg): theme.css owns ours.
   const term = (name: string): string => token(`--color-term-${name}`);
   try {
     return { background: token('--color-bg'), foreground: token('--color-text'), cursor: token('--color-text'),
-      selectionBackground: token('--color-text-muted', 0.3),
+      // the chrome's ::selection pair (globals.css): ANSI colors are ≥3:1 on Bg only, the theme ink reads on the tint
+      selectionBackground: token('--color-bg-text-selection'), selectionForeground: token('--color-text'),
       black: term('black'), red: term('red'), green: term('green'), yellow: term('yellow'),
       blue: term('blue'), magenta: term('magenta'), cyan: term('cyan'), white: term('white'),
       brightBlack: term('bright-black'), brightRed: term('bright-red'), brightGreen: term('bright-green'),
