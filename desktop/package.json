@@ -11,6 +11,7 @@
   "main": "src/main.mjs",
   "scripts": {
     "start": "electron .",
+    "sandbox": "node scripts/sandbox.mjs",
     "deps": "node scripts/build-runtime-deps.mjs",
     "test": "vitest run --exclude 'e2e/**'",
     "test:electron": "playwright test",
