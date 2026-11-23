@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect, memo, useSyncExternalStore } from 'react';
 import type { ElementRect } from './ViewportFrame';
-import { hoverRectStore, altKeyStore } from './hoverRectStore';
+import { hoverRectStore } from './hoverRectStore';
+import { altKeyStore } from './altKeyStore';
 import type { GridGeometry } from '@/store/types';
 import { getTrackBoundaries, snapToNearestBoundary, computeSpanFromSize } from '@/utils/gridGeometry';
 import { Badge } from '@/components/ui/Badge';
@@ -530,7 +531,6 @@ export const SelectionOverlay = memo(function SelectionOverlay({
   // updates re-render this small overlay only, never ViewportFrame.
   const hoveredInfo = useSyncExternalStore(hoverRectStore.subscribe, hoverRectStore.get);
   const hoveredRect = hoveredInfo?.rect ?? null;
-  // Subscribed here (always mounted), not in MeasureOverlay: Option held BEFORE hovering must count.
   const altDown = useSyncExternalStore(altKeyStore.subscribe, altKeyStore.get);
 
   const showHover = !isDragging

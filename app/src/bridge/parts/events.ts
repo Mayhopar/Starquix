@@ -21,7 +21,6 @@ export const BRIDGE_EVENTS = `
       click: this.handleNativeClick.bind(this),
       wheel: this.handleWheel.bind(this),
       keydown: this.handleKeyDown.bind(this),
-      altKey: this.handleAltKey.bind(this),
       dragover: this.handleFileDragOver.bind(this),
       drop: this.handleFileDrop.bind(this)
     };
@@ -31,19 +30,7 @@ export const BRIDGE_EVENTS = `
     }
   };
 
-  // Option held → the parent's MeasureOverlay draws distances (Figma-style).
-  // With focus in here the parent never sees the key, so relay its state on
-  // change; window blur clears it (a keyup elsewhere would never arrive).
-  IFrameBridge.prototype.handleAltKey = function(event) {
-    var down = event.type === 'blur' ? false
-      : event.key === 'Alt' ? event.type === 'keydown' : !!event.altKey;
-    if (down === !!this._altDown) return;
-    this._altDown = down;
-    this.sendToParent({ type: 'ALT_KEY', payload: { down: down } });
-  };
-
   IFrameBridge.prototype.handleKeyDown = function(event) {
-    this.handleAltKey(event);
     // Handle Escape to cancel flow drag
     if (event.key === 'Escape' && this._flowDrag._state) {
       this._flowDrag.handleCancel();

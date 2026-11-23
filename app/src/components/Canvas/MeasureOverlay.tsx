@@ -5,13 +5,14 @@ import { measureGaps, type Segment } from './measureGaps';
 // Inside the zoomed #canvas-content: hairlines and labels counter-scale by the live --sq-inv-scale.
 const INV = 'var(--sq-inv-scale, 1)';
 const HAIRLINE = `calc(${INV} * 1px)`;
+const LAYER = 'absolute pointer-events-none z-[1001]'; // ui-lint-line: overlay stacking order (measure above selection)
 
 function box({ x1, y1, x2, y2 }: Segment, offset: { x: number; y: number }): React.CSSProperties {
   return {
     left: Math.min(x1, x2) + offset.x,
     top: Math.min(y1, y2) + offset.y,
-    width: y1 === y2 ? Math.abs(x2 - x1) : 0,
-    height: x1 === x2 ? Math.abs(y2 - y1) : 0,
+    width: Math.abs(x2 - x1), // segments are axis-aligned: one of these is 0
+    height: Math.abs(y2 - y1),
   };
 }
 
@@ -26,7 +27,7 @@ export function MeasureOverlay({ selected, hovered, offset }: {
         <div
           key={`guide-${i}`}
           data-testid="measure-guide"
-          className="absolute pointer-events-none border-dashed border-overlay-measure z-[1001]" // ui-lint-line: overlay stacking order (measure above selection)
+          className={`${LAYER} border-dashed border-overlay-measure`}
           style={{ ...box(g, offset), [g.x1 === g.x2 ? 'borderLeftWidth' : 'borderTopWidth']: HAIRLINE }}
         />
       ))}
@@ -36,7 +37,7 @@ export function MeasureOverlay({ selected, hovered, offset }: {
           <Fragment key={`gap-${i}`}>
             <div
               data-testid="measure-line"
-              className="absolute pointer-events-none bg-overlay-measure z-[1001]" // ui-lint-line: overlay stacking order (measure above selection)
+              className={`${LAYER} bg-overlay-measure`}
               style={{
                 ...box(g, offset),
                 [horizontal ? 'height' : 'width']: HAIRLINE,
@@ -45,7 +46,7 @@ export function MeasureOverlay({ selected, hovered, offset }: {
             />
             {/* 0×0 anchor at the line's midpoint, scaled back to screen px; the label sits just below / right of the line */}
             <div
-              className="absolute pointer-events-none z-[1001]" // ui-lint-line: overlay stacking order (measure above selection)
+              className={LAYER}
               style={{
                 left: (g.x1 + g.x2) / 2 + offset.x,
                 top: (g.y1 + g.y2) / 2 + offset.y,

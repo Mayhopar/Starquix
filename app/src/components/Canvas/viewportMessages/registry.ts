@@ -3,7 +3,6 @@ import { handleBgImagePreview, handleImagePreviewRefresh } from './previews';
 import {
   handleElementHover,
   handleElementHoverEnd,
-  handleAltKey,
   handleElementHovered,
   handleElementRect,
   handleElementRectResponse,
@@ -50,7 +49,6 @@ export function buildMessageHandlers(): Record<string, MessageHandler> {
     IMAGE_PREVIEW_REFRESH: handleImagePreviewRefresh as MessageHandler,
     ELEMENT_HOVER: handleElementHover as MessageHandler,
     ELEMENT_HOVER_END: handleElementHoverEnd as MessageHandler,
-    ALT_KEY: handleAltKey as MessageHandler,
     ELEMENT_HOVERED: handleElementHovered as MessageHandler,
     ELEMENT_RECT: handleElementRect as MessageHandler,
     ELEMENT_RECT_RESPONSE: handleElementRectResponse as MessageHandler,

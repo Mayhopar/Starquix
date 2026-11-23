@@ -942,9 +942,6 @@ IFrameBridge.prototype.toggleDesignModeListeners = function(add) {
       document[method](event, handlers[event], true);
     });
 
-    document[method]('keyup', handlers.altKey, true);
-    window[method]('blur', handlers.altKey);
-
     // Wheel needs special options - capture must match for removal
     if (add) {
       document.addEventListener('wheel', handlers.wheel, { passive: false, capture: true });

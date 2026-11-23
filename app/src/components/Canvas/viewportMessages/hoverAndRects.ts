@@ -6,16 +6,10 @@
 import { isSelectionResolving } from './scanning';
 import type { ElementRect, KeyedRect, ElementHoverPayload, RectUpdatedPayload, RectsUpdatedPayload } from '@/bridge';
 import type { ViewportMessageContext } from './context';
-import { altKeyStore } from '../hoverRectStore';
 
 export function handleElementHover(ctx: ViewportMessageContext, payload: unknown): void {
   const p = payload as ElementHoverPayload;
   ctx.actions.setHoveredRect({ rect: p.rect, key: p.key, tagName: p.tagName, ...(p.computedStyles ? { computedStyles: p.computedStyles } : {}) });
-}
-
-/** Option state relayed from a focused iframe (MeasureOverlay). */
-export function handleAltKey(_ctx: ViewportMessageContext, payload: unknown): void {
-  altKeyStore.set(!!(payload as { down?: boolean }).down);
 }
 
 export function handleElementHoverEnd(ctx: ViewportMessageContext): void {

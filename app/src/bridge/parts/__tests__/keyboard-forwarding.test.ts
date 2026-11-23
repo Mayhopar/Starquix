@@ -109,21 +109,3 @@ describe('text entry inside the preview keeps its keystrokes', () => {
     }
   });
 });
-
-describe('handleAltKey relays Option state for the parent MeasureOverlay', () => {
-  beforeEach(() => resetHarnessDom());
-
-  it('sends ALT_KEY on change only — down, repeat, up, blur', () => {
-    const bridge = mount();
-    const send = bridge.sendToParent as ReturnType<typeof vi.fn>;
-    const alt = () => send.mock.calls.map((c) => c[0]).filter((m) => m.type === 'ALT_KEY').map((m) => m.payload.down);
-    bridge.handleKeyDown(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
-    bridge.handleKeyDown(new KeyboardEvent('keydown', { key: 'Alt', altKey: true })); // auto-repeat
-    bridge.handleAltKey(new KeyboardEvent('keyup', { key: 'Alt' }));
-    bridge.handleKeyDown(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
-    bridge.handleAltKey(new Event('blur'));
-    expect(alt()).toEqual([true, false, true, false]);
-    // bare Alt is not an editor shortcut — no KEYBOARD_EVENT for it
-    expect(send.mock.calls.some((c) => c[0].type === 'KEYBOARD_EVENT')).toBe(false);
-  });
-});

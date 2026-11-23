@@ -2,7 +2,7 @@ import type { ElementRect } from '@/bridge';
 
 /** An axis-aligned segment in document px; a gap also carries its length. */
 export interface Segment { x1: number; y1: number; x2: number; y2: number }
-export interface Gap extends Segment { value: number }
+interface Gap extends Segment { value: number }
 
 type Span = [number, number];
 const xs = (r: ElementRect): Span => [r.left, r.left + r.width];
@@ -27,20 +27,16 @@ function across(a: Span, b: Span): { at: number; shared: boolean } {
   return lo < hi ? { at: (lo + hi) / 2, shared: true } : { at: (a[0] + a[1]) / 2, shared: false };
 }
 
-/**
- * Figma's Option-hover: distances from the selection `a` to the hovered box `b`.
- * Apart on an axis → one gap line; boxes intersect (incl. one inside the other) →
- * edge-to-edge offsets on both axes. A diagonal line runs through a's centre and a
- * dashed guide extends b's edge to meet it. Zero-length gaps are dropped.
- */
-export function measureGaps(a: ElementRect, b: ElementRect): { gaps: Gap[]; guides: Segment[] } {
-  const ax = xs(a), bx = xs(b), ay = ys(a), by = ys(b);
-  const intersect = overlaps(ax, bx) && overlaps(ay, by);
+const transpose = (r: ElementRect): ElementRect => ({ left: r.top, top: r.left, width: r.height, height: r.width });
+const flip = <S extends Segment>(s: S): S => ({ ...s, x1: s.y1, y1: s.x1, x2: s.y2, y2: s.x2 });
+
+/** The horizontal lines; measureGaps gets the vertical ones by running this on transposed boxes. */
+function horizontal(a: ElementRect, b: ElementRect, intersect: boolean): { gaps: Gap[]; guides: Segment[] } {
+  const bx = xs(b), by = ys(b);
+  const y = across(ys(a), by);
   const gaps: Gap[] = [];
   const guides: Segment[] = [];
-
-  const y = across(ay, by);
-  for (const [from, to] of along(ax, bx, intersect)) {
+  for (const [from, to] of along(xs(a), bx, intersect)) {
     if (to <= from) continue;
     gaps.push({ x1: from, y1: y.at, x2: to, y2: y.at, value: to - from });
     if (!y.shared) {
@@ -48,16 +44,18 @@ export function measureGaps(a: ElementRect, b: ElementRect): { gaps: Gap[]; guid
       guides.push({ x1: x, y1: by[0] > y.at ? by[0] : by[1], x2: x, y2: y.at });
     }
   }
-
-  const x = across(ax, bx);
-  for (const [from, to] of along(ay, by, intersect)) {
-    if (to <= from) continue;
-    gaps.push({ x1: x.at, y1: from, x2: x.at, y2: to, value: to - from });
-    if (!x.shared) {
-      const yEdge = to === by[0] ? to : from;
-      guides.push({ x1: bx[0] > x.at ? bx[0] : bx[1], y1: yEdge, x2: x.at, y2: yEdge });
-    }
-  }
-
   return { gaps, guides };
+}
+
+/**
+ * Figma's Option-hover: distances from the selection `a` to the hovered box `b`.
+ * Apart on an axis → one gap line; boxes intersect (incl. one inside the other) →
+ * edge-to-edge offsets on both axes. A diagonal line runs through a's centre and a
+ * dashed guide extends b's edge to meet it. Zero-length gaps are dropped.
+ */
+export function measureGaps(a: ElementRect, b: ElementRect): { gaps: Gap[]; guides: Segment[] } {
+  const intersect = overlaps(xs(a), xs(b)) && overlaps(ys(a), ys(b));
+  const h = horizontal(a, b, intersect);
+  const v = horizontal(transpose(a), transpose(b), intersect);
+  return { gaps: [...h.gaps, ...v.gaps.map(flip)], guides: [...h.guides, ...v.guides.map(flip)] };
 }

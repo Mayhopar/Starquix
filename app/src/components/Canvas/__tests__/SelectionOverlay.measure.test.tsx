@@ -23,10 +23,4 @@ describe('SelectionOverlay Option-hover measuring', () => {
     alt('keyup');
     expect(labels()).toEqual([]);
   });
-
-  it('no Option → hover outline only', () => {
-    render(<SelectionOverlay selectedRect={{ left: 0, top: 0, width: 100, height: 50 }} scale={1} containerOffset={{ x: 0, y: 0 }} />);
-    act(() => hoverRectStore.set({ rect: { left: 130, top: 0, width: 50, height: 50 }, key: 'b' }));
-    expect(labels()).toEqual([]);
-  });
 });
