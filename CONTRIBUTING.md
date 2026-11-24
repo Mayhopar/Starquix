@@ -12,7 +12,7 @@ By opening a pull request you agree that your contribution is licensed under the
 
 ## Set up
 
-Requires Node.js 22+ and npm 10. Install and run the app as described in the [README](README.md#development).
+Requires Node.js 22.12+ and npm 10. Install and run the app as described in the [README](README.md#development).
 
 These help before changing code: [docs/architecture.md](docs/architecture.md) shows how the editor, the desktop shell, the preview bridge and the MCP relay fit together, and [docs/rules.md](docs/rules.md) lists the patterns to follow and the mistakes to avoid. [docs/decisions.md](docs/decisions.md) explains why things are built the way they are; `docs/data-flows/` and `docs/how-to/` cover specific areas.
 
@@ -36,7 +36,7 @@ cd desktop && npm test           # desktop unit tests
 cd mcp && npm run test:run       # only if you changed mcp/
 ```
 
-The desktop end-to-end tests drive the real Electron app: `cd desktop && npm run test:electron`. Run them when you change the desktop app, file writes or the canvas.
+The desktop end-to-end tests drive the real Electron app: `cd desktop && npm run test:electron`. Run them when you change the desktop app, file writes or the canvas. They start their own editor on :3061, so stop the README dev editor first, or set `SQ_REUSE_EDITOR=1` to reuse it.
 
 The `lefthook` pre-push hook runs the snapshot check and the editor tests on every push. Don't skip it with `--no-verify`; if it fails, fix the cause.
 
