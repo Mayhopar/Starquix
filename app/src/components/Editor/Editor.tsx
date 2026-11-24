@@ -83,6 +83,7 @@ import { findLocalProjectEntry, localPageId, resolveLocalPagePath, resolveLocalP
 import { watchLocalPageFiles } from '@/store/localPages';
 import { setLocalExpectedRoute, setLocalPageFile } from '@/utils/localPageSync';
 import { useLocalCrossFileToast } from './useLocalCrossFileToast';
+import { UpdateToast } from './UpdateToast';
 import { useSaveConflictToast } from './useSaveConflictToast';
 import { insertLocalComponent } from '@/components/Editor/localComponentInsert';
 import { bindInsertedBlogSlot } from '@/components/Editor/localBlogInsert';
@@ -1075,6 +1076,7 @@ export function Editor({ projectId, onProjectMissing }: EditorProps) {
                                   <PostEditorProvider>
                                     <SidebarTabProvider>
                                       <EditorContent projectId={projectId} onProjectMissing={onProjectMissing} />
+                                      <UpdateToast />
                                       {import.meta.env.DEV && <TelemetryPanel />}
                                     </SidebarTabProvider>
                                   </PostEditorProvider>

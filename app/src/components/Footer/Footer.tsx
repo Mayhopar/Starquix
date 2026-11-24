@@ -1,4 +1,5 @@
 import { ArrowUpRightIcon as SharedArrowUpRightIcon, CircleIcon as SharedCircleIcon, HomeFilledIcon, LineIcon as SharedLineIcon, PauseIcon as SharedPauseIcon, PencilIcon as SharedPencilIcon, PlayIcon as SharedPlayIcon, PolygonIcon as SharedPolygonIcon, RectangleIcon as SharedRectangleIcon } from '@/assets/icons';
+import { DISCORD_URL, openExternal } from '@/utils/supportLinks';
 import { footerOutlinePath, type FooterOutlineGeometry } from './footerOutline';
 import { PANEL_MOTION, RESIZE_EASE, easeOut, lerpPath, shapeProgress } from './footerMotion';
 // src/components/Footer/Footer.tsx
@@ -21,6 +22,7 @@ import {
   CloseIcon,
   ContainerIcon,
   CursorIcon,
+  DiscordIcon,
   DownloadIcon,
   FrameIcon,
   GearIcon,
@@ -1024,6 +1026,7 @@ export function Footer({ projectId, onOpenModal, addOpen = false, onCloseAdd, on
                 title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                 icon={isDark ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
               />
+              <FooterButton onClick={() => openExternal(DISCORD_URL)} title="Ask on Discord" icon={<DiscordIcon className="w-6 h-6" />} />
             </>
           )}
 

@@ -6,6 +6,7 @@ import { isStorageFailure, storageFailureGuidance } from '@/services/browserStor
 import { getActiveSaveProjectId } from '@/services/pendingProjectMutations';
 import { hasPendingUserAcceptance } from '@/services/durableEdits/acceptance';
 import { downloadReleaseDiagnostics, type FailureCategory } from '@/services/releaseDiagnostics';
+import { DISCORD_URL } from '@/utils/supportLinks';
 
 /** Root recovery may outlive RouterProvider, so unload protection reads the live acceptance lane. */
 export function RecoveryActions({ onRetry, category = 'render', detail }: { onRetry?: () => void | Promise<void>; category?: FailureCategory; detail?: string }) {
@@ -38,6 +39,7 @@ export function RecoveryActions({ onRetry, category = 'render', detail }: { onRe
     <div className="flex items-center gap-2 border-t border-stroke px-4 py-2">
       <Button variant="ghost" size="md" label="Download diagnostics" onClick={() => downloadReleaseDiagnostics({ failureCategory: category })} />
       <a href="/help.html#recovery" target="_blank" rel="noopener noreferrer" className="px-2 text-xs text-text-muted hover:text-text">Help</a>
+      <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="px-2 text-xs text-text-muted hover:text-text">Discord</a>
       <div className="flex-1" />
       {!startup && <Button variant="ghost" size="md" label="Reload" onClick={() => window.location.reload()} />}
       {onRetry && <Button variant="primary" size="md" label={retryLabel} aria-label={retryLabel} loading={busy} onClick={retry} />}
