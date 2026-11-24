@@ -527,3 +527,39 @@ describe('UndoContext page delete/restore entries (task-148)', () => {
     expect(result.current.doc.getMap('pages').has('about')).toBe(false);
   });
 });
+
+// #20: an outside edit (the AI, a terminal) changed the step's file, so the step can never replay.
+// It leaves the stack with a toast that says so, and the next ⌘Z reaches the step before it.
+describe('a step whose file changed since', () => {
+  beforeEach(() => { vi.clearAllMocks(); _resetStructuralWriteInFlightForTests(); });
+  afterEach(teardown);
+  const OUTSIDE = '<main>edited outside</main>\n';
+  const change = { file: PAGE, beforeSource: ORIGINAL, afterSource: DELETED };
+
+  async function pressTwice(push: (result: ReturnType<typeof mount>['result']) => void) {
+    await boot({ [PAGE]: OUTSIDE });
+    const { result } = mount();
+    act(() => result.current.takeSnapshot());
+    act(() => { h.doc.transact(() => h.doc.getMap('sourceText').set('k', new Y.Map()), 'user'); });
+    act(() => push(result));
+    await act(async () => { await result.current.undo(); });
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('step was removed'));
+    expect(await disk()).toBe(OUTSIDE);
+    expect(result.current.canRedo).toBe(false);
+    await act(async () => { await result.current.undo(); });
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(h.doc.getMap('sourceText').has('k')).toBe(false); // the step before it was undone
+    expect(result.current.canUndo).toBe(false);
+  }
+
+  it('a structural step is dropped', () => pressTwice(result =>
+    result.current.pushStructuralUndo({ structuralOp: { ...deleteRecord().structuralOp, sourceFiles: [change] } })));
+
+  it('a snapshot step is dropped', () => pressTwice(result => {
+    result.current.takeSnapshot();
+    const claim = result.current.claimSnapshot()!;
+    claim.attachFiles([change]);
+    claim.commit();
+  }));
+});

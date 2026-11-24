@@ -1116,8 +1116,17 @@ export function UndoProvider({ children }: { children: ReactNode }) {
    * busy/rejected replay leaves the entry untouched. Page/content operations
    * still use legacy replay and only transfer after its successful outcome.
    */
+  /** A refused replay keeps its step for a retry (87a0781c) — unless its file
+   *  changed since (an outside edit: the AI, a terminal). That step can never
+   *  replay: it leaves the stack, so the next press reaches the one before (#20). */
+  const refuseReplay = useCallback((entry: UndoEntry, dir: 'undo' | 'redo', error: unknown) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    const stale = /Source changed before acceptance/.test(detail);
+    if (stale) (dir === 'undo' ? setPast : setFuture)(prev => prev.filter(item => item !== entry));
+    toast.error(`${dir === 'undo' ? 'Undo' : 'Redo'} was not saved: ${detail}${stale ? ' — the step was removed' : ''}`);
+  }, []);
+
   const beginStructuralReplay = useCallback(async (entry: StructuralUndoRecord, dir: 'undo' | 'redo') => {
-    const label = dir === 'undo' ? 'Undo' : 'Redo';
     // An intervening accepted edit must not have its cleared redo resurrected
     // by this replay's asynchronous stack transfer — measured from the press,
     // not from when its turn comes.
@@ -1155,9 +1164,9 @@ export function UndoProvider({ children }: { children: ReactNode }) {
           });
       }
     } catch (error) {
-      toast.error(`${label} was not saved: ${error instanceof Error ? error.message : String(error)}`);
+      refuseReplay(entry, dir, error);
     } finally { releaseStructuralWrite(); }
-  }, [doc]);
+  }, [doc, refuseReplay]);
 
   const replayClasses = useCallback(async (snapshot: UndoSnapshot, direction: 'undo' | 'redo') => {
     const projectId = doc.getMap('meta').get('projectId') as string | undefined;
@@ -1180,7 +1189,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
           if (snapshot.fileChanges?.length) {
             const { readProjectedSourceState, withProjectedSource } = await import('@/services/durableEdits/projectedSource');
             await withProjectedSource(projectId, precedingRevision, async () => {
-              for (const file of snapshot.fileChanges!) if (await readProjectedSourceState(projectId, file.file, file.encoding) !== file.beforeSource) throw new Error('Undo source baseline changed');
+              for (const file of snapshot.fileChanges!) if (await readProjectedSourceState(projectId, file.file, file.encoding) !== file.beforeSource) throw new Error(`Source changed before acceptance: ${file.file}`);
             });
           }
         },
@@ -1215,7 +1224,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
         },
       });
     } catch (error) {
-      toast.error(`${direction === 'undo' ? 'Undo' : 'Redo'} not saved: ${error instanceof Error ? error.message : String(error)}`);
+      refuseReplay(snapshot, direction, error);
       return;
     }
     // Acceptance is final. Post-commit asset observers cannot turn it into a
@@ -1242,7 +1251,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       void flushDurableSourceWritesThrough(projectId!, accepted!.revision)
         .then(() => { if (content) window.dispatchEvent(new Event('sq:content-changed')); }).catch(() => {});
     }
-  }, [doc, createSnapshot, applySnapshot]);
+  }, [doc, createSnapshot, applySnapshot, refuseReplay]);
 
   // Owner 2026-11-10 ("no refusals … nothing lost"): ⌘Z / ⌘⇧Z pressed again
   // while the last one is still being saved is never refused ("busy") nor
