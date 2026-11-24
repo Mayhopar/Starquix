@@ -174,9 +174,10 @@ export function holdProjectInput(projectId: string, push: () => void, options?: 
   return () => { set.delete(held); if (!set.size && heldInputs.get(projectId) === set) heldInputs.delete(projectId); };
 }
 
-/** Push only the user-scoped held input (a quit, a selection change, an undo): fire-and-forget, never waits on the lane. */
+/** A barrier the user raised (a quit) pushes every held input, post typing too (#22) — only an agent's skips the user-scoped
+ * ones. Fire-and-forget, never waits on the lane. */
 export function pushUserHeldInput(projectId: string): void {
-  for (const held of [...heldInputs.get(projectId) ?? []]) if (held.user) held.push();
+  for (const held of [...heldInputs.get(projectId) ?? []]) held.push();
 }
 
 export async function awaitAccepted(projectId: string, options?: { agent?: boolean }): Promise<number> {
