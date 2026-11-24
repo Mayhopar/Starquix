@@ -41,31 +41,14 @@ function parseToken(token: string): ParsedToken {
   let state: State = 'default';
   let rest = token;
 
-  // Check for breakpoint prefix (must be first)
-  for (const bp of BREAKPOINT_PREFIXES) {
-    if (rest.startsWith(bp + ':')) {
-      breakpoint = bp as Breakpoint;
-      rest = rest.slice(bp.length + 1);
-      break;
-    }
-  }
-
-  // Check for theme prefix (after breakpoint)
-  for (const t of THEME_PREFIXES) {
-    if (rest.startsWith(t + ':')) {
-      theme = t as Theme;
-      rest = rest.slice(t.length + 1);
-      break;
-    }
-  }
-
-  // Check for state prefix (after theme)
-  for (const s of STATE_PREFIXES) {
-    if (rest.startsWith(s + ':')) {
-      state = s as State;
-      rest = rest.slice(s.length + 1);
-      break;
-    }
+  // Known variants in any order (hover:md:bg-x is md:hover:bg-x), one per axis; any other prefix ends the chain.
+  for (let m; (m = rest.match(/^([\w-]+):/));) {
+    const v = m[1];
+    if (breakpoint === 'xs' && (BREAKPOINT_PREFIXES as readonly string[]).includes(v)) breakpoint = v as Breakpoint;
+    else if (theme === 'light' && (THEME_PREFIXES as readonly string[]).includes(v)) theme = v as Theme;
+    else if (state === 'default' && (STATE_PREFIXES as readonly string[]).includes(v)) state = v as State;
+    else break;
+    rest = rest.slice(m[0].length);
   }
 
   return { breakpoint, theme, state, className: rest };

@@ -8,8 +8,9 @@ export const TEXT_ELEMENTS = new Set([
 
 // Regex patterns for detecting class categories
 export const CLASS_PATTERNS = {
-  fill: /\bbg-/,
-  stroke: /\b(border|outline|ring)[-\s]|\bborder\b/,
+  // Anchored to a token's start: group-hover:bg-… is not a fill of this element.
+  fill: /(^|\s)bg-/,
+  stroke: /(^|\s)(border|outline|ring)([-\s]|$)/,
   effects: /(^|\s|:)(shadow|blur|backdrop-blur|grayscale|invert|sepia|brightness-|contrast-|saturate-)/
 } as const;
 
