@@ -96,6 +96,7 @@
     },
     "electronFuses": {
       "runAsNode": true,
+      "enableCookieEncryption": true,
       "enableNodeOptionsEnvironmentVariable": false,
       "grantFileProtocolExtraPrivileges": false
     },
