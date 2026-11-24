@@ -68,7 +68,7 @@ export const AISettings: React.FC<AISettingsProps> = ({ isOpen, onClose, initial
   const bottom = <>{mcp && <McpTab />}<ImagesSection /><SystemPrompt initiallyOpen={initialTab === 'prompts'} /></>;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md" className="flex flex-col max-h-[80vh]">
+    <Modal isOpen={isOpen} onClose={onClose} aria-label="AI settings" size="md" className="flex flex-col max-h-[80vh]">
       <Row title="AI settings" className="pl-4 pr-2 border-b border-stroke" hover={false}
         right={[{ type: 'custom', unboxed: true, node: (
           <Button variant="ghost" size="sm" iconOnly aria-label="Close" icon={<CloseIcon className="w-4 h-4" />} onClick={onClose} />

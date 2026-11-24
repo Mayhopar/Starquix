@@ -48,7 +48,7 @@ export function Window({ isOpen, onClose, title, closeButton = false, children }
   isOpen: boolean; onClose: () => void; title: string; closeButton?: boolean; children: ReactNode;
 }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md" className="flex flex-col overflow-hidden">
+    <Modal isOpen={isOpen} onClose={onClose} aria-label={title} size="md" className="flex flex-col overflow-hidden">
       <Row title={<span className="text-lg text-text">{title}</span>} hover={false}
         className={cx('shrink-0 pl-4 pr-2 border-b border-stroke', closeButton ? 'py-2' : 'py-3.5')} // 56px either way
         right={closeButton ? [{ type: 'custom', unboxed: true, node: (

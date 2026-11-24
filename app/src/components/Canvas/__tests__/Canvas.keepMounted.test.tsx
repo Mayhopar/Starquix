@@ -337,3 +337,29 @@ describe('background click (ledger A8)', () => {
     expect(sel.clearSelection).not.toHaveBeenCalled();
   });
 });
+
+describe('a canvas gesture hands the keyboard to the canvas (#4/#19 focus rule)', () => {
+  beforeEach(() => {
+    ctxState.activeTopTab = 'pages';
+    ctxState.isPreview = false;
+    ctxState.editingPost = null;
+    ctxState.activeCollectionId = null;
+  });
+  it('a mousedown on the canvas takes focus from the toolbar control that had it (draw/pen/handles preventDefault theirs)', () => {
+    const { container } = renderCanvas();
+    const canvas = container.querySelector('[data-scroll-container]') as HTMLElement;
+    expect(canvas).toHaveAttribute('data-canvas-keys');
+    const tool = document.body.appendChild(document.createElement('button'));
+    tool.focus();
+    fireEvent.mouseDown(screen.getByTestId('viewport-frame'));
+    expect(document.body).toHaveFocus();
+    tool.remove();
+  });
+  it('focus already on the canvas (its iframe, mid text edit) stays there', () => {
+    const { container } = renderCanvas();
+    const inside = container.querySelector('#canvas-content')!.appendChild(document.createElement('iframe'));
+    inside.focus();
+    fireEvent.mouseDown(screen.getByTestId('viewport-frame'));
+    expect(inside).toHaveFocus();
+  });
+});

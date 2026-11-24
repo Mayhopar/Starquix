@@ -63,7 +63,7 @@ export const ImportProjectModal: React.FC<ImportProjectModalProps> = ({ isOpen, 
   const busy = state === 'reading' || state === 'importing';
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="sm" className="flex flex-col">
+    <Modal isOpen={isOpen} onClose={handleClose} aria-label="Import Astro project" size="sm" className="flex flex-col">
       <Row title="Import Astro project" className="pl-4 pr-2 border-b border-stroke" hover={false}
         right={[{ type: 'custom', unboxed: true, node: (
           <Button variant="ghost" size="sm" iconOnly aria-label="Close" icon={<CloseIcon className="w-4 h-4" />} onClick={handleClose} />

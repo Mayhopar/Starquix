@@ -81,7 +81,7 @@ export function MediaSlotDialog({ currentSrc, onUpload, onPick, onClear, onClose
     : null;
 
   return (
-    <Modal isOpen size="sm" onClose={() => { if (!uploading.current) onClose(); }}>
+    <Modal isOpen aria-label="Media" size="sm" onClose={() => { if (!uploading.current) onClose(); }}>
       <div className="p-3 space-y-2">
         <Row title="Media" size="sm" hover={false} className="px-0" />
         {error !== null && <OperationNotice title="The media slot was not updated." detail={error} />}

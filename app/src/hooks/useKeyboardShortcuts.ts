@@ -265,7 +265,8 @@ export async function deleteLocalElementGroup(
   } finally { releaseStructuralWrite(); }
 }
 
-export function useKeyboardShortcuts(): void {
+/** `designSurface`: the page canvas is what's on screen (Editor's own flag) — not the Content/Assets/variables views. */
+export function useKeyboardShortcuts(designSurface = true): void {
   const dispatch = useDispatch();
   const doc = useEditorDoc();
   const { undo, redo, takeSnapshot, claimSnapshot, pushStructuralUndo } = useUndoContext();
@@ -288,8 +289,8 @@ export function useKeyboardShortcuts(): void {
   const { scannedElementsRef, scannedByKeyRef, treeNodesRef } = useScannedElementsRef();
 
   // Consolidated ref for event handler access (avoid stale closures)
-  const stateRef = useRef({ selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview });
-  stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview };
+  const stateRef = useRef({ selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview, designSurface });
+  stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview, designSurface };
 
   // Helper to select an element with full metadata from scannedElements
   const selectElement = useCallback((key: string) => {
@@ -371,10 +372,17 @@ export function useKeyboardShortcuts(): void {
         return;
       }
 
+      // Every key from here on acts on the canvas (only ⌘Z/⌘Y/⌘J are app commands), so only while the keyboard is on
+      // the canvas: nothing focused, or focus in [data-canvas-keys] (the canvas with its iframe, the Layers tree) — on
+      // the Design view, with no window open. A focused control keeps its own keys (Enter clicks, Tab moves on).
+      const focus = document.activeElement;
+      const canvasKeys = stateRef.current.designSurface && !document.querySelector('[aria-modal="true"]') &&
+        (!focus || focus === document.body || !!focus.closest('[data-canvas-keys]'));
+
       // Bare-key shortcuts (no modifiers). Both the keys handled here and the
       // set the bridge forwards out of the preview iframe come from ONE list:
       // bridge/globalShortcuts.ts. Add a bare-key shortcut there, never here.
-      if (!cmdOrCtrl && !e.shiftKey && !e.altKey) {
+      if (canvasKeys && !cmdOrCtrl && !e.shiftKey && !e.altKey) {
         // Breakpoint shortcuts: 1–6 → xs…2xl (input guard above keeps typing safe)
         const bpIndex = BREAKPOINT_SHORTCUT_KEYS.indexOf(e.key);
         if (bpIndex !== -1) {
@@ -412,6 +420,8 @@ export function useKeyboardShortcuts(): void {
         setActiveTool(next); // Footer's effect is the sole sq:ai-context-mode emitter
         return;
       }
+
+      if (!canvasKeys) return;
 
       // ⌘C copy / ⌘X cut / ⌘V paste / ⌘D duplicate — element clipboard
       if (cmdOrCtrl && (e.key === 'c' || e.key === 'x' || e.key === 'v' || e.key === 'd') && !e.shiftKey && !e.altKey) {
