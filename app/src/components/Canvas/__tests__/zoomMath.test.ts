@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   MIN_SCALE, MAX_SCALE, ZOOM_LEVELS, FRAME_TOP_PADDING, FIT_MARGIN,
-  clampScale, stepScale, zoomAroundPoint, fitView, keepFrameOnScreen,
+  clampScale, stepScale, zoomAroundPoint, fitView,
 } from '../zoomMath';
 
 describe('clampScale', () => {
@@ -97,20 +97,5 @@ describe('fitView', () => {
     // frameLeft = 0 here, so x must be 0 and y = -32*1 + 0... screenTop = y + 32 = 0
     expect(v.x).toBeCloseTo(0, 6);
     expect(v.y + FRAME_TOP_PADDING * v.scale).toBeCloseTo(0, 6);
-  });
-});
-
-describe('keepFrameOnScreen', () => {
-  // Frame screen x = box.left + view.x + ((box.width - frameWidth) / 2) * scale (content layer centres the frame).
-  const frameX = (box: { left: number; width: number }, v: { x: number; scale: number }, fw = 375) => box.left + v.x + ((box.width - fw) / 2) * v.scale;
-  it.each([1, 0.5, 2])('⌘\\ hiding and showing both sidebars leaves the frame where it was (scale %s)', (scale) => {
-    const shown = { left: 240, width: 800 }, hidden = { left: 0, width: 1400 };
-    const view = { scale, x: 30, y: 12 };
-    const afterHide = keepFrameOnScreen(view, shown, hidden);
-    expect(frameX(hidden, afterHide)).toBeCloseTo(frameX(shown, view));
-    expect(afterHide.y).toBe(12);
-    expect(afterHide.scale).toBe(scale);
-    const afterShow = keepFrameOnScreen(afterHide, hidden, shown);
-    expect(afterShow.x).toBeCloseTo(view.x);
   });
 });

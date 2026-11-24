@@ -104,14 +104,3 @@ export function fitView(input: FitInput): ViewTransform {
 export function wheelZoomFactor(deltaY: number): number {
   return Math.exp(-Math.max(-50, Math.min(50, deltaY)) / 100);
 }
-
-export interface CanvasBox { left: number; width: number }
-
-/**
- * The canvas box moved under a still view (⌘\ takes both sidebars out of the layout, or brings them back). The
- * content layer centres the frame in the canvas width, so the frame would jump: shift the pan by what the box moved,
- * so the frame stays where it was on screen.
- */
-export function keepFrameOnScreen(view: ViewTransform, before: CanvasBox, after: CanvasBox): ViewTransform {
-  return { ...view, x: view.x + before.left - after.left - ((after.width - before.width) / 2) * view.scale };
-}
