@@ -193,7 +193,11 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
   const { activeCollectionId } = useVariables();
   const { editingPost, closePost } = usePostEditor();
   const { activeTopTab } = useSidebarTab();
-  const { isPreview } = useTool();
+  const { isPreview, sidebarsHidden } = useTool();
+  // ⌘\ moves the canvas edges while the window keeps its size. Open flyouts (ui/Popover), the
+  // post editor's toolbars and the frame's fixed-layer repaint (ViewportFrame) all follow
+  // `resize` already, so tell them the layout moved instead of wiring each one up.
+  useEffect(() => { window.dispatchEvent(new Event('resize')); }, [sidebarsHidden]);
   // 🏠 (sidebar top-left): snapshot the canvas as the project's cover, then leave.
   const navigate = useNavigate();
   const { captureScreenshot } = useCoverCapture({ iframeRef, projectId });
@@ -873,8 +877,11 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
             SLIDE out rather than pop: kept mounted and in flow (design-mode
             layout unchanged), translated off-screen, and lifted to z-50 ONLY in
             preview so they ride over the fixed full-window iframe (z-40) as they
-            go. motion-reduce respects the OS setting. */}
-        <div className={`relative h-full flex-shrink-0 ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 -translate-x-full' : ''}`}>
+            go. motion-reduce respects the OS setting.
+            ⌘\ (sidebarsHidden) takes both panels out of the layout instead, so the
+            canvas really is the whole window; `hidden` keeps them mounted (widths,
+            tabs, scroll and drafts survive) and out of the Tab order. */}
+        <div className={`relative h-full flex-shrink-0 ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 -translate-x-full' : ''} ${sidebarsHidden ? 'hidden' : ''}`}>
           <LeftSidebar />
         </div>
         <Canvas
@@ -893,7 +900,7 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
         {designSurface && (
           // task-116: stays mounted in preview and slides off to the right
           // (see the LeftSidebar wrapper above for the flow/z-50 rationale).
-          <div className={`relative flex-shrink-0 ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 translate-x-full' : ''}`} style={{ width: designBarWidth }}>
+          <div className={`relative flex-shrink-0 ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 translate-x-full' : ''} ${sidebarsHidden ? 'hidden' : ''}`} style={{ width: designBarWidth }}>
             {/* Resize Handle - absolute positioned on left edge */}
             <div
               className="absolute top-0 left-0 w-2 h-full cursor-col-resize group z-10"

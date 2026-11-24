@@ -175,6 +175,7 @@ export interface KeyboardEventPayload {
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
+  repeat?: boolean;
 }
 
 export interface TextSelectionChangedPayload {

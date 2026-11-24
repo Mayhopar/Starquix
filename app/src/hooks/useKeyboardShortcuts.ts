@@ -269,7 +269,7 @@ export function useKeyboardShortcuts(): void {
   const dispatch = useDispatch();
   const doc = useEditorDoc();
   const { undo, redo, takeSnapshot, claimSnapshot, pushStructuralUndo } = useUndoContext();
-  const { activeTool, setActiveTool, isPreview, setPreview } = useTool();
+  const { activeTool, setActiveTool, isPreview, setPreview, toggleSidebars } = useTool();
 
   const {
     selectedKey,
@@ -313,6 +313,19 @@ export function useKeyboardShortcuts(): void {
           // Edits are already durable; ⌘S only hurries their source projection.
           void flushDurableSourceWrites(projectId).catch(() => {});
         }
+        return;
+      }
+
+      // Show / hide both sidebars: ⌘\ (Ctrl+\), as in Figma. Global like Save, so the
+      // canvas gets the whole window wherever focus is. `code` is the key's position
+      // (layouts that print another character there), `key` the character itself.
+      // No Alt: AltGr (Ctrl+Alt on Windows) is how several layouts type a backslash.
+      if (cmdOrCtrl && !e.shiftKey && !e.altKey && (e.code === 'Backslash' || e.key === '\\')) {
+        if (e.defaultPrevented || e.isComposing || e.keyCode === 229 || stateRef.current.isPreview) return;
+        e.preventDefault();
+        // The focused field must not act on it too, not even a held key's repeats: a terminal sends Ctrl+\ to the shell as SIGQUIT.
+        e.stopPropagation();
+        if (!e.repeat) toggleSidebars();
         return;
       }
 
@@ -690,7 +703,7 @@ export function useKeyboardShortcuts(): void {
     [
       undo, redo, takeSnapshot, claimSnapshot, pushStructuralUndo,
       dispatch, doc, selectedElementId,
-      setActiveTool, setPreview,
+      setActiveTool, setPreview, toggleSidebars,
       clearSelection, clearAdditionalSelections, enterContext, exitContext, selectElement,
       scannedElementsRef, treeNodesRef
     ]
