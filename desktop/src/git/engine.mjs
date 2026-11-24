@@ -5,8 +5,10 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import git from 'isomorphic-git';
 // `node_modules` without a slash: projects symlink it to the app's shared runtime deps, and a
-// dir-only pattern would not match the symlink.
-const IGNORE = ['node_modules', '.sq/', 'dist/'];
+// dir-only pattern would not match the symlink. Astro's cache and macOS's .DS_Store rewrite themselves: kept in a
+// version they show changes nobody made, which block Restore, branch switch and Pull (#30). An imported site keeps its
+// .env (#16); like Astro's starter .gitignore, its secrets never go into a version or to GitHub.
+const IGNORE = ['node_modules', '.sq/', 'dist/', '.astro/', '.DS_Store', '.env', '.env.production'];
 // A git op never writes these into the project folder: node_modules is a symlink to the shared runtime deps, .sq/ is ours,
 // dist/ is build output (docs/plans/2026-10-18-publish-into-existing-repo-design.md: GitHub's tip may carry them).
 const RUNTIME = new Set(['node_modules', '.sq', 'dist']);
@@ -184,12 +186,14 @@ export function createEngine(dir, { http, onAuth } = {}) {
   }
   // D7/D8: pull = fetch + merge. Conflicts never reach the canvas: each conflicted file gets Mine
   // (isomorphic-git leaves <<<<<<< markers on disk) and the user picks Mine/Theirs per file.
+  /** Writes `filepath` as of commit `oid`; returns the blob oid written (null: deleted on that side). */
   async function writeSide(filepath, oid) {
     const target = path.join(dir, filepath);
     try {
-      const { blob } = await git.readBlob({ ...base, oid, filepath });
+      const { oid: written, blob } = await git.readBlob({ ...base, oid, filepath });
       await fsp.mkdir(path.dirname(target), { recursive: true }); await writeIfChanged(target, blob);
-    } catch (e) { if (e.code !== 'NotFoundError') throw e; await fsp.rm(target, { force: true }); } // deleted on that side
+      return written;
+    } catch (e) { if (e.code !== 'NotFoundError') throw e; await fsp.rm(target, { force: true }); return null; } // deleted on that side
   }
   async function pull(author) {
     await assertNotMerging(); await assertClean();
@@ -207,15 +211,17 @@ export function createEngine(dir, { http, onAuth } = {}) {
     } catch (e) {
       if (e.code !== 'MergeConflictError') throw e;
       const conflicts = e.data.filepaths;
-      for (const f of conflicts) await writeSide(f, ours);
-      await fsp.writeFile(MERGE, JSON.stringify({ ours, theirs, files: Object.fromEntries(conflicts.map(f => [f, 'mine'])) }));
+      // The tree was clean, so every file that differs now is the pull's: `wrote` (path → oid) is all Abort may take back.
+      const wrote = Object.fromEntries(await walkWork((f, h, w) => (h !== w ? [f, w] : undefined)));
+      for (const f of conflicts) wrote[f] = await writeSide(f, ours);
+      await fsp.writeFile(MERGE, JSON.stringify({ ours, theirs, files: Object.fromEntries(conflicts.map(f => [f, 'mine'])), wrote }));
       return { conflicts };
     }
   }
   async function resolve(filepath, side) {
     const m = await mergeState();
     if (!m?.files[filepath]) throw fail('invalid', 'Not a conflicted file');
-    await writeSide(filepath, side === 'theirs' ? m.theirs : m.ours);
+    m.wrote = { ...m.wrote, [filepath]: await writeSide(filepath, side === 'theirs' ? m.theirs : m.ours) };
     m.files[filepath] = side; await fsp.writeFile(MERGE, JSON.stringify(m));
   }
   async function stage(filepath) {
@@ -230,13 +236,15 @@ export function createEngine(dir, { http, onAuth } = {}) {
     const oid = await git.commit({ ...base, author, message: 'Merge from GitHub', parent: [m.ours, m.theirs] });
     await fsp.rm(MERGE); return oid;
   }
+  // Like `git merge --abort`: only what the pull wrote goes back, and only while it is as the pull left it — pages,
+  // images and edits made while the merge waited stay (#1). A merge parked by an older version has no `wrote`: nothing goes back.
   async function abort() {
     const m = await mergeState(); if (!m) return;
-    await git.checkout({ ...base, ref: await git.currentBranch(base), force: true });
-    for (const [f, head] of await changedRows()) {
-      if (head === 0) await fsp.rm(path.join(dir, f), { force: true }); else await writeSide(f, m.ours);
+    const now = await files();
+    for (const f of Object.keys({ ...m.files, ...m.wrote })) {
+      if ((now.get(f) ?? null) === m.wrote?.[f]) await writeSide(f, m.ours);
+      await git.resetIndex({ ...base, filepath: f }); // drops the merge's conflict stages and merged blobs
     }
-    await git.checkout({ ...base, ref: await git.currentBranch(base), force: true }); // resets the index
     await fsp.rm(MERGE);
   }
   // Publish into an existing repo (docs/plans/2026-10-18-publish-into-existing-repo-design.md E2): GitHub's tip at depth 1,

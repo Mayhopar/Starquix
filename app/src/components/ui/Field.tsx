@@ -19,6 +19,12 @@ import { ChevronDownIcon } from '@/assets/icons';
 import { cx } from './cx';
 import { Skeleton } from './Skeleton';
 
+/** THE dropdown chevron: a select Field's, and any field-looking trigger's (the font and colour pickers). */
+export const FieldChevron = () => <ChevronDownIcon className="w-4 h-4 shrink-0 text-text-secondary" />;
+/** A Button that looks like a select Field: the Field's 1px edge (a real border, not the outline's inset ring) and its
+ *  4px trailing gap, so a `<FieldChevron />` as the Button's last child sits exactly where a select Field's does. */
+export const fieldTrigger = 'h-7 py-0 pr-1 font-normal bg-input-fill inset-ring-0 border border-input-stroke';
+
 const SKELETON_BOX: Record<InputSize, string> = { sm: 'h-6', md: 'h-7', lg: 'h-8' }; // InputContainer's heights
 
 export type { InputSize };
@@ -179,11 +185,12 @@ export const Field = forwardRef<HTMLInputElement | HTMLSelectElement | HTMLTextA
     let trailing: React.ReactNode = props.trailing ?? rightSlot;
     if (props.as === 'select') {
       const showChevron = props.showChevron ?? true;
-      if (showChevron && !trailing) trailing = <ChevronDownIcon className="w-4 h-4 shrink-0" />;
+      if (showChevron && !trailing) trailing = <FieldChevron />;
     } else if (props.as !== 'textarea' && (props.unit ?? suffix) && !trailing) {
       trailing = props.unit ?? suffix;
     }
 
+    const opensOnClick = props.as === 'select' || (!!inputProps?.readOnly && !!inputProps.onClick);
     const lg = size === 'lg';
     const valueClasses = cx(baseFieldStyles, lg ? 'text-sm' : 'text-xs', mono && 'font-mono');
 
@@ -195,7 +202,7 @@ export const Field = forwardRef<HTMLInputElement | HTMLSelectElement | HTMLTextA
         size={size}
         disabled={disabled}
         error={!!error}
-        className={cx(props.as === 'textarea' && 'h-auto', containerClassName || className)}
+        className={cx(props.as === 'textarea' && 'h-auto', opensOnClick ? 'cursor-pointer' : 'cursor-text', containerClassName || className)}
       >
         {prefix && <span className="text-xs text-text-secondary shrink-0 pl-2 -mr-2">{prefix}</span>}
         {props.as === 'textarea' ? (

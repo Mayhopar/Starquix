@@ -166,3 +166,14 @@ describe('Pages panel rename gesture ownership', () => {
     expect(shown()).toBe('/page-2');
   });
 });
+
+// ⌘\ hides the sidebars and dispatches `resize`: a menu pinned at the cursor would float over the canvas.
+describe('Pages panel row menu', () => {
+  it('closes when the layout resizes', () => {
+    renderNode(page({ id: 'p2', name: 'Page 2' }));
+    fireEvent.contextMenu(screen.getByTestId('page-item'));
+    expect(screen.getByText('Delete')).toBeTruthy();
+    fireEvent(window, new Event('resize'));
+    expect(screen.queryByText('Delete')).toBeNull();
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { handleElementClick, handleElementClicked, handleSlotPlaceholderClick, TEXT_EDITABLE_TAGS } from '../selection';
 import { makeFakeCtx, makeFakeIframe } from './fakeContext';
+import { layerMenu } from '@/components/Editor/layerMenuStore';
 
 const rect = { top: 1, left: 2, width: 3, height: 4 };
 const basePayload = {
@@ -184,4 +185,31 @@ it('ELEMENT_CLICK carries the actual imported card paths separately from legacy 
   const ctx = makeFakeCtx();
   handleElementClick(ctx, { ...basePayload, postLinkPaths: ['/works/second'] });
   expect(ctx.refs.selectInContext.current).toHaveBeenCalledWith(basePayload.key, expect.objectContaining({ postLinkPaths: ['/works/second'], postSlug: undefined }));
+});
+
+describe('ELEMENT_CLICK after a canvas right-click (issue #5)', () => {
+  it('a plain select opens the armed layer menu at the cursor', () => {
+    layerMenu.open(null);
+    layerMenu.arm({ x: 7, y: 8 });
+    const ctx = makeFakeCtx();
+    handleElementClick(ctx, basePayload);
+    expect(ctx.refs.selectInContext.current).toHaveBeenCalledWith(basePayload.key, expect.anything());
+    expect(layerMenu.get()).toEqual({ x: 7, y: 8 });
+    layerMenu.open(null);
+  });
+
+  it('a click that ends early (text edit entry) consumes the armed point without opening', () => {
+    layerMenu.open(null);
+    layerMenu.arm({ x: 7, y: 8 });
+    const ctx = makeFakeCtx({ refs: { selectedKey: { current: 'k1' } } });
+    handleElementClick(ctx, { ...basePayload, key: 'k1', tagName: 'p', isDoubleClick: true, hasChildren: false });
+    expect(layerMenu.get()).toBeNull();
+    expect(layerMenu.takeArmed()).toBeNull();
+  });
+
+  it('an unarmed click opens nothing', () => {
+    layerMenu.open(null);
+    handleElementClick(makeFakeCtx(), basePayload);
+    expect(layerMenu.get()).toBeNull();
+  });
 });

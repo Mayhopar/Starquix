@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { parse } from '@babel/parser';
-import { NO_TITLE } from './deps.mjs';
+import { NO_TITLE, astroPackage, major } from './deps.mjs';
 import { buildSite } from './site-build.mjs';
 
 const run = promisify(execFile);
@@ -19,7 +19,6 @@ const MODERN_CONFIG = /^src\/content\.config\.(ts|js|mjs|mts)$/;
 const SOURCE = /^src\/.+\.(astro|ts|tsx|js|jsx|mjs|mts)$/;
 const OTHER_LOCKS = ['pnpm-lock.yaml', 'yarn.lock', 'bun.lockb', 'bun.lock'];
 const SKIP = new Set(['node_modules', '.sq', '.git', 'dist', '.astro']);
-const major = range => Number(/(\d+)/.exec(String(range ?? ''))?.[1] ?? NaN);
 
 /** What a legacy collection folder holds: entries (markdown) or data (json/yaml). */
 const loaderFor = (name, kind) => `loader: glob({ pattern: ${kind === 'data' ? "'**/*.{json,yaml,yml}'" : "'**/[^_]*.{md,mdx,markdown}'"}, base: './src/content/${name}' })`;
@@ -98,7 +97,7 @@ export function upgradeSource(text, rel) {
 export function upgradePackage(text, versions, { markdownPlugins }) {
   const pkg = JSON.parse(text);
   for (const field of ['dependencies', 'devDependencies']) {
-    for (const name of Object.keys(pkg[field] ?? {})) if ((name === 'astro' || name.startsWith('@astrojs/')) && versions[name]) pkg[field][name] = `^${versions[name]}`;
+    for (const name of Object.keys(pkg[field] ?? {})) if (astroPackage(name) && versions[name]) pkg[field][name] = `^${versions[name]}`;
   }
   const has = name => pkg.dependencies?.[name] ?? pkg.devDependencies?.[name];
   // Satteri renders markdown by default: remark/rehype plugins in the config need the unified pipeline installed.

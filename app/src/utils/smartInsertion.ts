@@ -1,6 +1,7 @@
 import type { ScannedElement } from '@/context/SelectionContext';
 import { isComponentInstanceContainerKey, isWrapperKey } from '@/store/keyKind';
 import { isLayoutSlotKey } from '@/utils/layoutChromeKeys';
+import { isContainerNode } from '@/store/planLayersDrop';
 
 interface Rect {
   top: number;
@@ -42,12 +43,11 @@ export function findInsertionTarget(
     // (which bake + export already treat as top-level) instead of the wrapper key
     // (which the editor bake silently drops). task-078.
     if (isWrapperKey(el.key)) return false;
-    // A literal <slot> is a compile-time placeholder, never a container
-    // (2026-08-26): in the layout master it spans the whole band, won the
-    // deepest pick, and the drawn chrome nested INSIDE it — unreachable by
-    // normal click and mis-shelved under the slot in Layers. A FILLED slot
-    // scans as its wrapper <div data-sq-slot> and still parents normally.
-    if (el.tagName === 'slot') return false;
+    // Only a tag that can hold children parents a draw — the Layers drop rule.
+    // A frame drawn over an <h1>, <a>, <img> nested INSIDE it (audit #28); a
+    // literal <slot> spans the whole layout band and swallowed the chrome
+    // (2026-08-26). A FILLED slot scans as its wrapper <div data-sq-slot>.
+    if (!isContainerNode(el)) return false;
     // Instances can't parent a drawn element when locked — skip them so the
     // search falls through to the nearest non-instance ancestor.
     if (lockInstances && isComponentInstanceContainerKey(el.key)) return false;

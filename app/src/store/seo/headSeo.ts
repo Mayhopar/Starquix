@@ -15,9 +15,9 @@
  */
 import { parseFrontmatter } from '@/core/collections/content-ops';
 import {
-  attrOf, decodeEntities, jsString, jsStringValue, readLocalConsts, readPropsDecl, referencedIdents,
-  scanTags, skipJs, splitFrontmatter,
-  type Attr, type Frontmatter, type PropsDecl, type Span, type Tag,
+  applySplices, attrOf, decodeEntities, jsString, jsStringValue, readLocalConsts, readPropsDecl, referencedIdents,
+  removeAttr, scanTags, skipJs, splitFrontmatter,
+  type Attr, type Frontmatter, type PropsDecl, type Span, type Splice, type Tag,
 } from './astroScan';
 
 export type PageSeoField = 'title' | 'description' | 'image' | 'imageAlt' | 'noindex' | 'canonical' | 'shareTitle' | 'shareDescription';
@@ -617,12 +617,6 @@ function setFrontmatterKey(src: string, key: string, value: string | boolean | n
 
 // ── edit ────────────────────────────────────────────────────────────────────
 
-type Splice = { start: number; end: number; text: string };
-
-function applySplices(src: string, splices: Splice[]): string {
-  return [...splices].sort((a, b) => b.start - a.start).reduce((s, x) => s.slice(0, x.start) + x.text + s.slice(x.end), src);
-}
-
 /** Insert `text` as the last child of `tag` (before its close), matching indentation. */
 function appendChild(f: FileInfo, tag: Tag, text: string): Splice {
   const close = tag.close!;
@@ -657,11 +651,7 @@ function removeTag(f: FileInfo, t: Tag): Splice {
 function setAttr(f: FileInfo, t: Tag, key: string, text: string | null): Splice {
   const a = attrOf(t, key) ?? t.attrs.find((x) => x.kind === 'shorthand' && x.name === key);
   if (a) {
-    if (text === null) {
-      let s = a.start;
-      while (s > 0 && /\s/.test(f.src[s - 1])) s--;
-      return { start: s, end: a.end, text: '' };
-    }
+    if (text === null) return removeAttr(f.src, a);
     return { start: a.start, end: a.end, text };
   }
   if (text === null) return { start: t.start, end: t.start, text: '' };

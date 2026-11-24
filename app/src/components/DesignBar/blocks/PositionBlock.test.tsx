@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { PositionBlock } from './PositionBlock';
+import { renderInMulti } from '../multi/__tests__/renderInMulti';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -64,6 +65,41 @@ describe('PositionBlock inset typing', () => {
     unmount();
     expect(onClassesChange).toHaveBeenCalledTimes(1);
     expect(onClassesChange.mock.calls[0][0]).toMatch(/left-/);
+  });
+});
+
+// Audit #26: the inset reader and writer matched `top-` only, so `-top-2` read blank and typing stacked a
+// second class (`-top-2 top-4`, `-top-2 -top-3`); `top-1/2` read as 4 because parseFloat('1/2') is 1.
+describe('PositionBlock insets: negatives and fractions', () => {
+  const typeInto = (classes: string, label: string, value: string) => {
+    const onClassesChange = vi.fn();
+    const { unmount } = render(<PositionBlock classes={classes} onClassesChange={onClassesChange} />);
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    unmount(); // flushes the pending commit
+    return onClassesChange.mock.calls.at(-1)?.[0] as string | undefined;
+  };
+  const shown = (label: string) => (screen.getByLabelText(label) as HTMLInputElement).value;
+
+  it('a negative inset reads as its negative value', () => {
+    render(<PositionBlock classes="absolute -top-2 -right-2" onClassesChange={vi.fn()} />);
+    expect(shown('Top inset')).toBe('-8');
+    expect(shown('Right inset')).toBe('-8');
+  });
+
+  it('typing over a negative inset replaces it', () => {
+    expect(typeInto('absolute -top-2 -right-2', 'Top inset', '16')).toBe('absolute -right-2 top-4');
+    expect(typeInto('absolute top-4', 'Top inset', '-12')).toBe('absolute -top-3');
+    expect(typeInto('absolute -top-2', 'Top inset', '-12')).toBe('absolute -top-3');
+    expect(typeInto('absolute !top-0', 'Top inset', '16')).toBe('absolute top-4');
+  });
+
+  it('clearing a negative inset removes it', () => {
+    expect(typeInto('absolute -top-2', 'Top inset', '')).toBe('absolute');
+  });
+
+  it('top-1/2 reads as a fraction, not as top-1 (4px)', () => {
+    renderInMulti(<PositionBlock classes="absolute" onClassesChange={vi.fn()} />, ['absolute top-1/2', 'absolute top-1']);
+    expect((screen.getByLabelText('Top inset') as HTMLInputElement).placeholder).toBe('Mixed');
   });
 });
 

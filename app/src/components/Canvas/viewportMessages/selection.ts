@@ -9,6 +9,7 @@ import type { ViewportMessageContext } from './context';
 import { clearSelectedCellGeometry } from '@/store/gridGeometryStore';
 import { lockedKeyPredicate } from '@/components/DesignBar/lockTier';
 import { deriveSelectedElementId } from '@/context/SelectionContext';
+import { layerMenu } from '@/components/Editor/layerMenuStore';
 
 /** Tags that support inline text editing on double-click. */
 export const TEXT_EDITABLE_TAGS = new Set([
@@ -60,6 +61,8 @@ export function handleElementClicked(ctx: ViewportMessageContext, _payload: unkn
 
 export function handleElementClick(ctx: ViewportMessageContext, rawPayload: unknown): void {
   const clicked = rawPayload as ElementClickPayload;
+  // A canvas right-click armed the layer menu; only a plain select below opens it.
+  const menuAt = layerMenu.takeArmed();
   // The admitted scan owns source versions/revisions; click payloads only
   // identify the current DOM node and may omit that ownership metadata.
   const scanned = ctx.refs.scannedElements.current.find(element => element.key === clicked.key);
@@ -197,6 +200,7 @@ export function handleElementClick(ctx: ViewportMessageContext, rawPayload: unkn
     payload.sourceLocation
   );
   ctx.actions.updateSelectionRect(payload.rect);
+  if (menuAt) layerMenu.open(menuAt);
 }
 
 export function handleSlotPlaceholderClick(ctx: ViewportMessageContext, payload: unknown): void {

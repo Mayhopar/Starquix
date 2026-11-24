@@ -70,6 +70,7 @@ vi.mock('@/hooks/useLayoutLibrary', () => ({
 }));
 
 import { ElementsTree } from '../ElementsTree';
+import { layerMenu } from '@/components/Editor/layerMenuStore';
 
 function scanned(key: string, parentKey: string | null): ScannedElement {
   return {
@@ -249,4 +250,31 @@ it('Layers retains the clicked imported card link evidence without borrowing its
   ]);
   fireEvent.click(rowOf(container, 'el-b'));
   expect(container.querySelector('[data-testid="probe"]')?.getAttribute('data-post-links')).toBe('["/works/second"]');
+});
+
+describe('ElementsTree — right-click opens the layer menu (issue #5)', () => {
+  beforeEach(() => {
+    h.doc = buildDoc();
+    h.activeTool = 'select';
+    act(() => layerMenu.open(null));
+  });
+
+  it('on a member: keeps the multi-selection and opens at the cursor, instead of the native menu', () => {
+    const { container } = renderTree(THREE_ROOTS);
+    fireEvent.click(rowOf(container, 'el-a'));
+    fireEvent.click(rowOf(container, 'el-c'), { metaKey: true });
+    const notPrevented = fireEvent.contextMenu(rowOf(container, 'el-c'), { clientX: 30, clientY: 40 });
+    expect(notPrevented).toBe(false);
+    expect(probeText(container)).toBe('el-a|el-c');
+    expect(layerMenu.get()).toEqual({ x: 30, y: 40 });
+  });
+
+  it('on a row outside the selection: selects that row alone, then opens', () => {
+    const { container } = renderTree(THREE_ROOTS);
+    fireEvent.click(rowOf(container, 'el-a'));
+    fireEvent.click(rowOf(container, 'el-b'), { metaKey: true });
+    fireEvent.contextMenu(rowOf(container, 'el-c'), { clientX: 5, clientY: 6 });
+    expect(probeText(container)).toBe('el-c|');
+    expect(layerMenu.get()).toEqual({ x: 5, y: 6 });
+  });
 });

@@ -56,6 +56,17 @@ describe('missingPackages', () => {
       dependencies: { astro: '^4', 'astro-seo': '^0.8.3' }, devDependencies: { '@tailwindcss/x': '^1', '@types/node': '^20' } }));
     expect(await missingPackages(project, shared)).toEqual([['@tailwindcss/x', '^1'], ['astro-seo', '^0.8.3']]);
   });
+
+  // #13 (audit 2026-11-24): an imported Tailwind 4 site ran on the runtime's Tailwind 3.4 — only @tailwindcss/vite was missing.
+  it('also lists a package the runtime carries at an older major than the site declares; Astro\'s own and older majors stay shared', async () => {
+    const shared = await tmp(); const project = await tmp();
+    for (const [name, version] of [['astro', '7.4.7'], ['@astrojs/mdx', '8.1.3'], ['tailwindcss', '3.4.19'], ['typescript', '6.0.3'], ['zod', '4.6.7']]) {
+      await pkg(shared, name, { manifest: { version }, index: '' });
+    }
+    await fs.writeFile(path.join(project, 'package.json'), JSON.stringify({ dependencies: { astro: '^8.0.0', '@astrojs/mdx': '^9.0.0',
+      tailwindcss: '^4.1.11', '@tailwindcss/vite': '^4.1.11', zod: '^3.23.8', typescript: '^5.7.2' } }));
+    expect(await missingPackages(project, shared)).toEqual([['@tailwindcss/vite', '^4.1.11'], ['tailwindcss', '^4.1.11']]);
+  });
 });
 
 describe('installPackages + merged node_modules', () => {
@@ -84,6 +95,22 @@ describe('installPackages + merged node_modules', () => {
     expect((await fs.stat(path.join(project, '.sq/deps/installed.json'))).mtimeMs).toBe(stamp.mtimeMs);
     await linkNodeModules(project, shared, null); // extras gone → back to the plain link (our merged dir is ours to replace)
     expect(await fs.realpath(path.join(project, 'node_modules'))).toBe(await fs.realpath(shared));
+  }, 120_000);
+
+  it('the site\'s own newer major of a runtime package wins; what the extras pulled in never shadows the runtime (#13)', async () => {
+    const shared = await tmp(); const project = await tmp(); const local = await tmp();
+    await pkg(shared, 'astro', { index: 'module.exports = "shared-astro";' });
+    await pkg(shared, 'tailwindcss', { manifest: { version: '3.4.19' }, index: 'module.exports = "tailwind 3";' });
+    await pkg(shared, 'dep', { index: 'module.exports = "shared dep";' });
+    await pkg(local, 'dep', { manifest: { version: '2.0.0' }, index: 'module.exports = "extras dep";' });
+    await pkg(local, 'tailwindcss', { manifest: { version: '4.1.11', dependencies: { dep: `file:${path.join(local, 'dep')}` } },
+      index: 'module.exports = "tailwind 4 + " + require("dep");' });
+    const extras = await installPackages(project, [['tailwindcss', `file:${path.join(local, 'tailwindcss')}`]], { npmCli: NPM });
+    await linkNodeModules(project, shared, extras);
+    const req = createRequire(path.join(project, 'src/x.js'));
+    expect(req('tailwindcss')).toBe('tailwind 4 + extras dep'); // its own dependencies still resolve from the extras
+    expect(req('dep')).toBe('shared dep');
+    expect(req('astro')).toBe('shared-astro');
   }, 120_000);
 
   it('an install that fails names the packages and says what to do', async () => {

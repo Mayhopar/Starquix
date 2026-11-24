@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { GestureHostContext } from '@/components/ui/valueGesture';
-import { findClass, setClass } from '../utils';
+import { findClass, setClass, utilityPattern } from '../utils';
 import { resolveToClass } from '@/core/classes/vocabulary';
 import { SegmentedControl } from '@/components/ui';
 import { Field, Row } from '@/components/ui';
@@ -45,19 +45,11 @@ const parsePosition = (classes: string): string => {
   return token || 'static';
 };
 
-const parseInset = (classes: string, side: 'top' | 'right' | 'bottom' | 'left' | 'inset'): string => {
-  // Check for full inset first
-  if (side === 'inset') {
-    const insetToken = findClass(classes, /^inset-(.+)$/);
-    if (insetToken) {
-      const match = insetToken.match(/^inset-(.+)$/);
-      return match ? match[1] : '';
-    }
-    return '';
-  }
+type Side = 'top' | 'right' | 'bottom' | 'left';
 
-  // Check for specific side
-  const pattern = new RegExp(`^${side}-(.+)$`);
+// The field reads, an edit replaces and a multi edit owns one token: utilityPattern(side), -top-2 included.
+const parseInset = (classes: string, side: Side): string => {
+  const pattern = utilityPattern(side);
   const token = findClass(classes, pattern);
 
   if (!token) return '';
@@ -65,36 +57,34 @@ const parseInset = (classes: string, side: 'top' | 'right' | 'bottom' | 'left' |
   const match = token.match(pattern);
   if (!match) return '';
 
-  const value = match[1];
+  const [, sign, value] = match;
 
   // Handle arbitrary values
   const arbitrary = value.match(/^\[(-?\d+)px\]$/);
   if (arbitrary) {
-    return arbitrary[1];
+    return `${sign}${arbitrary[1]}`;
   }
 
-  // Handle numeric scale values (top-4 = 16px)
-  const num = parseFloat(value);
+  // Handle numeric scale values (top-4 = 16px) — strict: top-1/2 is the fraction below, not 1
+  const num = Number(value);
   if (!isNaN(num)) {
-    return `${num * 4}`;
+    return `${sign}${num * 4}`;
   }
 
   // Handle special values
-  if (value === 'full') return '100%';
+  if (value === 'full') return `${sign}100%`;
   if (value === 'auto') return 'auto';
   if (value === '0') return '0';
-  if (value === 'px') return '1';
+  if (value === 'px') return `${sign}1`;
 
   // Handle fractions
   const fraction = value.match(/^(\d+)\/(\d+)$/);
   if (fraction) {
-    return `${Math.round((parseInt(fraction[1]) / parseInt(fraction[2])) * 100)}%`;
+    return `${sign}${Math.round((parseInt(fraction[1]) / parseInt(fraction[2])) * 100)}%`;
   }
 
   return '';
 };
-
-type Side = 'top' | 'right' | 'bottom' | 'left';
 
 // ============================================================================
 // Several selected — each control's own reader ("Mixed", design C6) and what
@@ -109,7 +99,7 @@ const OWNS = {
   position: ownsGroups('standalone:position'),
   /** Negative insets are `unique:` groups in Tailwind's table — a regex owns both signs. */
   inset: (side: Side): Owns => {
-    const re = new RegExp(`^-?${side}-`);
+    const re = utilityPattern(side);
     return token => re.test(token);
   },
 };
@@ -185,8 +175,7 @@ export const PositionBlock: React.FC<PositionBlockProps> = ({
 
   const commitInset = useCallback((side: Side, value: string) => {
     // Remove old inset class for this side
-    const pattern = new RegExp(`^${side}-(.+)$`);
-    let newClasses = setClass(classesRef.current, pattern, null);
+    let newClasses = setClass(classesRef.current, utilityPattern(side), null);
 
     // Add new class if value is set
     if (value !== '' && value !== 'auto') {

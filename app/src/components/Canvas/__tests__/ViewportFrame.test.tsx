@@ -17,6 +17,7 @@ import { setScreenHeight } from '../viewportHeightPreferences';
 import { _resetGridCacheForTests, setGrid } from '../gridPreferences';
 import { SelectionProvider, useScannedElements, useRectActions, useScannedElementsRef } from '@/context/SelectionContext';
 import { recordEditorMetric } from '@/performance/editorMetrics';
+import { layerMenu } from '@/components/Editor/layerMenuStore';
 
 // ==============================================================
 // Mocks
@@ -2042,5 +2043,58 @@ describe('ViewportFrame', () => {
       await act(async () => simulateMessage('IFRAME_READY'));
       expect(gridOf(container)).toBeNull();
     });
+  });
+});
+
+describe('ViewportFrame — canvas right-click opens the layer menu (issue #5)', () => {
+  const canvas = () => document.querySelector('[data-testid="editor-canvas"]') as HTMLElement;
+  const simulatedClicks = () => mockContentWindow.postMessage.mock.calls.filter(([m]) => m?.type === 'SIMULATE_CLICK');
+
+  beforeEach(() => {
+    realSelectionMode = false;
+    isEditingTextValue = false;
+    selectedKeyValue = 'src/pages/index.astro:5:1';
+    scannedElementsValue = [{ key: 'src/pages/index.astro:5:1', tagName: 'p', classes: '', parentKey: null, rect: { top: 10, left: 10, width: 100, height: 20 } }];
+    mockContentWindow.postMessage.mockClear();
+    layerMenu.open(null);
+  });
+  afterEach(() => { act(() => layerMenu.open(null)); });
+
+  it('a right mousedown leaves the overlay hit-testable, so the contextmenu lands in the editor, not the iframe', async () => {
+    renderViewportFrame();
+    await act(async () => { simulateMessage('IFRAME_READY'); });
+    const overlay = canvas().querySelector('.z-\\[100\\]') as HTMLElement;
+    fireEvent.mouseDown(overlay, { button: 2, clientX: 300, clientY: 300 });
+    expect(overlay.style.pointerEvents).toBe('auto');
+    fireEvent.mouseDown(overlay, { button: 0, clientX: 300, clientY: 300 });
+    expect(overlay.style.pointerEvents).toBe('none');
+  });
+
+  it('inside a selected layer: opens at the cursor and keeps the selection (no simulated click)', () => {
+    renderViewportFrame();
+    const notPrevented = fireEvent.contextMenu(canvas(), { clientX: 50, clientY: 20 });
+    expect(notPrevented).toBe(false);
+    expect(layerMenu.get()).toEqual({ x: 50, y: 20 });
+    expect(simulatedClicks()).toHaveLength(0);
+  });
+
+  it('elsewhere: arms the menu and selects by a plain simulated click at the iframe point', () => {
+    renderViewportFrame({ scale: 0.5 });
+    fireEvent.contextMenu(canvas(), { clientX: 300, clientY: 200 });
+    expect(layerMenu.get()).toBeNull();
+    expect(simulatedClicks()).toEqual([[{ type: 'SIMULATE_CLICK', payload: { x: 600, y: 400 } }, '*']]);
+    expect(layerMenu.takeArmed()).toEqual({ x: 300, y: 200 });
+  });
+
+  it('leaves the native behaviour alone while editing text and in preview', () => {
+    isEditingTextValue = true;
+    const view = renderViewportFrame();
+    expect(fireEvent.contextMenu(canvas(), { clientX: 50, clientY: 20 })).toBe(true);
+    view.unmount();
+    isEditingTextValue = false;
+    renderViewportFrame({ isPreview: true });
+    expect(fireEvent.contextMenu(canvas(), { clientX: 50, clientY: 20 })).toBe(true);
+    expect(layerMenu.get()).toBeNull();
+    expect(simulatedClicks()).toHaveLength(0);
   });
 });

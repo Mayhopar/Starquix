@@ -4,13 +4,12 @@ Why we made certain choices in Starquix V2.
 
 ## Why Yjs for State Management?
 
-**Decision:** Use Yjs CRDT document as the single source of truth.
+**Decision:** Use a Yjs CRDT document as the session working copy. The project files stay the source of truth: the doc is rebuilt from them on every open.
 
 **Reasons:**
 - **Unified undo/redo** - All operations (classes, text, pages) can be tracked together
 - **Future collaborative editing** - CRDTs handle concurrent edits naturally
 - **Reactive updates** - Yjs observers trigger React re-renders automatically
-- **Persistence ready** - Can sync to server or local storage easily
 
 **Trade-off:** More complex than plain React state, but pays off for undo and future features.
 

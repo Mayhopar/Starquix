@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { parseSpacing, createSpacingClass, setClass, findClass } from '../utils';
+import { parseSpacing, utilityPattern, createSpacingClass, parseClasses } from '../utils';
 import { optimizeSpacingClasses, type FourSides } from '@/core/classes/vocabulary';
 import { Field, UnitField, IconButton, type UnitFieldProps } from '@/components/ui';
 import { Row } from '@/components/ui';
@@ -62,29 +62,26 @@ const UNIT_OPTIONS_WITH_AUTO = [
 ];
 
 
-// Parse auto margin from classes
-const parseAutoMargin = (classes: string, side: Side): boolean => {
-  // Check for individual side auto: mt-auto, mr-auto, mb-auto, ml-auto
-  if (findClass(classes, new RegExp(`^m${side}-auto$`))) {
-    return true;
-  }
-  // Check for axis auto: mx-auto affects l and r, my-auto affects t and b
-  if ((side === 'l' || side === 'r') && findClass(classes, /^mx-auto$/)) {
-    return true;
-  }
-  if ((side === 't' || side === 'b') && findClass(classes, /^my-auto$/)) {
-    return true;
-  }
-  return false;
-};
+const SIDES: Side[] = ['t', 'r', 'b', 'l'];
+type SideRead = ReturnType<typeof parseSpacing> & { isAuto: boolean };
 
-/** One side as the block reads it (side → axis → all; margin auto) — the per-field "Mixed" reader. */
+/** One side as the block reads it: its most specific token (side → axis → all) decides, read or not —
+ *  under `p-4 px-[clamp(…)]` X is unknown, never p-4's 16px. A margin `*-auto` token is auto. */
+const readSide = (classes: string, type: SpacingType, side: Side): SideRead => {
+  let read = parseSpacing(classes, type, side);
+  if (read.raw === null) read = parseSpacing(classes, type, side === 't' || side === 'b' ? 'y' : 'x');
+  if (read.raw === null) read = parseSpacing(classes, type, '');
+  return { ...read, isAuto: type === 'm' && !!read.raw?.endsWith('-auto') };
+};
+const readSides = (classes: string, type: SpacingType) =>
+  Object.fromEntries(SIDES.map(side => [side, readSide(classes, type, side)])) as Record<Side, SideRead>;
+/** The side has a value the rebuild can write back (a number or auto). */
+const known = (r: SideRead) => r.value !== null || r.isAuto;
+
+/** The per-field "Mixed" reader. */
 const sideValue = (classes: string, type: SpacingType, side: Side): string => {
-  if (type === 'm' && parseAutoMargin(classes, side)) return 'auto';
-  const own = parseSpacing(classes, type, side);
-  const axis = parseSpacing(classes, type, side === 't' || side === 'b' ? 'y' : 'x');
-  const v = own.value !== null ? own : axis.value !== null ? axis : parseSpacing(classes, type, '');
-  return v.value === null ? '' : `${v.value}${v.unit}`;
+  const { value, unit, isAuto } = readSide(classes, type, side);
+  return isAuto ? 'auto' : value === null ? '' : `${value}${unit}`;
 };
 const FIELD_SIDES: Record<SpacingField, Side[]> = { y: ['t', 'b'], x: ['l', 'r'], t: ['t'], r: ['r'], b: ['b'], l: ['l'] };
 /** Stable module-level readers per (type, field): Y compares T+B, X compares L+R (design C6). */
@@ -93,14 +90,22 @@ const READERS = Object.fromEntries((['p', 'm'] as const).map(type => [type, Obje
     [field, (classes: string) => FIELD_SIDES[field].map(side => sideValue(classes, type, side))]),
 )])) as Record<SpacingType, Record<SpacingField, (classes: string) => string[]>>;
 
-/** What an edit of `sides` owns: those sides' utilities only (margin incl. negative and auto) — never the
+/** What an edit of `sides` owns: those sides' utilities only (negative, auto and `!` too) — never the
  *  axis or all-sides shorthand, which members keep (side utilities win over them in Tailwind's order). */
 const ownsSides = (type: SpacingType, sides: Side[]): Owns => {
-  const re = new RegExp(`^${type === 'm' ? '-?m' : 'p'}[${sides.join('')}]-`);
+  const re = utilityPattern(`${type}[${sides.join('')}]`);
   return token => re.test(token);
 };
 
 const SIDE_NAMES: Record<Side, string> = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
+
+/** A margin side set to `auto`: a read-only value in a field box (the whole box focuses it); × switches back to a number. */
+const AutoField = ({ icon, 'aria-label': ariaLabel, onRemove }: { icon: React.ReactNode; 'aria-label': string; onRemove: () => void }) => (
+  <Field readOnly value="auto" onChange={() => {}} icon={icon} aria-label={ariaLabel} trailing={
+    <IconButton size="sm" onClick={onRemove} title="Remove auto"
+      className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text">×</IconButton>
+  } />
+);
 
 // Icon mapping for padding sides (swapped: top↔bottom, left↔right)
 const PADDING_ICONS = {
@@ -192,22 +197,7 @@ const SpacingControl: React.FC<SpacingControlProps> = ({
               {(['t', 'l', 'b', 'r'] as Side[]).map(side => {
                 const Icon = type === 'p' ? PADDING_ICONS[side] : MARGIN_ICONS[side];
                 return values[side].isAuto && type === 'm' && !mixed[side] ? (
-                  <div key={side} className="flex items-center h-7 border border-input-stroke rounded-inner overflow-hidden bg-input-fill">
-                    <span className="w-4 h-4 ml-1 flex items-center justify-center shrink-0 text-text-secondary">
-                      <Icon className="w-4 h-4" />
-                    </span>
-                    <div className="flex-1 flex items-center">
-                      <span className="flex-1 py-1 px-1 text-xs text-text">auto</span>
-                      <IconButton
-                        size="sm"
-                        onClick={() => onValueChange(side, '', 'px', false)}
-                        className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text"
-                        title="Remove auto"
-                      >
-                        ×
-                      </IconButton>
-                    </div>
-                  </div>
+                  <AutoField key={side} icon={<Icon className="w-4 h-4" />} aria-label={`${label} ${SIDE_NAMES[side]}`} onRemove={() => onValueChange(side, '', 'px', false)} />
                 ) : (
                   <SpacingField
                     key={side}
@@ -245,22 +235,7 @@ const SpacingControl: React.FC<SpacingControlProps> = ({
             /* Collapsed: Y and X inputs side by side */
             <div className="grid grid-cols-2 gap-1">
               {yValue.isAuto && type === 'm' && !mixed.y ? (
-                <div className="flex items-center h-7 border border-input-stroke rounded-inner overflow-hidden bg-input-fill">
-                  <span className="w-4 h-4 ml-1 flex items-center justify-center shrink-0 text-text-secondary">
-                    <MarginYIcon className="w-4 h-4" />
-                  </span>
-                  <div className="flex-1 flex items-center">
-                    <span className="flex-1 py-1 px-1 text-xs text-text">auto</span>
-                    <IconButton
-                      size="sm"
-                      onClick={() => onValueChange('y', '', 'px', false)}
-                      className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text"
-                      title="Remove auto"
-                    >
-                      ×
-                    </IconButton>
-                  </div>
-                </div>
+                <AutoField icon={<MarginYIcon className="w-4 h-4" />} aria-label={`${label} Y`} onRemove={() => onValueChange('y', '', 'px', false)} />
               ) : (
                 <SpacingField
                   spacingType={type}
@@ -298,22 +273,7 @@ const SpacingControl: React.FC<SpacingControlProps> = ({
                 />
               )}
               {xValue.isAuto && type === 'm' && !mixed.x ? (
-                <div className="flex items-center h-7 border border-input-stroke rounded-inner overflow-hidden bg-input-fill">
-                  <span className="w-4 h-4 ml-1 flex items-center justify-center shrink-0 text-text-secondary">
-                    <MarginXIcon className="w-4 h-4" />
-                  </span>
-                  <div className="flex-1 flex items-center">
-                    <span className="flex-1 py-1 px-1 text-xs text-text">auto</span>
-                    <IconButton
-                      size="sm"
-                      onClick={() => onValueChange('x', '', 'px', false)}
-                      className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text"
-                      title="Remove auto"
-                    >
-                      ×
-                    </IconButton>
-                  </div>
-                </div>
+                <AutoField icon={<MarginXIcon className="w-4 h-4" />} aria-label={`${label} X`} onRemove={() => onValueChange('x', '', 'px', false)} />
               ) : (
                 <SpacingField
                   spacingType={type}
@@ -383,72 +343,21 @@ export const SpacingBlock: React.FC<SpacingBlockProps> = ({
   classes,
   onClassesChange
 }) => {
-  // Parse all values using useMemo. Precedence: individual side → axis
-  // shorthand (px/py, mx/my) → all-sides shorthand (p-*, m-*). Without the
-  // all-sides fallback, a class like `p-10` reads as 0 on every side.
-  const { padding, margin, shouldExpandPadding, shouldExpandMargin } = useMemo(() => {
-    const ptRaw = parseSpacing(classes, 'p', 't');
-    const prRaw = parseSpacing(classes, 'p', 'r');
-    const pbRaw = parseSpacing(classes, 'p', 'b');
-    const plRaw = parseSpacing(classes, 'p', 'l');
-
-    const pxRaw = parseSpacing(classes, 'p', 'x');
-    const pyRaw = parseSpacing(classes, 'p', 'y');
-    const pAll = parseSpacing(classes, 'p', '');
-
-    const px = pxRaw.value !== null ? pxRaw : pAll;
-    const py = pyRaw.value !== null ? pyRaw : pAll;
-
-    const pt = ptRaw.value !== null ? ptRaw : py;
-    const pb = pbRaw.value !== null ? pbRaw : py;
-    const pl = plRaw.value !== null ? plRaw : px;
-    const pr = prRaw.value !== null ? prRaw : px;
-
-    const mtRaw = parseSpacing(classes, 'm', 't');
-    const mrRaw = parseSpacing(classes, 'm', 'r');
-    const mbRaw = parseSpacing(classes, 'm', 'b');
-    const mlRaw = parseSpacing(classes, 'm', 'l');
-
-    const mxRaw = parseSpacing(classes, 'm', 'x');
-    const myRaw = parseSpacing(classes, 'm', 'y');
-    const mAll = parseSpacing(classes, 'm', '');
-
-    const mx = mxRaw.value !== null ? mxRaw : mAll;
-    const my = myRaw.value !== null ? myRaw : mAll;
-
-    const mt = mtRaw.value !== null ? mtRaw : my;
-    const mb = mbRaw.value !== null ? mbRaw : my;
-    const ml = mlRaw.value !== null ? mlRaw : mx;
-    const mr = mrRaw.value !== null ? mrRaw : mx;
-
-    const mtAuto = parseAutoMargin(classes, 't');
-    const mrAuto = parseAutoMargin(classes, 'r');
-    const mbAuto = parseAutoMargin(classes, 'b');
-    const mlAuto = parseAutoMargin(classes, 'l');
-
-    // Auto-expand if sides have different values or units
-    const pxMixed = pt.value !== null && pb.value !== null && (pt.value !== pb.value || pt.unit !== pb.unit);
-    const pyMixed = pl.value !== null && pr.value !== null && (pl.value !== pr.value || pl.unit !== pr.unit);
-    const mxMixed = ((mt.value !== null || mtAuto) && (mb.value !== null || mbAuto)) &&
-      (mt.value !== mb.value || mt.unit !== mb.unit || mtAuto !== mbAuto);
-    const myMixed = ((ml.value !== null || mlAuto) && (mr.value !== null || mrAuto)) &&
-      (ml.value !== mr.value || ml.unit !== mr.unit || mlAuto !== mrAuto);
-
+  // Every side through readSide (side → axis → all-sides). Without the all-sides fallback, a class
+  // like `p-10` reads as 0 on every side.
+  const { reads, padding, margin, shouldExpandPadding, shouldExpandMargin } = useMemo(() => {
+    const reads = { p: readSides(classes, 'p'), m: readSides(classes, 'm') };
+    const field = (s: SideRead): SpacingValue => ({ ...s, value: `${s.value ?? ''}` });
+    const fields = (r: Record<Side, SideRead>): SpacingValues => ({ t: field(r.t), r: field(r.r), b: field(r.b), l: field(r.l) });
+    // Auto-expand if the two sides of an axis have different values or units
+    const differ = (a: SideRead, b: SideRead) => known(a) && known(b) &&
+      (a.value !== b.value || a.unit !== b.unit || a.isAuto !== b.isAuto);
     return {
-      padding: {
-        t: { value: pt.value !== null ? `${pt.value}` : '', unit: pt.unit, isAuto: false },
-        r: { value: pr.value !== null ? `${pr.value}` : '', unit: pr.unit, isAuto: false },
-        b: { value: pb.value !== null ? `${pb.value}` : '', unit: pb.unit, isAuto: false },
-        l: { value: pl.value !== null ? `${pl.value}` : '', unit: pl.unit, isAuto: false }
-      } as SpacingValues,
-      margin: {
-        t: { value: mtAuto ? '' : (mt.value !== null ? `${mt.value}` : ''), unit: mt.unit, isAuto: mtAuto },
-        r: { value: mrAuto ? '' : (mr.value !== null ? `${mr.value}` : ''), unit: mr.unit, isAuto: mrAuto },
-        b: { value: mbAuto ? '' : (mb.value !== null ? `${mb.value}` : ''), unit: mb.unit, isAuto: mbAuto },
-        l: { value: mlAuto ? '' : (ml.value !== null ? `${ml.value}` : ''), unit: ml.unit, isAuto: mlAuto }
-      } as SpacingValues,
-      shouldExpandPadding: pxMixed || pyMixed,
-      shouldExpandMargin: mxMixed || myMixed
+      reads,
+      padding: fields(reads.p),
+      margin: fields(reads.m),
+      shouldExpandPadding: differ(reads.p.t, reads.p.b) || differ(reads.p.l, reads.p.r),
+      shouldExpandMargin: differ(reads.m.t, reads.m.b) || differ(reads.m.l, reads.m.r)
     };
   }, [classes]);
 
@@ -494,20 +403,9 @@ export const SpacingBlock: React.FC<SpacingBlockProps> = ({
       onClassesChange(tokens.join(' '), ownsSides(type, sides));
       return;
     }
-    let newClasses = classes;
-
-    // Get current values for all sides to enable axis optimization
-    const currentValues = type === 'p' ? padding : margin;
-
-    // Build the new four-sides state
-    const newSidesState: Record<Side, { value: number | null; unit: string; isAuto: boolean }> = {
-      t: { value: currentValues.t.value !== '' ? parseFloat(currentValues.t.value) : null, unit: currentValues.t.unit, isAuto: currentValues.t.isAuto || false },
-      r: { value: currentValues.r.value !== '' ? parseFloat(currentValues.r.value) : null, unit: currentValues.r.unit, isAuto: currentValues.r.isAuto || false },
-      b: { value: currentValues.b.value !== '' ? parseFloat(currentValues.b.value) : null, unit: currentValues.b.unit, isAuto: currentValues.b.isAuto || false },
-      l: { value: currentValues.l.value !== '' ? parseFloat(currentValues.l.value) : null, unit: currentValues.l.unit, isAuto: currentValues.l.isAuto || false },
-    };
-
-    // Apply the change to the affected sides
+    // Build the new four-sides state: the sides as read, then the change to the affected sides
+    const read = reads[type];
+    const newSidesState: Record<Side, { value: number | null; unit: string; isAuto: boolean }> = { ...read };
     const numValue = value !== '' ? parseFloat(value) : null;
     sides.forEach(side => {
       newSidesState[side] = {
@@ -517,24 +415,11 @@ export const SpacingBlock: React.FC<SpacingBlockProps> = ({
       };
     });
 
-    // Remove ALL existing spacing classes for this type (individual, axis, and shorthand)
-    const prefix = type === 'm' ? '-?m' : 'p';
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}t-`), null);
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}r-`), null);
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}b-`), null);
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}l-`), null);
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}x-`), null);
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}y-`), null);
-    newClasses = setClass(newClasses, new RegExp(`^${prefix}-(?!t|r|b|l|x|y)`), null);
-    if (type === 'm') {
-      newClasses = setClass(newClasses, /^mt-auto$/, null);
-      newClasses = setClass(newClasses, /^mr-auto$/, null);
-      newClasses = setClass(newClasses, /^mb-auto$/, null);
-      newClasses = setClass(newClasses, /^ml-auto$/, null);
-      newClasses = setClass(newClasses, /^mx-auto$/, null);
-      newClasses = setClass(newClasses, /^my-auto$/, null);
-      newClasses = setClass(newClasses, /^m-auto$/, null);
-    }
+    // The rebuild below re-expresses every side it could read. A side it could not read (px-[clamp(…)],
+    // mb-[-4px], px-gutter) and does not edit keeps its token; every other token of this type goes.
+    const keep = SIDES.filter(side => !sides.includes(side) && !known(read[side])).map(side => read[side].raw);
+    const owned = utilityPattern(`${type}[trblxy]?`);
+    let newClasses = parseClasses(classes).filter(token => keep.includes(token) || !owned.test(token)).join(' ');
 
     // Check if any sides have auto values (margin only)
     const hasAnyAuto = type === 'm' && (
@@ -622,7 +507,7 @@ export const SpacingBlock: React.FC<SpacingBlockProps> = ({
     }
 
     onClassesChange(newClasses.trim());
-  }, [classes, padding, margin, onClassesChange, isMulti]);
+  }, [classes, reads, onClassesChange, isMulti]);
 
   const handlePaddingChange = useCallback((sideOrAxis: Side | 'x' | 'y', value: string, unit: string, isAuto?: boolean) => {
     if (sideOrAxis === 'x') {

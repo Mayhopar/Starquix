@@ -111,8 +111,8 @@ Before any undoable action — ~90 call sites across ~30 files. By category
 |----------|----------------------|
 | Class/style edits | `ClassStoreContext.tsx`, DesignBar blocks |
 | Text/markup edits | `ViewportFrame.tsx` (edit-mode entry, MARKUP_CHANGED) |
-| Page ops (create/delete/rename/move/layout) | `PagesContext.tsx`, `LocalPagesContext.tsx` |
-| SEO edits | `SeoPanel/useSeoData.ts` |
+| Page ops (create/delete/rename/move/layout) | `PagesContext.tsx` |
+| SEO edits | `SeoPanel/usePageSeo.ts` |
 | Element ops (add/remove/reorder/reparent/draw) | `ViewportFrame.tsx`, `useReorderElements.ts`, LayersPanel |
 | Link ops | `ViewportFrame.tsx` MARKUP_CHANGED handler (deferred — see Semantics) |
 | Instance lifecycle (push/reset/update-to-master) | DesignBar, Assets |
