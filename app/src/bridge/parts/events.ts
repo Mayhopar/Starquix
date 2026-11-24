@@ -78,7 +78,8 @@ export const BRIDGE_EVENTS = `
         shiftKey: event.shiftKey,
         ctrlKey: event.ctrlKey,
         metaKey: event.metaKey,
-        altKey: event.altKey
+        altKey: event.altKey,
+        repeat: event.repeat
       }
     });
 

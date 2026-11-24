@@ -130,6 +130,12 @@ export const createDimensionClass = (
 };
 
 /**
+ * A utility token for `prefix` (a regex fragment: 'pt', 'p[tb]', 'top'), negative (`-mt-4`, `-top-2`)
+ * and important (`!p-4`, Tailwind 3) included — they are the same property. Groups: sign, value.
+ */
+export const utilityPattern = (prefix: string): RegExp => new RegExp(`^!?(-?)${prefix}-(.+)$`);
+
+/**
  * Parse spacing value (margin/padding)
  * Now supports all CSS units: px, %, vh, vw, rem, em, svh, dvh
  */
@@ -138,19 +144,18 @@ export const parseSpacing = (
   type: 'm' | 'p',
   side: '' | 't' | 'r' | 'b' | 'l' | 'x' | 'y'
 ): { value: number | null; unit: string; raw: string | null } => {
-  const prefix = `${type}${side}`;
-  const pattern = new RegExp(`^-?${prefix}-(.+)$`);
+  const pattern = utilityPattern(`${type}${side}`);
   const token = findClass(classes, pattern);
 
   if (!token) {
     return { value: null, unit: 'px', raw: null };
   }
 
-  const isNegative = token.startsWith('-');
   const match = token.match(pattern);
   if (!match) return { value: null, unit: 'px', raw: token };
 
-  const suffix = match[1];
+  const isNegative = match[1] === '-';
+  const suffix = match[2];
 
   // Arbitrary value: p-[20px], mt-[16vh], mb-[2rem], etc.
   // Supports: px, %, vh, vw, rem, em, svh, dvh, lvh
@@ -164,7 +169,7 @@ export const parseSpacing = (
   // Numeric scale: p-4 = 16px
   if (suffix === 'px') return { value: isNegative ? -1 : 1, unit: 'px', raw: token };
 
-  const num = parseFloat(suffix);
+  const num = Number(suffix); // strict: a custom `px-2xs` is unread, not 2
   if (!isNaN(num)) {
     const val = num * 4;
     return { value: isNegative ? -val : val, unit: 'px', raw: token };

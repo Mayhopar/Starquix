@@ -20,12 +20,14 @@ import {
   acquireStructuralWrite,
   releaseStructuralWrite,
   classifyStructuralTarget,
+  planLocalReparentInsert,
 } from '@/components/Editor/localStructuralOps';
+import { resolveLocalUsageTarget } from '@/utils/localUsageTarget';
 import { afterLocalPageArrives, isLocalPageInSync, LOCAL_PAGE_NOT_LOADED_REASON } from '@/utils/localPageSync';
 import { notifyLocalCrossFileWrite, localCrossFileReason, captureLocalWriteOrigin } from '@/utils/localWriteScope';
 import { insertRegionInverseOp, type PushStructuralUndo } from '@/store/structuralUndo';
 
-/** Canvas.handleElementCreated's DrawOverlay/PenOverlay result, minus insertIndex. */
+/** Canvas.handleElementCreated's DrawOverlay/PenOverlay result. */
 export interface LocalDrawPayload {
   tag: string;
   classes: string;
@@ -36,6 +38,8 @@ export interface LocalDrawPayload {
    * layout <slot> key that is absent from the scan → treated as empty canvas.
    */
   parentKey: string | null;
+  /** Where it was drawn among parentKey's children; absent (AI tool) = the container's end. */
+  insertIndex?: number;
   staticMarkup?: string;
   /** Pen anchors — NOT materialized; only the derived staticMarkup lands in the file. */
   penPath?: string;
@@ -54,8 +58,9 @@ export interface LocalDrawArgs {
 
 /**
  * Serialize the just-drawn payload and insert it into the real file.
- * Placement: element under the draw is the target (container → inside-end,
- * void → after); empty canvas → resolveInsertTarget's page-anchor fallback.
+ * Placement: element under the draw is the target (container → at the drawn
+ * slot among its children, else inside-end; void → after); empty canvas →
+ * resolveInsertTarget's page-anchor fallback.
  * On success the new element is selected after the HMR rescan via the
  * pending-selection singleton (exact line). Returns {ok:true} only on a real
  * write; failures carry the reason (task-133 Task 9: the AI tool relays it —
@@ -106,6 +111,15 @@ export async function insertLocalDrawnElement(
           : "Page isn't ready yet — wait for the preview to load",
       );
       return { ok: false, reason };
+    }
+    // Drawn INTO a container: land at the drawn slot, beside the nearest
+    // anchorable sibling (the reparent-drop rule), not at the container's end.
+    if (dropTarget?.sourceLocation && draw.insertIndex !== undefined && 'loc' in target && target.position === 'inside-end') {
+      const byKey = new Map(scannedElements.map((e) => [e.key, e]));
+      const slot = planLocalReparentInsert(dropTarget.key, scannedElements.filter((e) => e.parentKey === dropTarget.key).map((e) => e.key), draw.insertIndex);
+      // A rendered component's anchor is its `<Card />` tag; the anchor must share the container's file.
+      const loc = slot && (resolveLocalUsageTarget(slot.targetKey, byKey, pageFile) ?? byKey.get(slot.targetKey)?.sourceLocation);
+      if (slot && loc?.file === target.loc.file) { target.loc = loc; target.position = slot.position; }
     }
 
     // THE write-scope law (utils/localWriteScope.ts): drawing ONTO an element

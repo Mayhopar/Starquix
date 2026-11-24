@@ -57,6 +57,7 @@ import type { DynamicComponentIndex } from '@/store/folderManifest';
 import { useLocalProjectPath } from '@/hooks/useLocalProjectPath';
 import { lockedKeyPredicate } from '@/components/DesignBar/lockTier';
 import { resolveCloneRedirect } from './resolveCloneRedirect';
+import { layerMenu, type MenuPoint } from '@/components/Editor/layerMenuStore';
 import { useAI } from '@/ai/AIContext';
 import { useTool } from '@/context';
 
@@ -229,6 +230,8 @@ interface TreeContextValue {
   onSelect: (key: string, elementId: string, modifiers?: SelectModifiers) => void;
   /** Select a synthetic (layout/slot) node by its UI-only key — no Yjs element lookup. */
   onDoubleClick: (node: TreeNode) => void;
+  /** Right-click: select the row unless it is already a member, then open the layer menu. */
+  onContextMenu: (key: string, elementId: string, point: MenuPoint) => void;
 }
 
 const TreeContext = stableContext<TreeContextValue | null>('TreeContext', null);
@@ -272,6 +275,7 @@ const SortableNode = memo(function SortableNode({
     onToggleExpand,
     onSelect,
     onDoubleClick,
+    onContextMenu,
   } = useTreeContext();
   const { attributes, listeners, setNodeRef } = useSortable({
     id: node.key,
@@ -398,6 +402,11 @@ const SortableNode = memo(function SortableNode({
     onDoubleClick(node);
   }, [onDoubleClick, node]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    onContextMenu(node.key, node.elementId, { x: e.clientX, y: e.clientY });
+  }, [onContextMenu, node.key, node.elementId]);
+
   const handleToggle = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -475,6 +484,7 @@ const SortableNode = memo(function SortableNode({
           className={rowClassName}
           onClick={handleClick}
           onDoubleClick={handleDoubleClickLocal}
+          onContextMenu={handleContextMenu}
         />
       </div>
 
@@ -1117,6 +1127,15 @@ export function ElementsTree({ baseDepth = 0, viewedComponentFile = null, dynami
     [selectedKey, additionalSelections],
   );
 
+  const handleContextMenu = useCallback(
+    (clickedKey: string, elementId: string, point: MenuPoint) => {
+      const key = resolveCloneRedirect({ clickedKey, scannedElements }) ?? clickedKey;
+      if (key !== selectedKey && !additionalSelections.some(e => e.key === key)) handleSelect(clickedKey, elementId);
+      layerMenu.open(point);
+    },
+    [scannedElements, selectedKey, additionalSelections, handleSelect],
+  );
+
   const treeContextValue = useMemo<TreeContextValue>(
     () => ({
       expandedNodes,
@@ -1141,12 +1160,13 @@ export function ElementsTree({ baseDepth = 0, viewedComponentFile = null, dynami
       onToggleExpand: toggleExpand,
       onSelect: handleSelect,
       onDoubleClick: handleDoubleClick,
+      onContextMenu: handleContextMenu,
     }),
     [
       expandedNodes, selectedKey, multiSelectedKeys, groupKeys, isTreeHovered, aiActiveSet, aiTouchedSet,
       motherEntityKeys, blogSlotKeys, postRootKeys, postRootLabels,
       componentTypeById, penShapeIds, dynamicIndex, baseDepth, viewedComponentFile, localLayout,
-      toggleExpand, handleSelect, handleDoubleClick,
+      toggleExpand, handleSelect, handleDoubleClick, handleContextMenu,
     ],
   );
 

@@ -122,3 +122,74 @@ describe('flow reorder with a live slot', () => {
     expect(a.style.opacity).toBe('');
   });
 });
+
+describe('siblings with no box are not drop targets (audit #27: a hidden md:block child)', () => {
+  let sendToParent: ReturnType<typeof vi.fn>;
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  /** A vertical stack of 300px-tall <p>s; HIDDEN measures like display:none (all zeros). */
+  function mount(order: string[], parentKey = 'p', left = 0, width = 600) {
+    const parent = document.createElement('section');
+    parent.setAttribute('data-key', parentKey);
+    document.body.appendChild(parent);
+    let top = 0;
+    for (const name of order) {
+      const el = document.createElement('p');
+      el.setAttribute('data-key', name);
+      parent.appendChild(el);
+      if (name.endsWith('HIDDEN')) { el.style.display = 'none'; stubRect(el, { left: 0, top: 0, right: 0, bottom: 0 }); }
+      else { stubRect(el, { left, top, right: left + width, bottom: top + 300 }); top += 300; }
+    }
+    stubRect(parent, { left, top: 0, right: left + width, bottom: top });
+    return parent;
+  }
+  function manager() {
+    sendToParent = vi.fn();
+    return new FlowDragManager({
+      findElementByKey: (k: string) => document.querySelector(`[data-key="${k}"]`),
+      isEditorNode: (n: Element) => n.nodeType === 1 && (n.hasAttribute('data-drag-ghost') || n.hasAttribute('data-sq-drop-line')),
+      sendToParent,
+    });
+  }
+  const drop = () => sendToParent.mock.calls.find((call) => call[0].type === 'DRAG_ELEMENT_DROP')![0].payload;
+
+  it('a hidden first child: the slot lands between the visible siblings, index in file order', () => {
+    const parent = mount(['HIDDEN', 'X1', 'X2', 'X3']);
+    const m = manager();
+    m.handleStart({ key: 'X3', iframeX: 100, iframeY: 750 });
+    m.handleMove({ iframeX: 100, iframeY: 340 }); // top half of X2
+    m.handleEnd();
+    expect(keys(parent)).toEqual(['HIDDEN', 'X1', 'X3', 'X2']);
+    expect(drop()).toMatchObject({ insertIndex: 2, reparented: false });
+  });
+
+  it('a hidden middle child: an element can still be dropped below it', () => {
+    const parent = mount(['X1', 'HIDDEN', 'X2', 'X3']);
+    const m = manager();
+    m.handleStart({ key: 'X1', iframeX: 100, iframeY: 100 });
+    m.handleMove({ iframeX: 100, iframeY: 800 }); // bottom half of X3
+    m.handleEnd();
+    expect(keys(parent)).toEqual(['HIDDEN', 'X2', 'X3', 'X1']);
+    expect(drop()).toMatchObject({ insertIndex: 3 });
+  });
+
+  it('wiggling the only visible child never moves it across hidden ones', () => {
+    const parent = mount(['X1', 'HIDDEN']);
+    const m = manager();
+    m.handleStart({ key: 'X1', iframeX: 100, iframeY: 100 });
+    m.handleMove({ iframeX: 100, iframeY: 250 });
+    m.handleEnd();
+    expect(keys(parent)).toEqual(['X1', 'HIDDEN']);
+    expect(drop().insertIndex).toBe(0);
+  });
+
+  it('a drop into another container reports the slot in that container’s file order', () => {
+    mount(['X1', 'X2'], 'p', 0, 300);
+    mount(['Q-HIDDEN', 'Q1', 'Q2'], 'q', 700); // wider than the dragged element: a drop container
+    const m = manager();
+    m.handleStart({ key: 'X1', iframeX: 100, iframeY: 100 });
+    m.handleMove({ iframeX: 900, iframeY: 340 }); // over q, top half of Q2
+    m.handleEnd();
+    expect(drop()).toMatchObject({ newParentKey: 'q', insertIndex: 2, reparented: true });
+  });
+});

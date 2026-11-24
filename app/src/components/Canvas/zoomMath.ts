@@ -67,6 +67,9 @@ export interface FitInput {
   /** Frame height in CONTENT px (screen px ÷ current scale). <2 → width-only fit. */
   frameHeight: number;
   margin?: number;
+  /** Canvas width covered by the floating side panels: the fit uses the gap between them. */
+  insetLeft?: number;
+  insetRight?: number;
 }
 
 /**
@@ -78,7 +81,9 @@ export interface FitInput {
  */
 export function fitView(input: FitInput): ViewTransform {
   const m = input.margin ?? FIT_MARGIN;
-  const availW = Math.max(input.canvasWidth - 2 * m, 1);
+  const left = input.insetLeft ?? 0, right = input.insetRight ?? 0;
+  const visibleW = input.canvasWidth - left - right;
+  const availW = Math.max(visibleW - 2 * m, 1);
   const availH = Math.max(input.canvasHeight - 2 * m, 1);
   const widthOnly = input.frameHeight < 2;
   const raw = widthOnly
@@ -87,7 +92,7 @@ export function fitView(input: FitInput): ViewTransform {
   const scale = clampScale(raw);
 
   const frameLeft = (input.canvasWidth - input.viewportWidth) / 2;
-  const x = (input.canvasWidth - input.viewportWidth * scale) / 2 - frameLeft * scale;
+  const x = left + (visibleW - input.viewportWidth * scale) / 2 - frameLeft * scale;
 
   const heightFits = !widthOnly && input.frameHeight * scale <= availH + STEP_EPS;
   const y = heightFits

@@ -478,6 +478,10 @@
 }
 .sq-post-editor .ProseMirror .ProseMirror-selectednode::selection,
 .sq-post-editor .ProseMirror .ProseMirror-selectednode ::selection { background: transparent; }
+/* A block with its own fill + ink (the page's code block, a colored band) keeps that ink when selected: the selection
+   tint lies over the block's fill, and the theme ink ::selection paints (globals.css) would sink into a dark block. */
+.sq-post-editor .ProseMirror :is(pre.sq-code, .sq-stack[data-sq-colored])::selection,
+.sq-post-editor .ProseMirror :is(pre.sq-code, .sq-stack[data-sq-colored]) ::selection { color: currentColor; }
 
 /* Agent multiplayer (owner 2026-11-08, ledger G7): blocks an outside agent just
    changed light up in the AI overlay color and fade (applyOutside adds the class

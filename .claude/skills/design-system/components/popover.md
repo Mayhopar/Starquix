@@ -22,6 +22,11 @@ another Popover registers with its ancestors, so a click inside the child's
 panel never closes the parent. A real outside click still closes all of them.
 A `Modal` takes part the same way: a Popover/Menu inside it registers with it.
 
+**A hidden trigger closes it:** on scroll / resize a Popover whose trigger left
+the layout (`display: none` on it or an ancestor — the sidebars hidden with ⌘\)
+calls `onClose` instead of jumping to the window corner. ⌘\ moves the chrome
+without a window resize, so Editor dispatches `resize` for it.
+
 ## Menu = Popover + MenuItem rows
 ```tsx
 <Menu isOpen onClose triggerRef>
@@ -30,7 +35,8 @@ A `Modal` takes part the same way: a Popover/Menu inside it registers with it.
   <MenuItem label="Grid" selected onSelect={…} />   // checkmark
 </Menu>
 ```
-- MenuItem: h-7, text-xs, `danger` (error tokens), `selected`, `disabled`, `icon` (node or slot spec).
+- MenuItem: h-7, text-xs, `danger` (error tokens), `selected`, `disabled`, `icon` (node or slot spec),
+  `shortcut` (right-aligned hint, at least 16px from the label).
 
 ## Don't
 - Never hand-roll `absolute` menus/dropdown lists — always Menu/Popover.

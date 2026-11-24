@@ -34,44 +34,26 @@ export function getEffectiveClasses(
   theme: Theme,
   state: State
 ): string[] {
-  const result = new Map<string, string>(); // group -> class
-
-  // Get breakpoint index for cascade
-  const bpIndex = BREAKPOINTS.indexOf(breakpoint);
+  let result: string[] = [];
+  // A slot overrides the property groups it sets in the slots before it and keeps every token of its own: two tokens
+  // of one slot (ring-2 ring-blue-500, flex … hidden) are Tailwind's to order, never the editor's to drop (audit #2, #7).
+  const apply = (slot: string[]) => {
+    const groups = new Set(slot.map(getPropertyGroup));
+    result = [...result.filter(cls => !groups.has(getPropertyGroup(cls))), ...slot];
+  };
 
   // Apply cascade: smaller breakpoints first, then current
-  for (let i = 0; i <= bpIndex; i++) {
-    const bp = BREAKPOINTS[i];
-
-    // First apply light theme default state
-    for (const cls of storage[bp].light.default) {
-      result.set(getPropertyGroup(cls), cls);
-    }
-
-    // Then apply light theme target state (if not default)
-    if (state !== 'default') {
-      for (const cls of storage[bp].light[state]) {
-        result.set(getPropertyGroup(cls), cls);
-      }
-    }
-
+  for (const bp of BREAKPOINTS.slice(0, BREAKPOINTS.indexOf(breakpoint) + 1)) {
+    apply(storage[bp].light.default);
+    if (state !== 'default') apply(storage[bp].light[state]);
     // If dark theme, apply dark overrides
     if (theme === 'dark') {
-      // Apply dark theme default state
-      for (const cls of storage[bp].dark.default) {
-        result.set(getPropertyGroup(cls), cls);
-      }
-
-      // Then apply dark theme target state (if not default)
-      if (state !== 'default') {
-        for (const cls of storage[bp].dark[state]) {
-          result.set(getPropertyGroup(cls), cls);
-        }
-      }
+      apply(storage[bp].dark.default);
+      if (state !== 'default') apply(storage[bp].dark[state]);
     }
   }
 
-  return Array.from(result.values());
+  return result;
 }
 
 /**
@@ -96,23 +78,10 @@ export function computeSlotContent(
   tempStorage[breakpoint][theme][state] = [];
   const inherited = getEffectiveClasses(tempStorage, breakpoint, theme, state);
 
-  // Build map of inherited property groups
-  const inheritedByGroup = new Map<string, string>();
-  inherited.forEach(cls => {
-    inheritedByGroup.set(getPropertyGroup(cls), cls);
-  });
-
-  // Only store classes that differ from inherited
-  const toStore: string[] = [];
-  newEffectiveClasses.forEach(cls => {
+  // The slot stores a property group only when its tokens differ from the inherited ones (it then overrides them all).
+  const groupTokens = (tokens: string[], group: string) => tokens.filter(t => getPropertyGroup(t) === group).sort().join(' ');
+  return newEffectiveClasses.filter(cls => {
     const group = getPropertyGroup(cls);
-    const inheritedCls = inheritedByGroup.get(group);
-    if (inheritedCls !== cls) {
-      // Different from inherited, or not inherited at all - store it
-      toStore.push(cls);
-    }
-    // If same as inherited, don't store (let inheritance work)
+    return groupTokens(newEffectiveClasses, group) !== groupTokens(inherited, group);
   });
-
-  return toStore;
 }
