@@ -77,7 +77,7 @@ cd desktop && npm run deps && npm run mcp && npm start      # desktop app (`mcp/
 
 Requires Node.js 22.12+ and npm 10. The desktop app runs on macOS, Windows and Linux.
 
-A dev launch points `~/.starquix-mcp` (the agent relay launcher) at your checkout, so an installed Starquix app's agents use the dev relay until the installed app launches again. Set `STARQUIX_MCP_HOME` to a scratch folder to avoid it.
+A dev launch points `~/.starquix-mcp` (the agent relay launcher) at your checkout, so an installed Starquix app's agents use the dev relay until the installed app launches again.
 
 Tests: `cd app && npm run test:run` and `cd desktop && npm test`.
 
