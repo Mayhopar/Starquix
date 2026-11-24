@@ -887,7 +887,7 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
             the canvas is always the whole window and ⌘\ (sidebarsHidden) only hides
             them; `hidden` keeps them mounted (widths, tabs, scroll and drafts
             survive) and out of the Tab order. */}
-        <div ref={leftPanelRef} className={`absolute left-0 top-0 h-full ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 -translate-x-full' : 'z-10'} ${sidebarsHidden ? 'hidden' : ''}`}>
+        <div ref={leftPanelRef} data-sq-panel="left" className={`absolute left-0 top-0 h-full ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 -translate-x-full' : 'z-10'} ${sidebarsHidden ? 'hidden' : ''}`}>
           <LeftSidebar />
         </div>
         <Canvas
@@ -906,7 +906,7 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
         {designSurface && (
           // task-116: stays mounted in preview and slides off to the right
           // (see the LeftSidebar wrapper above for the floating/z-50 rationale).
-          <div ref={rightPanelRef} className={`absolute right-0 top-0 h-full ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 translate-x-full' : 'z-10'} ${sidebarsHidden ? 'hidden' : ''}`} style={{ width: designBarWidth }}>
+          <div ref={rightPanelRef} data-sq-panel="right" className={`absolute right-0 top-0 h-full ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 translate-x-full' : 'z-10'} ${sidebarsHidden ? 'hidden' : ''}`} style={{ width: designBarWidth }}>
             {/* Resize Handle - absolute positioned on left edge */}
             <div
               className="absolute top-0 left-0 w-2 h-full cursor-col-resize group z-10"

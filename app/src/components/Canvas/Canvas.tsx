@@ -282,9 +282,10 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
     const canvas = canvasRef.current;
     let view: ViewTransform = { scale: 1, x: 0, y: 0 };
     if (canvas && canvas.clientWidth > 2 && canvas.clientHeight > 2) {
-      // The floating side panels cover the canvas edges (Editor publishes their widths): fit and centre in the gap.
-      const inset = (name: string) => parseFloat(getComputedStyle(canvas).getPropertyValue(name)) || 0;
-      const insetLeft = inset('--sq-panel-left'), insetRight = inset('--sq-panel-right');
+      // The floating side panels cover the canvas edges: fit and centre in the gap. Measured here, not read from
+      // Editor's --sq-panel-* (its effects run after this child's on the first load).
+      const inset = (side: string) => document.querySelector<HTMLElement>(`[data-sq-panel="${side}"]`)?.offsetWidth ?? 0;
+      const insetLeft = inset('left'), insetRight = inset('right');
       const fit = fitView({
         canvasWidth: canvas.clientWidth,
         canvasHeight: canvas.clientHeight,
