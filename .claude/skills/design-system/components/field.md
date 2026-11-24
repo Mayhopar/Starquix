@@ -51,6 +51,11 @@
   radios, icon buttons inside fields, the SegmentedControl track) use the same two tokens — never `bg-bg-contrast`. A
   hand-rolled field box outside the kit does too; `styles/__tests__/inputFill.test.ts` fails on one painting
   `bg-bg-contrast`.
+- One dropdown chevron: `FieldChevron` (16px, `text-text-secondary`) — the select Field's, 5px from the box's outer
+  right edge (1px border + the 4px slot gap). A Button that opens a menu but looks like a select (font picker, colour
+  picker) is `<Button variant="outline" className={`${fieldTrigger} w-full pl-2 …`} iconRight={<FieldChevron />}>`:
+  `fieldTrigger` swaps the outline's inset ring for the Field's real 1px border and ends on that 4px gap, so its
+  chevron lands on the select's x. Never a bare `ChevronDownIcon` with its own margin, colour or opacity in a field box.
 - Loading state: `<Labeled label="Address" skeleton><Field size="lg" skeleton … /></Labeled>` — the label becomes a bar
   of its own width (no helper line), the field its own 24/28/32px box pulsing (no input). In a window form that is
   `<Prop label="Address" skeleton />`. Wrap the set in `role="status"` + an `aria-label`.
