@@ -181,3 +181,14 @@ describe('delete a layout', () => {
     expect(h.takeSnapshot).not.toHaveBeenCalled();
   });
 });
+
+// ⌘\ hides the sidebars and dispatches `resize`: a menu pinned at the cursor would float over the canvas.
+describe('Assets row menu', () => {
+  it('closes when the layout resizes', () => {
+    render(<AssetsPanel activeComponentPath={null} onSelectComponent={vi.fn()} onClearComponent={vi.fn()} />);
+    fireEvent.contextMenu(screen.getByText('Foo'));
+    expect(screen.getByText('Delete')).toBeTruthy();
+    fireEvent(window, new Event('resize'));
+    expect(screen.queryByText('Delete')).toBeNull();
+  });
+});

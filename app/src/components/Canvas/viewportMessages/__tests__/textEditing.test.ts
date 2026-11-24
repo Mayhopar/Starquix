@@ -198,6 +198,14 @@ describe('KEYBOARD_EVENT', () => {
     expect(spy).toHaveBeenCalled();
     expect((spy.mock.calls[0][0] as KeyboardEvent).metaKey).toBe(true);
   });
+
+  it('keeps an auto-repeat an auto-repeat (a held ⌘\\ toggles the sidebars once)', () => {
+    const ctx = makeFakeCtx();
+    const spy = vi.fn();
+    document.addEventListener('keydown', spy, { once: true });
+    handleKeyboardEvent(ctx, { key: '\\', code: 'Backslash', metaKey: true, shiftKey: false, ctrlKey: false, altKey: false, repeat: true });
+    expect((spy.mock.calls[0][0] as KeyboardEvent).repeat).toBe(true);
+  });
 });
 
 describe('writer gating (dev: legacy file write is dead — design 2026-06-11 §1.3)', () => {
