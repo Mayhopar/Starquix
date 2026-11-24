@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { rgbToHex } from './utils';
-import { Button, Swatch } from '@/components/ui';
+import { Button, Swatch, fieldBox } from '@/components/ui';
 
 // ============================================================================
 // Color Conversion Utilities
@@ -283,7 +283,7 @@ export const CustomColorPicker: React.FC<CustomColorPickerProps> = ({
       {/* Color Preview and Hex Input */}
       <div className="flex gap-2 items-center mb-2">
         <Swatch color={currentHex} className="w-8 h-8" />
-        <div className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill">
+        <div {...fieldBox} className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill cursor-text">
           <span className="pl-2 py-1 text-3xs text-text-secondary">
             HEX
           </span>
@@ -300,7 +300,7 @@ export const CustomColorPicker: React.FC<CustomColorPickerProps> = ({
 
       {/* RGB Inputs */}
       <div className="flex gap-2 mb-2">
-        <div className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill">
+        <div {...fieldBox} className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill cursor-text">
           <span className="pl-2 py-1 text-3xs text-text-secondary">
             R
           </span>
@@ -314,7 +314,7 @@ export const CustomColorPicker: React.FC<CustomColorPickerProps> = ({
             max={255}
           />
         </div>
-        <div className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill">
+        <div {...fieldBox} className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill cursor-text">
           <span className="pl-2 py-1 text-3xs text-text-secondary">
             G
           </span>
@@ -328,7 +328,7 @@ export const CustomColorPicker: React.FC<CustomColorPickerProps> = ({
             max={255}
           />
         </div>
-        <div className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill">
+        <div {...fieldBox} className="flex flex-1 border border-input-stroke rounded-sm overflow-hidden bg-input-fill cursor-text">
           <span className="pl-2 py-1 text-3xs text-text-secondary">
             B
           </span>

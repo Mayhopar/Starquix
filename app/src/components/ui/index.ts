@@ -33,6 +33,7 @@ export { IconButton, type IconButtonProps, type IconButtonSize } from './IconBut
 
 // Inputs
 export { Field, type FieldProps, type InputSize, type SelectOption } from './Field';
+export { fieldBox } from './InputContainer';
 export { SearchField, UnitField, InlineEdit, type SearchFieldProps, type UnitFieldProps, type InlineEditProps } from './FieldPresets';
 export { InputGroup, type InputGroupProps, type InputGroupLayout, type InputGroupGap } from './InputGroup';
 export { Labeled, type LabeledProps } from './Labeled';

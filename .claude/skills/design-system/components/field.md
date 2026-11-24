@@ -18,6 +18,16 @@
 - Numeric fields get universal ↑/↓ (±1) and Shift+↑/↓ (±10) stepping unless you
   pass your own `onKeyDown`.
 - `InputContainer` is internal — never import it in new code.
+- The whole box is one hit target (issue #10): a press on the border, padding, leading label/icon, `prefix`, `unit` or
+  the select chevron focuses the input (caret at the near end; an `onFocus` select-all is kept) or opens the select; a
+  click there reaches the input's `onClick` once. One cursor across the box: text, or pointer for a select / a read-only
+  field with `onClick`. A button, link or other focusable element in a slot keeps its own clicks — never wrap a Field
+  in your own click-to-focus div.
+- A field-looking box that cannot be a Field (a table cell holding bare inputs, the chat composer, a picker's own
+  value boxes) spreads `fieldBox` (`import { fieldBox } from '@/components/ui'`): `<td {...fieldBox} className="… cursor-text">`.
+  Same contract: a press anywhere focuses the box's first input/select/textarea; controls inside keep their own clicks;
+  a nested `fieldBox` (an opacity input + `%` inside a colour cell) wins over the outer one. Not on a scroll container:
+  its scrollbar presses would be taken.
 
 ## Window fields (the Figma Input)
 ```tsx

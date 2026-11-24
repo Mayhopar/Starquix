@@ -184,6 +184,7 @@ export const Field = forwardRef<HTMLInputElement | HTMLSelectElement | HTMLTextA
       trailing = props.unit ?? suffix;
     }
 
+    const opensOnClick = props.as === 'select' || (!!inputProps?.readOnly && !!inputProps.onClick);
     const lg = size === 'lg';
     const valueClasses = cx(baseFieldStyles, lg ? 'text-sm' : 'text-xs', mono && 'font-mono');
 
@@ -195,7 +196,7 @@ export const Field = forwardRef<HTMLInputElement | HTMLSelectElement | HTMLTextA
         size={size}
         disabled={disabled}
         error={!!error}
-        className={cx(props.as === 'textarea' && 'h-auto', containerClassName || className)}
+        className={cx(props.as === 'textarea' && 'h-auto', opensOnClick ? 'cursor-pointer' : 'cursor-text', containerClassName || className)}
       >
         {prefix && <span className="text-xs text-text-secondary shrink-0 pl-2 -mr-2">{prefix}</span>}
         {props.as === 'textarea' ? (

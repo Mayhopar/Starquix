@@ -16,7 +16,7 @@ import { useSelectedRectOptional } from '@/context/SelectionContext';
 import { findClass, setClass } from '../utils';
 import { deriveAxisPlacement, buildAxisEdit, axisEditTokens } from './gridPlacement';
 import { resolveToClass } from '@/core/classes/vocabulary';
-import { SegmentedControl, Popover, Field, IconButton, MenuItem } from '@/components/ui';
+import { SegmentedControl, Popover, Field, IconButton, MenuItem, fieldBox } from '@/components/ui';
 import { useMixedValue, useMultiMembers, ownsGroups, type Owns } from '../multi/mixed';
 import {
   WrapIcon,
@@ -625,7 +625,7 @@ export const SizeInput: React.FC<SizeInputProps> = ({
 
   return (
     <div className="relative">
-      <div className="flex items-center h-7 rounded-inner bg-input-fill border border-input-stroke overflow-hidden">
+      <div {...fieldBox} className="flex items-center h-7 rounded-inner bg-input-fill border border-input-stroke overflow-hidden cursor-text">
         <span className="w-4 h-4 ml-1 flex items-center justify-center text-xs text-text-secondary shrink-0">
           {label}
         </span>
@@ -818,7 +818,7 @@ const ConstraintInput: React.FC<ConstraintInputProps> = ({
 
   return (
     <div className="relative">
-      <div className="flex items-center h-7 rounded-inner bg-input-fill border border-input-stroke overflow-hidden">
+      <div {...fieldBox} className="flex items-center h-7 rounded-inner bg-input-fill border border-input-stroke overflow-hidden cursor-text">
         <span className="w-4 h-4 ml-1 flex items-center justify-center text-text-secondary shrink-0">
           <Icon className="w-4 h-4" />
         </span>
