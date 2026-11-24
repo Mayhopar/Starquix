@@ -129,7 +129,7 @@ export const BRIDGE_LINKS = `
     }
 
     // Temporarily make element contentEditable if using saved range
-    var wasContentEditable = element.contentEditable === 'true';
+    var wasContentEditable = element.isContentEditable;
     if (!wasContentEditable) {
       element.contentEditable = 'true';
     }

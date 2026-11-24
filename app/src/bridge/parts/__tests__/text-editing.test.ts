@@ -141,3 +141,53 @@ describe('line breaks inside edited text (personal-site hero, 2026-09-14)', () =
     expect(bridge.editedInlineMarkup(document.querySelector('p')!)).toBeNull();
   });
 });
+
+describe('inline editing edits text, never structure (audit #3, #38, #40)', () => {
+  type Bridge = HarnessBridge & { exitEditModeCleanup: () => void; handleMouseDown: (e: MouseEvent) => void };
+  let bridge: Bridge;
+  beforeEach(() => { resetHarnessDom(); bridge = mountBridgeForTest() as Bridge; });
+  const sent = (type: string) => (bridge.sendToParent as ReturnType<typeof vi.fn>).mock.calls
+    .map((c) => c[0] as { type: string; payload: Record<string, unknown> }).filter((m) => m.type === type);
+  const HEADING = '<h1 data-key="src/pages/index.astro:8:5">Build <span class="text-indigo-600" data-sq-source="src/pages/index.astro:8:15">faster</span> sites</h1>';
+
+  it('#3: typing in text with an inline <span> commits its markup, span kept, and no flattened text write', () => {
+    document.body.innerHTML = HEADING;
+    const h1 = document.querySelector('h1')!;
+    bridge.handleEnterEditMode({ key: 'src/pages/index.astro:8:5' });
+    h1.lastChild!.textContent = ' sites today'; // the user types at the end
+    bridge.exitEditModeCleanup();
+    expect(sent('MARKUP_CHANGED').map((m) => m.payload)).toEqual([
+      { key: 'src/pages/index.astro:8:5', innerHTML: 'Build <span class="text-indigo-600">faster</span> sites today' },
+    ]);
+    const exited = sent('EDIT_MODE_EXITED')[0].payload;
+    expect(exited.originalText).toBe(exited.textContent); // reports unchanged: no plain-text copy written over it
+  });
+
+  it('#3: undo of such an edit puts the inline markup back, not flattened text', () => {
+    document.body.innerHTML = HEADING;
+    const h1 = document.querySelector('h1')!;
+    bridge.handleEnterEditMode({ key: 'src/pages/index.astro:8:5', originalText: 'Build faster sites' });
+    bridge.editingElement = null; bridge.originalTextContent = null;
+    h1.textContent = 'Build faster sites today';
+    bridge.handleRestoreOriginalText({ key: 'src/pages/index.astro:8:5' });
+    expect(h1.querySelector('span.text-indigo-600')?.textContent).toBe('faster');
+  });
+
+  it('#38: the edited element accepts plain text only, so ⌘B/⌘I cannot add formatting that is never saved', () => {
+    document.body.innerHTML = HEADING;
+    bridge.handleEnterEditMode({ key: 'src/pages/index.astro:8:5' });
+    expect(document.querySelector('h1')!.contentEditable).toBe('plaintext-only');
+  });
+
+  it('#40: the second mousedown of a double-click outside edit mode starts no word selection; inside it, it does', () => {
+    document.body.innerHTML = HEADING;
+    const dbl = () => new MouseEvent('mousedown', { detail: 2, cancelable: true, clientX: 1, clientY: 1 });
+    const outside = dbl();
+    bridge.handleMouseDown(outside);
+    expect(outside.defaultPrevented).toBe(true);
+    bridge.handleEnterEditMode({ key: 'src/pages/index.astro:8:5' });
+    const inside = dbl();
+    bridge.handleMouseDown(inside);
+    expect(inside.defaultPrevented).toBe(false);
+  });
+});

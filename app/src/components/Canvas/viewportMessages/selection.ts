@@ -10,14 +10,6 @@ import { clearSelectedCellGeometry } from '@/store/gridGeometryStore';
 import { lockedKeyPredicate } from '@/components/DesignBar/lockTier';
 import { deriveSelectedElementId } from '@/context/SelectionContext';
 
-/** Tags that support inline text editing on double-click. */
-export const TEXT_EDITABLE_TAGS = new Set([
-  'p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'label', 'li', 'td', 'th',
-  'dt', 'dd', 'figcaption', 'blockquote', 'q', 'cite', 'em', 'strong', 'small',
-  'mark', 'del', 'ins', 'sub', 'sup', 'code', 'pre', 'abbr', 'time', 'b', 'i', 'u', 's',
-  'button',
-]);
-
 export interface ElementClickPayload {
   key: string;
   tagName: string;
@@ -95,9 +87,9 @@ export function handleElementClick(ctx: ViewportMessageContext, rawPayload: unkn
   // Handle drill-down context (Figma-like behavior)
   const { isDoubleClick, hasChildren, isDirectSelect, isOutsideContext, drillDownContext } = payload;
 
-  // Double-click on already-selected leaf text element: enter text edit mode
-  const clickedTag = payload.tagName?.toLowerCase();
-  if (isDoubleClick && payload.key === ctx.refs.selectedKey.current && !hasChildren && !ctx.refs.isEditingText.current && clickedTag && TEXT_EDITABLE_TAGS.has(clickedTag)) {
+  // Double-click on the already-selected childless element edits its text, whatever
+  // its tag (audit #41: a tag list left a div/section uneditable that Enter edits).
+  if (isDoubleClick && payload.key === ctx.refs.selectedKey.current && !hasChildren && !ctx.refs.isEditingText.current) {
     ctx.actions.sendEnterEditMode(payload.key); // db-bound keys are blocked inside the funnel itself
     return;
   }

@@ -4738,8 +4738,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     if (!key) return;
     var element = this.findElementByKey(key);
     if (!element) return;
-    // An element whose text is split by line breaks restores its markup, so
-    // the <br> comes back with the text (flat textContent would drop it).
+    // An element whose text holds inline markup restores that markup, so the
+    // <br>/<span> comes back with the text (flat textContent would drop it).
     if (this.originalMarkupByKey && this.originalMarkupByKey[key] !== undefined) {
       element.innerHTML = this.originalMarkupByKey[key];
     } else if (this.originalTextByKey[key] !== undefined) {
@@ -4764,9 +4764,9 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     this.savedSelectionRange = null;
     this.editingElement = element;
     this.originalTextContent = element.textContent;
-    if (key && this.hasLineBreakText(element)) {
-      // Line-break text commits as markup (see exitEditModeCleanup); keep the
-      // first-seen inner markup so an undo can put the <br> back on screen.
+    if (key && this.hasInlineMarkup(element)) {
+      // Such text commits as markup (see exitEditModeCleanup); keep the
+      // first-seen inner markup so an undo can put it back on screen.
       this.originalMarkupByKey = this.originalMarkupByKey || {};
       if (this.originalMarkupByKey[key] === undefined) this.originalMarkupByKey[key] = element.innerHTML;
     }
@@ -4782,7 +4782,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
         this.originalTextByKey[key] = element.textContent;
       }
     }
-    element.contentEditable = 'true';
+    // Text, never structure: no ⌘B/⌘I/paste formatting the commit would drop (audit #38).
+    element.contentEditable = 'plaintext-only';
     // Seamless canvas Task 1.7: a restored draft (typed before a crash or a
     // document replacement). The baselines above stay the FILE text, so exit
     // reports the change and commits it.
@@ -5011,7 +5012,7 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     }
 
     // Temporarily make element contentEditable if using saved range
-    var wasContentEditable = element.contentEditable === 'true';
+    var wasContentEditable = element.isContentEditable;
     if (!wasContentEditable) {
       element.contentEditable = 'true';
     }
@@ -5460,6 +5461,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   };
 
   IFrameBridge.prototype.handleMouseDown = function(event) {
+    // Outside text editing a double-click selects or edits elements, never words (audit #40).
+    if (event.detail > 1 && !this.editingElement) event.preventDefault();
     this.mouseDownTarget = event.target;
     this.mouseDownPos = { x: event.clientX, y: event.clientY };
     this.isDragging = false;
@@ -6416,16 +6419,18 @@ IFrameBridge.prototype.handlePickElementAtPoint = function(payload) {
   
 
 
-/** Text split by line breaks commits as markup (flat textContent would drop
- *  every <br>) — unless a link carrier already owns this element's markup. */
-IFrameBridge.prototype.hasLineBreakText = function(element) {
-    return !!element.querySelector('br, wbr') && !element.querySelector('a');
+/** Text holding elements (<br>, <span>, <strong>…) commits as markup — flat
+ *  textContent would drop them (audit #3) — unless a link carrier already owns
+ *  this element's markup. Editing is plaintext-only, so the elements are the
+ *  ones that were there. */
+IFrameBridge.prototype.hasInlineMarkup = function(element) {
+    return element.children.length > 0 && !element.querySelector('a');
 };
 
-/** Inner markup to commit for line-break text, bookkeeping attributes stripped;
+/** Inner markup to commit for such text, bookkeeping attributes stripped;
  *  null = plain text is exact. Rides the same markup channel links use. */
 IFrameBridge.prototype.editedInlineMarkup = function(element) {
-    return this.hasLineBreakText(element) ? this.sanitizeLinkHtml(this.cleanClone(element).innerHTML) : null;
+    return this.hasInlineMarkup(element) ? this.sanitizeLinkHtml(this.cleanClone(element).innerHTML) : null;
 };
 
 IFrameBridge.prototype.exitEditModeCleanup = function() {

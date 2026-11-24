@@ -17,8 +17,8 @@ export const BRIDGE_TEXT_EDITING = `
     if (!key) return;
     var element = this.findElementByKey(key);
     if (!element) return;
-    // An element whose text is split by line breaks restores its markup, so
-    // the <br> comes back with the text (flat textContent would drop it).
+    // An element whose text holds inline markup restores that markup, so the
+    // <br>/<span> comes back with the text (flat textContent would drop it).
     if (this.originalMarkupByKey && this.originalMarkupByKey[key] !== undefined) {
       element.innerHTML = this.originalMarkupByKey[key];
     } else if (this.originalTextByKey[key] !== undefined) {
@@ -43,9 +43,9 @@ export const BRIDGE_TEXT_EDITING = `
     this.savedSelectionRange = null;
     this.editingElement = element;
     this.originalTextContent = element.textContent;
-    if (key && this.hasLineBreakText(element)) {
-      // Line-break text commits as markup (see exitEditModeCleanup); keep the
-      // first-seen inner markup so an undo can put the <br> back on screen.
+    if (key && this.hasInlineMarkup(element)) {
+      // Such text commits as markup (see exitEditModeCleanup); keep the
+      // first-seen inner markup so an undo can put it back on screen.
       this.originalMarkupByKey = this.originalMarkupByKey || {};
       if (this.originalMarkupByKey[key] === undefined) this.originalMarkupByKey[key] = element.innerHTML;
     }
@@ -61,7 +61,8 @@ export const BRIDGE_TEXT_EDITING = `
         this.originalTextByKey[key] = element.textContent;
       }
     }
-    element.contentEditable = 'true';
+    // Text, never structure: no ⌘B/⌘I/paste formatting the commit would drop (audit #38).
+    element.contentEditable = 'plaintext-only';
     // Seamless canvas Task 1.7: a restored draft (typed before a crash or a
     // document replacement). The baselines above stay the FILE text, so exit
     // reports the change and commits it.

@@ -20,7 +20,7 @@ async function editHeading(page, from, to) {
   await select(page, h1);
   await expect(page.getByTestId('design-bar').getByText('H1', { exact: true })).toBeVisible();
   await page.keyboard.press('Enter');
-  await expect(frame.locator('[contenteditable="true"]')).toBeVisible();
+  await expect(frame.locator('[contenteditable="plaintext-only"]')).toBeVisible();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type(to);
   await page.keyboard.press('Escape');

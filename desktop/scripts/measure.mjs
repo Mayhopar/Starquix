@@ -106,7 +106,7 @@ async function edits(page, read) {
     // The last DesignBar button keeps focus; Enter must reach the editor, not re-click it.
     await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
     await page.keyboard.press('Enter');
-    const editable = frame.locator('[contenteditable="true"]');
+    const editable = frame.locator('[contenteditable="plaintext-only"]');
     if (!await editable.waitFor({ timeout: 3000 }).then(() => true, () => false)) {
       const box = await p.boundingBox(); await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
     }

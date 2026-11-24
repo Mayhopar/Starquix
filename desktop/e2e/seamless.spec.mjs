@@ -36,11 +36,11 @@ test('A1: class edits then typing across the deferred write — no navigation, t
     await select(page, para);
     await expect(page.getByTestId('design-bar').getByText('P', { exact: true })).toBeVisible();
     await page.keyboard.press('Enter');
-    const editable = frame.locator('[contenteditable="true"]');
+    const editable = frame.locator('[contenteditable="plaintext-only"]');
     await expect(editable).toBeVisible();
     await editable.press('End');
     for (let i = 0; i < 70; i++) { await page.keyboard.type('x'); await page.waitForTimeout(100); }
-    await expect(frame.locator('[contenteditable="true"]')).toContainText('x'.repeat(70));
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toContainText('x'.repeat(70));
     // Typed text is mirrored to disk while editing (Task 1.6).
     const drafts = path.join(temp, 'projects', id, '.sq/drafts');
     const draftFiles = () => fs.readdir(drafts).then(f => f.filter(n => n.endsWith('.json'))).catch(() => []);
@@ -72,7 +72,7 @@ test('A6-draft: typed text survives kill -9 of Electron and is restored on relau
     await select(page, para);
     await expect(page.getByTestId('design-bar').getByText('P', { exact: true })).toBeVisible();
     await page.keyboard.press('Enter');
-    const editable = frame.locator('[contenteditable="true"]');
+    const editable = frame.locator('[contenteditable="plaintext-only"]');
     await expect(editable).toBeVisible();
     await page.keyboard.press('End');
     await page.keyboard.type('y'.repeat(20));
@@ -86,7 +86,7 @@ test('A6-draft: typed text survives kill -9 of Electron and is restored on relau
     app = null;
     ({ app, page } = await launch(env));
     await page.goto(editorUrl);
-    const restored = preview(page).locator('[contenteditable="true"]');
+    const restored = preview(page).locator('[contenteditable="plaintext-only"]');
     await expect(restored).toContainText('y'.repeat(20), { timeout: BOOT });
     await page.keyboard.press('Escape');
     const pageFile = path.join(temp, 'projects', id, 'src/pages/index.astro');
@@ -163,18 +163,18 @@ test('A3: external edits appear live; a text edit in progress survives them', as
     await select(page, para);
     await expect(page.getByTestId('design-bar').getByText('P', { exact: true })).toBeVisible();
     await page.keyboard.press('Enter');
-    await expect(frame.locator('[contenteditable="true"]')).toBeVisible();
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toBeVisible();
     await page.keyboard.press('ArrowRight'); // collapse the select-all to the end
     await page.keyboard.type(' typed');
-    await expect(frame.locator('[contenteditable="true"]')).toHaveText('First editable paragraph typed');
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toHaveText('First editable paragraph typed');
     await fs.writeFile(layoutFile, (await fs.readFile(layoutFile, 'utf8')).replace('<slot />', '<slot />\n    <footer>Layout footer</footer>'));
     await expect(frame.getByText('Layout footer', { exact: true })).toBeVisible({ timeout: 3_000 });
-    await expect(frame.locator('[contenteditable="true"]')).toHaveText('First editable paragraph typed');
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toHaveText('First editable paragraph typed');
     // Same file changes under the edit: held until the edit ends, then applied.
     await page.keyboard.type(' more');
     await fs.writeFile(pageFile, (await fs.readFile(pageFile, 'utf8')).replace('</main>', '  <p class="mt-4">Second IDE edit</p>\n  </main>'));
     await page.waitForTimeout(1_500);
-    await expect(frame.locator('[contenteditable="true"]')).toHaveText('First editable paragraph typed more');
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toHaveText('First editable paragraph typed more');
     await page.keyboard.press('Escape');
     await expect(frame.getByText('Second IDE edit', { exact: true })).toBeVisible({ timeout: 5_000 });
     // The same-file IDE edit moved the source version, so the commit's identity is

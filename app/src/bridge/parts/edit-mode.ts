@@ -13,16 +13,18 @@
 export const BRIDGE_EDIT_MODE = `
 
 
-/** Text split by line breaks commits as markup (flat textContent would drop
- *  every <br>) — unless a link carrier already owns this element's markup. */
-IFrameBridge.prototype.hasLineBreakText = function(element) {
-    return !!element.querySelector('br, wbr') && !element.querySelector('a');
+/** Text holding elements (<br>, <span>, <strong>…) commits as markup — flat
+ *  textContent would drop them (audit #3) — unless a link carrier already owns
+ *  this element's markup. Editing is plaintext-only, so the elements are the
+ *  ones that were there. */
+IFrameBridge.prototype.hasInlineMarkup = function(element) {
+    return element.children.length > 0 && !element.querySelector('a');
 };
 
-/** Inner markup to commit for line-break text, bookkeeping attributes stripped;
+/** Inner markup to commit for such text, bookkeeping attributes stripped;
  *  null = plain text is exact. Rides the same markup channel links use. */
 IFrameBridge.prototype.editedInlineMarkup = function(element) {
-    return this.hasLineBreakText(element) ? this.sanitizeLinkHtml(this.cleanClone(element).innerHTML) : null;
+    return this.hasInlineMarkup(element) ? this.sanitizeLinkHtml(this.cleanClone(element).innerHTML) : null;
 };
 
 IFrameBridge.prototype.exitEditModeCleanup = function() {

@@ -247,6 +247,8 @@ export const BRIDGE_EVENTS = `
   };
 
   IFrameBridge.prototype.handleMouseDown = function(event) {
+    // Outside text editing a double-click selects or edits elements, never words (audit #40).
+    if (event.detail > 1 && !this.editingElement) event.preventDefault();
     this.mouseDownTarget = event.target;
     this.mouseDownPos = { x: event.clientX, y: event.clientY };
     this.isDragging = false;

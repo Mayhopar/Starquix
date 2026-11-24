@@ -110,6 +110,23 @@ describe('handleWrapSelectionInLink early returns (LI-3)', () => {
     expect((p as HTMLElement).contentEditable).toBe('false');
     expect(p.querySelector('a')).toBeNull();
   });
+
+  it('a failed wrap mid-edit leaves the (plain-text) edit session editable', () => {
+    document.body.innerHTML = '<p data-key="el-abc:p-0"><b>bold</b> tail text</p>';
+    const p = document.querySelector('p')!;
+    // jsdom has no isContentEditable; Chrome reports it for 'plaintext-only' too.
+    Object.defineProperty(p, 'isContentEditable', { get: () => ['true', 'plaintext-only'].includes(p.contentEditable) });
+    bridge.handleEnterEditMode({ key: 'el-abc:p-0' });
+    const range = document.createRange();
+    range.setStart(p.querySelector('b')!.firstChild!, 1);
+    range.setEnd(p.childNodes[1]!, 4);
+    selectRange(range);
+
+    bridge.handleWrapSelectionInLink({ key: 'el-abc:p-0', href: '/x' });
+
+    expect(p.contentEditable).toBe('plaintext-only');
+    expect(bridge.editingElement).toBe(p);
+  });
 });
 
 describe('handleWrapSelectionInLink happy path (LI-3)', () => {
