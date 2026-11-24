@@ -185,11 +185,20 @@ export const BRIDGE_FLOW_DRAG = `
     line.style.display = '';
   };
 
-  /** The next real sibling (drag chrome and the hidden dragged element
-   *  skipped); null when last. */
+  /** A sibling the slot can sit next to: real (not drag chrome, not the
+   *  dragged element) and with a box. A display:none or zero-size child
+   *  ("hidden md:block") is no drop target: its empty rect tied on the leading
+   *  edge wherever the pointer was, so drops landed at the top (audit #27). */
+  FlowDragManager.prototype._isSlotSibling = function(el) {
+    if (el === this._state.element || this._bridge.isEditorNode(el)) return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+
+  /** The next drop-target sibling; null when last. */
   FlowDragManager.prototype._nextSibling = function(el) {
     var n = el.nextElementSibling;
-    while (n && (this._bridge.isEditorNode(n) || n === this._state.element)) n = n.nextElementSibling;
+    while (n && !this._isSlotSibling(n)) n = n.nextElementSibling;
     return n;
   };
 
@@ -220,14 +229,12 @@ export const BRIDGE_FLOW_DRAG = `
     this._containers = null;
   };
 
-  /** A container's real children with their rects (drag chrome and the
-   *  dragged element skipped). */
+  /** A container's drop-target children with their rects. */
   FlowDragManager.prototype._childEntries = function(parent) {
     var entries = [];
     for (var i = 0; i < parent.children.length; i++) {
       var kid = parent.children[i];
-      if (kid === this._state.element || this._bridge.isEditorNode(kid)) continue;
-      entries.push({ el: kid, rect: kid.getBoundingClientRect() });
+      if (this._isSlotSibling(kid)) entries.push({ el: kid, rect: kid.getBoundingClientRect() });
     }
     return entries;
   };
@@ -384,8 +391,11 @@ export const BRIDGE_FLOW_DRAG = `
     // Find insertion position among container's children
     var entries = this._childEntries(container.element);
     var targetRef = this._findInsertTarget(entries, x, y, container.axis);
-    var insertIndex = entries.length;
-    for (var i = 0; i < entries.length; i++) if (entries[i].el === targetRef) { insertIndex = i; break; }
+    // The host anchors by FILE order, where boxless children still count.
+    var insertIndex = 0;
+    for (var k = container.element.firstElementChild; k && k !== targetRef; k = k.nextElementSibling) {
+      if (k !== this._state.element && !this._bridge.isEditorNode(k)) insertIndex++;
+    }
 
     // Update insertion info (used by handleEnd)
     this._reparentTarget = {
