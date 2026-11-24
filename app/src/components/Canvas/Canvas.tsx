@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useRef, useState, useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
 import toast from 'react-hot-toast';
 import { Button, OperationNotice } from '@/components/ui';
 import { ViewportFrame } from './ViewportFrame';
@@ -32,7 +32,7 @@ import { useComponentLibrary } from '@/hooks/useComponentLibrary';
 import { resolvedLayoutChrome } from '@/store/layoutElement';
 import { PIXEL_GRID_ID, applyPixelGridStyle } from './PixelGridOverlay';
 import { selectProjectId } from '@/store/selectors';
-import { fitView, wheelZoomFactor, zoomAroundPoint, type ViewTransform } from './zoomMath';
+import { fitView, keepFrameOnScreen, wheelZoomFactor, zoomAroundPoint, type CanvasBox, type ViewTransform } from './zoomMath';
 import { executeZoomCommand, ZOOM_COMMAND_EVENT, type ZoomCommandAction } from './zoomCommands';
 import { ZoomChip } from './ZoomChip';
 import { generateDrawnKey } from '@/utils/generateId';
@@ -163,7 +163,7 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
   );
   const { dropIndicator } = useDropIndicator();
   const { clearSelection, select } = useSelectionContext();
-  const { activeTool, isPreview } = useTool();
+  const { activeTool, isPreview, sidebarsHidden } = useTool();
   const isPreviewRef = useRef(isPreview);
   isPreviewRef.current = isPreview;
   const { scannedElementsRef } = useScannedElementsRef();
@@ -541,13 +541,16 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
 
   // Track canvas width and container top offset for viewport frame positioning
   const [canvasContainerTop, setCanvasContainerTop] = useState(0);
+  const canvasBoxRef = useRef<CanvasBox | null>(null);
 
   useEffect(() => {
     if (!canvasEl) return;
 
     const updateMeasurements = () => {
+      const rect = canvasEl.getBoundingClientRect();
+      canvasBoxRef.current = { left: rect.left, width: canvasEl.clientWidth };
       setCanvasWidth(canvasEl.clientWidth);
-      setCanvasContainerTop(canvasEl.getBoundingClientRect().top);
+      setCanvasContainerTop(rect.top);
     };
 
     const observer = new ResizeObserver(updateMeasurements);
@@ -561,6 +564,21 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
       window.removeEventListener('scroll', updateMeasurements);
     };
   }, [canvasEl]);
+
+  // ⌘\ moves the canvas box in this commit (layout effects run after the sidebars left the DOM flow): keep the frame
+  // where it was on screen instead of re-centring it in the wider (or narrower) canvas.
+  useLayoutEffect(() => {
+    const before = canvasBoxRef.current;
+    if (!canvasEl || !before || isPreview) return;
+    const after = { left: canvasEl.getBoundingClientRect().left, width: canvasEl.clientWidth };
+    canvasBoxRef.current = after;
+    const view = keepFrameOnScreen({ scale: scaleRef.current, ...positionRef.current }, before, after);
+    positionRef.current = { x: view.x, y: view.y };
+    // Before paint, not in a rAF: one frame of the re-centred frame would show as a flicker.
+    if (contentRef.current) contentRef.current.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    scheduleFlush();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only a ⌘\ toggle moves the box under a still view
+  }, [sidebarsHidden]);
 
   // Calculate viewport frame position on canvas
   // (viewportWidth is declared above, next to hasElements, so the zoom-command
