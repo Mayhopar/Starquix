@@ -14,6 +14,11 @@ export const CLASS_PATTERNS = {
   effects: /(^|\s|:)(shadow|blur|backdrop-blur|grayscale|invert|sepia|brightness-|contrast-|saturate-)/
 } as const;
 
+/** End of a colour token: an optional opacity modifier (`border-white/10`, `text-black/[.15]`). Every
+ *  colour reader ends with it (`.source`) or strips it — else the colour reads as none and an edit
+ *  stacks a second colour. */
+export const OPACITY_SUFFIX = /(?:\/(?:\d+|\[[^\]]+\]))?$/;
+
 /** Fill gradient directions (the Fill block's Gradient tab, single and multi). */
 export const GRADIENT_DIRECTIONS = [
   { value: 'to-t', label: 'Top' },

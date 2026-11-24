@@ -1815,6 +1815,7 @@ export const DesignBar: React.FC<DesignBarProps> = ({ onClassesChange }) => {
         </>
       ) : activeTab === 'classes' ? (
         <ClassesTab
+          key={key} // an unapplied draft belongs to the element it was typed for
           classes={fullClasses}
           onClassesChange={handleClassesTabChange}
         />

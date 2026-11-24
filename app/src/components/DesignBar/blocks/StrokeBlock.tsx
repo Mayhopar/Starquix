@@ -11,6 +11,7 @@ import { ColorPicker } from '../ColorPicker';
 import { IndividualIcon, StrokeWidthIcon, BorderTopIcon, BorderRightIcon, BorderBottomIcon, BorderLeftIcon } from '@/assets/icons';
 import { SegmentedControl, Field, IconButton } from '@/components/ui';
 import { useMixedValue, ownsGroups, type Owns } from '../multi/mixed';
+import { OPACITY_SUFFIX } from '../classPatterns';
 
 // ============================================================================
 // Constants
@@ -87,7 +88,7 @@ const isBorderColor = (token: string, side?: Side): boolean => {
   const prefix = `border${side ? `-${side}` : ''}-`;
   if (!token.startsWith(prefix)) return false;
 
-  const colorPart = token.slice(prefix.length);
+  const colorPart = token.slice(prefix.length).replace(OPACITY_SUFFIX, '');
 
   // Width values (0, 2, 4, 8, [Npx]) and style values are not colours
   if (/^(0|2|4|8|\[\d+px\])$/.test(colorPart)) return false;

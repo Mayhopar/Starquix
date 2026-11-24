@@ -196,29 +196,29 @@ const NAMED_MAX_WIDTH_PX: Record<string, number> = {
   'screen-2xl': 1536,
 };
 
+// The bare token only: `classes` is the active layer's, so a token still carrying a variant
+// (group-open:max-h-96, max-md:max-w-full) is a state the bar does not edit — never read or replace it.
 const parseConstraint = (classes: string, dim: Dimension, type: 'min' | 'max'): number | null => {
   const prefix = type === 'min' ? `min-${dim}` : `max-${dim}`;
-  // Optional responsive prefix pattern: sm:, md:, lg:, etc.
-  const responsivePrefix = '([a-z0-9-]+:)*';
 
-  // Arbitrary px value: max-w-[100px], sm:max-w-[100px]
-  const pxMatch = findClass(classes, new RegExp(`^${responsivePrefix}${prefix}-\\[(\\d+)px\\]$`));
+  // Arbitrary px value: max-w-[100px]
+  const pxMatch = findClass(classes, new RegExp(`^${prefix}-\\[(\\d+)px\\]$`));
   if (pxMatch) {
     const match = pxMatch.match(/\[(\d+)px\]/);
     if (match) return parseInt(match[1], 10);
   }
 
   // Numeric scale: max-w-96 = 384px (96 * 4)
-  const numericMatch = findClass(classes, new RegExp(`^${responsivePrefix}${prefix}-(\\d+)$`));
+  const numericMatch = findClass(classes, new RegExp(`^${prefix}-(\\d+)$`));
   if (numericMatch) {
     const match = numericMatch.match(new RegExp(`${prefix}-(\\d+)$`));
     if (match) return parseInt(match[1], 10) * 4;
   }
 
-  // Named sizes: max-w-md, max-w-screen-lg, sm:max-w-xl, etc. (max-w only, not min-w)
+  // Named sizes: max-w-md, max-w-screen-lg, etc. (max-w only, not min-w)
   if (type === 'max') {
     for (const [name, px] of Object.entries(NAMED_MAX_WIDTH_PX)) {
-      if (findClass(classes, new RegExp(`^${responsivePrefix}${prefix}-${name}$`))) {
+      if (findClass(classes, new RegExp(`^${prefix}-${name}$`))) {
         return px;
       }
     }
@@ -226,7 +226,7 @@ const parseConstraint = (classes: string, dim: Dimension, type: 'min' | 'max'): 
 
   // Special values: max-w-full, max-w-min, max-w-max, max-w-none, min-w-full, min-w-0
   // Return -1 as sentinel to indicate "constraint exists but no numeric px value"
-  const specialMatch = findClass(classes, new RegExp(`^${responsivePrefix}${prefix}-(full|min|max|none|fit|0)$`));
+  const specialMatch = findClass(classes, new RegExp(`^${prefix}-(full|min|max|none|fit|0)$`));
   if (specialMatch) {
     return -1; // Sentinel: constraint exists
   }
@@ -424,8 +424,7 @@ const updateConstraint = (
   value: number | null
 ): string => {
   const prefix = type === 'min' ? `min-${dim}` : `max-${dim}`;
-  // Match with optional responsive prefixes: sm:max-w-md, lg:max-w-xl, etc.
-  let newClasses = setClass(classes, new RegExp(`^([a-z0-9-]+:)*${prefix}-`), null);
+  let newClasses = setClass(classes, new RegExp(`^${prefix}-`), null); // the bare token only (see parseConstraint)
 
   if (value !== null && value > 0) {
     const constraintClass = resolveToClass(prefix, value, 'px');
