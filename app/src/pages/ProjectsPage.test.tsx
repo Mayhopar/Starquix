@@ -28,7 +28,8 @@ vi.mock('@/assets/icons', () => {
 
 import { db } from '@/db';
 import toast from 'react-hot-toast';
-import ProjectsPage, { type UpdateState } from './ProjectsPage';
+import ProjectsPage from './ProjectsPage';
+import type { UpdateState } from '@/hooks/useDesktopUpdate';
 import { _resetProjectUndoForTests } from '@/services/projectUndo';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -393,7 +394,16 @@ describe('ProjectsPage update notifier', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Update to 0.3.3' }));
     expect(open).toHaveBeenCalledWith(page, '_blank', 'noopener,noreferrer');
     expect(screen.getByRole('button', { name: 'Update to 0.3.3' })).toBeInTheDocument();
+    expect(screen.getByText('Starquix 0.3.3 is available')).toBeInTheDocument(); // the banner, not a header button
   });
+
+  it('the Discord button in the top bar opens the community invite', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Ask on Discord' }));
+    expect(open).toHaveBeenCalledWith('https://discord.gg/Fpuwzbd48V', '_blank', 'noopener,noreferrer');
+  });
+
 
   it('already latest: the version and no button; main\'s pushes then show, relabel and remove it live; leaving unsubscribes', async () => {
     const { push, off } = desktop({ current: '0.3.2', latest: null, page: null });

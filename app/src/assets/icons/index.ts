@@ -344,6 +344,7 @@ export {
 
 // Shared editor chrome.
 export const ArrowUpRightIcon = icon('arrow-up-right');
+export const DiscordIcon = icon('discord');
 export const CornerRadiusIcon = icon('corner-radius');
 export const EditPageIcon = icon('edit-page');
 export const FileTextIcon = icon('file-text');

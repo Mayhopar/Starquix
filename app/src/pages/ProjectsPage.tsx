@@ -10,16 +10,13 @@ import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { ProjectCard } from '@/components/ProjectCard';
 import { CreateProjectCard } from '@/components/CreateProjectCard';
 import { ImportProjectModal } from '@/components/ImportProjectModal';
-import { ArrowUpRightIcon, PlusLargeIcon as PlusIcon } from '@/assets/icons';
+import { DiscordIcon, PlusLargeIcon as PlusIcon } from '@/assets/icons';
 import { db, getAssetBlob, renameProject } from '@/db';
 import { createScaffoldProject } from '@/services/projectImport/createFilesTruthProject';
 import { captureProject, deleteProject, restoreProject, projectUndo, type DeletedProject } from '@/services/projectUndo';
 import { getModifierKey, shortcutLabel } from '@/utils/platform';
-
-/** Update notifier (desktop/src/update-check.mjs → preload `sqDesktop.update`): a newer release with this machine's
- *  installer and the release page main built for it, else both null. */
-export interface UpdateState { current: string; latest: string | null; page: string | null }
-type DesktopUpdate = { state(): Promise<UpdateState>; onState(callback: (state: UpdateState) => void): () => void };
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate';
+import { DISCORD_URL, openExternal } from '@/utils/supportLinks';
 
 type ProjectFailure = { issue: OperationIssue; storage: boolean };
 const storageGuidance = 'Browser storage could not complete this action. Free device storage without clearing this site’s data, then try again.';
@@ -37,13 +34,7 @@ export default function ProjectsPage() {
     deleting: new Set<string>(), retainedDeletes: new Map<string, Project>() });
   const [isImportOpen, setIsImportOpen] = useState(false);
   // Update notifier, notify only (desktop/src/update-check.mjs): main checks the releases repo; this page shows the answer.
-  const [update, setUpdate] = useState<UpdateState | null>(null);
-  useEffect(() => {
-    const updates = (globalThis as { sqDesktop?: { update?: DesktopUpdate } }).sqDesktop?.update;
-    if (!updates) return;
-    updates.state().then(setUpdate, () => {});
-    return updates.onState(setUpdate);
-  }, []);
+  const update = useDesktopUpdate();
   const latest = update?.latest; const page = update?.page;
 
   const failure = useCallback((operation: 'controls' | 'project-create' | 'project-delete', error: unknown, projectId: string | null = null): ProjectFailure => ({
@@ -272,8 +263,6 @@ export default function ProjectsPage() {
           Projects
         </h1>
         <div className="flex items-center gap-3">
-          {latest && page && <Button variant="ghost" size="lg" label={`Update to ${latest}`} iconRight={<ArrowUpRightIcon className="w-4 h-4" />}
-            onClick={() => window.open(page, '_blank', 'noopener,noreferrer')} />}
           <Button onClick={() => setIsImportOpen(true)} variant="ghost" size="lg" label="Import project" />
           <Button
             onClick={handleCreateProject}
@@ -284,10 +273,16 @@ export default function ProjectsPage() {
             <PlusIcon className="w-6 h-6 mr-2" />
             {isCreating ? 'Creating...' : 'New Project'}
           </Button>
+          <Button variant="ghost" iconOnly title="Ask on Discord" aria-label="Ask on Discord" icon={<DiscordIcon className="w-4 h-4" />}
+            onClick={() => openExternal(DISCORD_URL)} />
           <ThemeToggle />
         </div>
       </div>
 
+      {/* Above everything else on the page: people on an old build keep hitting bugs a release already fixed. */}
+      {latest && page && <div className="mb-4"><OperationNotice title={`Starquix ${latest} is available`}
+        detail="Bug fixes. Install it over this app — your projects stay."
+        action={{ label: `Update to ${latest}`, onClick: () => openExternal(page) }} /></div>}
       {readFailure && <OperationNotice key={issueKey(readFailure.issue)} title="Projects could not be loaded."
         detail={readFailure.storage ? storageGuidance : projects.length > 0 ? 'Showing the last loaded projects. Retry to update this list.' : 'Retry to load your projects.'}
         action={{ label: 'Retry', onClick: () => { void loadProjects(); }, busy: isLoading }} />}
