@@ -466,6 +466,28 @@ describe('local pending selection (task-133)', () => {
     } finally { setActiveSaveProjectId(null); }
   });
 
+  // #18 (address reuse): after ⌘D then ⌘Z the selected copy's address names the next element (a section).
+  // The replay's restore selects exactly the key the step started with — or nothing.
+  it('an undo/redo restore selects exactly its key, or clears, never the element now at the old address', async () => {
+    const { setActiveSaveProjectId } = await import('@/services/pendingProjectMutations');
+    const { setLocalPendingRestore, getSelectionEpoch } = await import('@/utils/localPendingSelection');
+    setActiveSaveProjectId('browser_restore');
+    try {
+      const doc = new Y.Doc(); doc.getMap('meta').set('projectId', 'browser_restore');
+      const li = el(`${FILE}:6:17`, null, { tagName: 'li' }), section = el(`${FILE}:7:5`, null, { tagName: 'section' });
+      const ctx = makeFakeCtx({ refs: { selectedKey: { current: section.key }, patchSelection: { current: vi.fn() } }, env: { doc } });
+      setLocalPendingRestore(FILE, li.key, getSelectionEpoch());
+      handleElementsScanned(ctx, { elements: [li, section] });
+      await new Promise(r => setTimeout(r, 0));
+      expect(ctx.refs.selectInContext.current).toHaveBeenCalledWith(li.key, expect.anything());
+      expect(ctx.refs.patchSelection?.current).not.toHaveBeenCalled();
+      setLocalPendingRestore(FILE, null, getSelectionEpoch());
+      handleElementsScanned(ctx, { elements: [li, section] });
+      await new Promise(r => setTimeout(r, 0));
+      expect(ctx.actions.clearSelection).toHaveBeenCalledTimes(1);
+    } finally { setActiveSaveProjectId(null); }
+  });
+
   // e2e A2 2026-11-10 (log-proven): ⌘D's pending resolved AFTER the user pressed
   // Escape and clicked another paragraph — it re-selected the copy, and Backspace
   // deleted the copy instead of the clicked paragraph. The newest intent wins.

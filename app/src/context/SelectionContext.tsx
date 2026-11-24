@@ -31,7 +31,7 @@ import { buildTreeFromScannedElements, type TreeNode } from '@/utils/treeUtils';
 import { isUserSelectable } from '@/store/keyKind';
 import { decideToggle, relinkSameLine, type ToggleDecision } from '@/store/multiSelect';
 import { selectOptionsFor } from '@/utils/selectOptions';
-import { noteSelectionChanged } from '@/utils/localPendingSelection';
+import { noteSelectionChanged, registerSelectedKeyReader } from '@/utils/localPendingSelection';
 import { createElementGeometryStore, sameElementRect, type ElementGeometryStore } from './elementGeometryStore';
 import { stableContext } from '@/utils/stableContext';
 
@@ -580,6 +580,7 @@ export const SelectionProvider: React.FC<SelectionProviderProps> = ({
   // Refs for synchronous cross-context access
   const isLinkInteractingRef = useRef(false);
   const selectedKeyRef = useRef<string | null>(null);
+  useEffect(() => { registerSelectedKeyReader(() => selectedKeyRef.current); return () => registerSelectedKeyReader(() => null); }, []);
   // Synchronous mirror of selectionState.additionalSelections: every writer
   // below keeps the two equal in the same call, so several toggles in one tick
   // (canvas Shift+click / Layers ⌘-click) read the truth, not a stale render.

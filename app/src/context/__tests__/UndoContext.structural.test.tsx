@@ -44,6 +44,7 @@ import {
   _resetStructuralWriteInFlightForTests,
 } from '@/components/Editor/localStructuralOps';
 import type { StructuralUndoRecord } from '@/store/structuralUndo';
+import { clearLocalPendingSelection, peekLocalPendingSelection, registerSelectedKeyReader } from '@/utils/localPendingSelection';
 import { applyCommand } from '@/store/commands';
 
 const PAGE = 'src/pages/index.astro';
@@ -562,4 +563,26 @@ describe('a step whose file changed since', () => {
     claim.attachFiles([change]);
     claim.commit();
   }));
+});
+
+// #18 (address reuse): ⌘D then ⌘Z handed the copy's address to the next element, which stayed selected
+// — Backspace then deleted it. A replay restores the selection its step started with, by its exact key.
+describe('a replay restores the selection its step started with', () => {
+  beforeEach(() => { vi.clearAllMocks(); _resetStructuralWriteInFlightForTests(); });
+  afterEach(() => { teardown(); registerSelectedKeyReader(() => null); clearLocalPendingSelection(); });
+
+  it('⌘Z restores the selection from before the step, ⌘⇧Z the one ⌘Z was pressed on', async () => {
+    await boot({ [PAGE]: DELETED });
+    let selected: string | null = `${PAGE}:6:17`;
+    registerSelectedKeyReader(() => selected);
+    const { result } = mount();
+    act(() => result.current.pushStructuralUndo(deleteRecord()));
+    selected = `${PAGE}:7:5`; // the step's own result got selected (the ⌘D copy)
+    await act(async () => { await result.current.undo(); });
+    expect(peekLocalPendingSelection()).toMatchObject({ file: PAGE, exact: `${PAGE}:6:17` });
+    clearLocalPendingSelection();
+    selected = null;
+    await act(async () => { await result.current.redo(); });
+    expect(peekLocalPendingSelection()).toMatchObject({ file: PAGE, exact: `${PAGE}:7:5` });
+  });
 });

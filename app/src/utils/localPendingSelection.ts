@@ -30,6 +30,8 @@ export interface LocalPendingSelection {
   sourceLocation?: SourceLocation;
   /** getSelectionEpoch() when the gesture began. */
   selectionEpoch?: number;
+  /** An undo / redo: select exactly this key once the file rescans — or nothing (null). */
+  exact?: string | null;
 }
 
 let pending: LocalPendingSelection | null = null;
@@ -41,6 +43,20 @@ let pending: LocalPendingSelection | null = null;
 let selectionEpoch = 0;
 export function noteSelectionChanged(): void { selectionEpoch++; }
 export function getSelectionEpoch(): number { return selectionEpoch; }
+
+// SelectionContext's live key, for a structural undo step to carry the selection it started with (#18).
+let readSelectedKey: () => string | null = () => null;
+export function registerSelectedKeyReader(read: () => string | null): void { readSelectedKey = read; }
+export function getSelectedKey(): string | null { return readSelectedKey(); }
+
+/** ⌘Z / ⌘⇧Z rewrote `file`, and keys are positions: the selected one may now name another element (an undone
+ *  ⌘D hands the copy's address to the next one). The next scan of the file selects exactly `key` — the selection
+ *  the step started with — or nothing (#18). */
+export function setLocalPendingRestore(file: string, key: string | null, sinceEpoch: number): void {
+  const projectId = getActiveSaveProjectId();
+  if (sinceEpoch === selectionEpoch && projectId) pending = { file, predicted: `${file}:`, exact: key, selectionEpoch: sinceEpoch,
+    projectId, projectGeneration: getActiveSaveProjectGeneration(), surfaceGeneration: getLocalSurfaceGeneration() };
+}
 
 /** `sinceEpoch` = getSelectionEpoch() at the gesture's start: a gesture the user
  *  re-selected past sets nothing (and never clears a newer gesture's pending). */
@@ -74,6 +90,7 @@ export function resolveLocalPendingMatch(
 ): { key: string | null; consumed: boolean } {
   const covers = freshKeys.some((k) => k.startsWith(`${p.file}:`));
   if (!covers) return { key: null, consumed: false };
+  if (p.exact !== undefined) return { key: p.exact !== null && freshKeys.includes(p.exact) ? p.exact : null, consumed: true };
   return { key: matchPredictedKey(p.predicted, freshKeys, { exactLineOnly: true }), consumed: true };
 }
 

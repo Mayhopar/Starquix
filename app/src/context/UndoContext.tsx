@@ -47,6 +47,7 @@ import { classCommands, writesSourceClasses } from '@/services/durableEdits/clas
 import { flushDurableSourceWrites } from '@/services/durableEdits/sourceMaterialization';
 import type { MaterializationCommand } from '@/services/durableEdits/types';
 import { captureLocalWriteOrigin } from '@/utils/localWriteScope';
+import { getSelectedKey, getSelectionEpoch, setLocalPendingRestore } from '@/utils/localPendingSelection';
 import { parseSourceLocationFromKey } from '@/utils/sourceLocationKey';
 import { SOURCE_OWNED_FIELD } from '@/store/sourceOverrideEntries';
 import { SOURCE_CLASS_CARRIERS, prepareSourceClassReplay, type SourceClassCarrier } from '@/services/durableEdits/sourceClassIdentity';
@@ -1105,7 +1106,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   const pushStructuralUndo = useCallback<PushStructuralUndo>((record) => {
     stackGenerationRef.current++;
     // The page it was made on: its undo replays there from any page.
-    const stamped = record.origin ? record : { ...record, origin: captureLocalWriteOrigin() };
+    const stamped = { ...record, origin: record.origin ?? captureLocalWriteOrigin(), selection: getSelectedKey() };
     setPast(prev => [...prev.slice(-(MAX_UNDO_STEPS - 1)), stamped]);
     setFuture([]);
   }, []);
@@ -1131,6 +1132,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     // by this replay's asynchronous stack transfer — measured from the press,
     // not from when its turn comes.
     const generationAtLaunch = stackGenerationRef.current;
+    const selected = getSelectedKey(), selectionEpoch = getSelectionEpoch(); // at the press
     // Owner 2026-11-10: behind a write in flight it waits its turn — never "busy".
     await acquireStructuralWrite();
     const ops = dir === 'undo' ? entry.structuralOp.inverse : entry.structuralOp.forward;
@@ -1140,10 +1142,13 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       const accepted = await acceptStructuralReplay(doc, ops, entry.structuralOp.sourceFiles, dir === 'undo' ? 'before' : 'after', entry.structuralOp.sourceSteps, entry.structuralOp.masterWrite, entry.origin);
       if (dir === 'undo') setPast(prev => prev.filter(item => item !== entry));
       else setFuture(prev => prev.filter(item => item !== entry));
+      // Keys are positions: select what the step started with, and let the reverse replay select what this press left.
+      const moved = { ...entry, selection: selected };
       if (stackGenerationRef.current === generationAtLaunch) {
-          if (dir === 'undo') setFuture(prev => [entry, ...prev]);
-          else setPast(prev => [...prev, entry]);
+          if (dir === 'undo') setFuture(prev => [moved, ...prev]);
+          else setPast(prev => [...prev, moved]);
       }
+      if (accepted.files?.[0]) setLocalPendingRestore(accepted.files[0].file, entry.selection ?? null, selectionEpoch);
       {
         const projectId = doc.getMap('meta').get('projectId') as string;
         void import('@/services/durableEdits/sourceMaterialization').then(async ({ flushDurableSourceWritesThrough }) => {

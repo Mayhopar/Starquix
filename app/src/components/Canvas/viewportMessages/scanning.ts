@@ -303,6 +303,8 @@ export function handleElementsScanned(ctx: ViewportMessageContext, payload: unkn
       if (consumed) clearLocalPendingSelection();
       const match = key ? p.elements.find(el => el.key === key) : undefined;
       if (match) ctx.refs.selectInContext.current(match.key, selectOptionsFor(match));
+      // An undo / redo restore found nothing to select: its old key may name another element now (#18).
+      else if (localPending.exact !== undefined) ctx.actions.clearSelection();
       // No match: the selection keeps its key; give the box that key's rect now.
       else if (ctx.refs.selectedKey.current) ctx.actions.updateSelectionRect(p.elements.find(e => e.key === ctx.refs.selectedKey.current)?.rect ?? null);
     }, () => { if (resolvingSelection === localPending) resolvingSelection = null; });
