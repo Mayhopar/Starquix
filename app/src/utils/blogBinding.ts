@@ -8,6 +8,7 @@
 import { siteUsesContentLayer } from '@/utils/siteAstro';
 import { escapeRegex } from './regex';
 import { importSpecifierFor } from './localStructural';
+import { applySplices, attrOf, removeAttr, scanTags, splitFrontmatter, type Span, type Splice, type Tag } from '@/store/seo/astroScan';
 
 export type BlogSort = 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc';
 export type Schema = ReadonlyArray<{ name: string; type: string }>;
@@ -154,7 +155,8 @@ export function parseBlogBindings(source: string): BlogBinding[] {
     // getStaticPaths block is ours only with the canonical paginate call.
     const custom = squash(expr) !== squash(emitPostsExpression({ collection, filter, sort, limit }))
       || (/export async function getStaticPaths/.test(frontmatter) && !(postsVar === 'posts' && paginate))
-      || (numberedVar && slot !== 0);
+      || (numberedVar && slot !== 0)
+      || isForeignPosts(block);
     return { ...base, collection, filter, sort, limit, pagination, href, custom, postsVar };
   });
 }
@@ -234,9 +236,107 @@ export const PAGINATION_CHROME: Record<'numbered' | 'load-more', string> = { num
 export const importStatementRe = (name: string) => new RegExp(`^[ \\t]*import\\s+${name}\\s+from\\s+['"]([^'"]+)['"]`, 'm');
 const stripFragments = (inner: string) => inner.replace(POSTS_FRAGMENT_RE, '').replace(PAGINATION_FRAGMENT_RE, '').trim();
 
-/** The card tags a slot's fragment renders (`<X y={post} />`, as emitBlogBinding writes them). */
+/** The card's entry prop: `y={post}` (whitespace aside). */
+const entryAttr = (t: Tag) => t.attrs.find((a) => a.kind === 'expression' && a.value.trim() === 'post');
+const isCardTag = (t: Tag) => /^[A-Z]/.test(t.name) && !!entryAttr(t);
+
+/** The card tags `src` renders (a page, a slot, a fragment): components taking the entry as `y={post}`, at ANY
+ *  attribute position — the editor writes instance override props before it (utils/propOverrides.ts). */
 export function cardTagsOf(src: string): string[] {
-  return [...src.matchAll(/<([A-Z][\w$]*)\s+[\w$]+=\{post\}/g)].map((m) => m[1]);
+  return scanTags(src, splitFrontmatter(src)?.templateStart ?? 0).filter(isCardTag).map((t) => t.name);
+}
+
+/** `t` renamed to `name`: its open tag and its close tag. */
+const renameTag = (src: string, t: Tag, name: string): Splice[] => {
+  const at = (start: number): Splice => ({ start, end: start + t.name.length, text: name });
+  return t.close ? [at(t.start + 1), at(src.indexOf(t.name, t.close.start))] : [at(t.start + 1)];
+};
+
+/**
+ * THE card swap (card picker, missing-card heal, re-emit): card tag `t` renamed to `name`, its entry `oldProp={…}` to
+ * `prop` — by parsed spans, in any attribute position (null = the `{post}` entry, else the first prop passing a bare
+ * identifier). Every other attribute — the page's instance override props — and the formatting stay as written.
+ */
+function cardTagEdits(src: string, t: Tag, name: string, oldProp: string | null, prop: string): Splice[] {
+  const entry = oldProp ? t.attrs.find((a) => a.kind === 'expression' && a.name === oldProp)
+    : entryAttr(t) ?? t.attrs.find((a) => a.kind === 'expression' && /^\s*[A-Za-z_$][\w$]*\s*$/.test(a.value));
+  const edits = renameTag(src, t, name);
+  if (entry && entry.name !== prop) edits.push({ start: entry.start, end: entry.start + entry.name.length, text: prop });
+  return edits;
+}
+
+/** Every `<tag …>` of `tpl` swapped by cardTagEdits. */
+export const renameCardTags = (tpl: string, tag: string, name: string, oldProp: string | null, prop: string): string =>
+  applySplices(tpl, scanTags(tpl).filter((t) => t.name === tag).flatMap((t) => cardTagEdits(tpl, t, name, oldProp, prop)));
+
+/**
+ * The page markup around one post's card. The post link is PAGE markup (`<a … class="block">`), not a card prop: it
+ * works for any card — an imported site's own copy too. A self-linking card (or no detail route) gets a <div>; a
+ * self-linking card's has no box (`contents`): the cards lay out exactly as without it (live 2026-10-10: a site
+ * styling every element `display: flow-root` lost the cards' margin collapse to a plain div). Either is stamped
+ * data-sq-post-slug: the bridge reads the nearest stamp, so every element of the card offers "Go to post" (the editor).
+ */
+function cardWrapper(href: string | null, cardLinks: boolean, id: string) {
+  const kind = href !== null && !cardLinks ? 'a' : 'div';
+  const link = `href={\`${href}\${${id}}\`}`, stamp = `data-sq-post-slug={${id}}`;
+  const want = kind === 'a' ? 'block' : cardLinks ? 'contents' : null; // the class token the binding owns
+  return { kind, link, stamp, want, open: kind === 'a' ? `<a ${link} class="block" ${stamp}>` : `<div${want ? ` class="${want}"` : ''} ${stamp}>` };
+}
+type CardWrapper = ReturnType<typeof cardWrapper>;
+
+type PostsShape = { list: Span; wrapper?: Tag; card: Tag };
+
+/** The posts fragment as the binding writes it — `{LIST.map((post) => <a|div …><Card … /></a|div>)}`, the wrapper
+ *  optional (older pages) — and nothing else; null for any other shape: the page's own markup, so the slot is custom
+ *  and never rewritten (a re-emit would otherwise drop what the page added). */
+function postsShape(fragment: string): PostsShape | null {
+  const head = /^\s*<Fragment slot="posts">\s*\{\s*([A-Za-z_$][\w$]*(?:\.data)?)\.map\(\(\s*post\s*\)\s*=>\s*(\(\s*)?/.exec(fragment);
+  if (!head) return null;
+  const [, outer, inner, ...extra] = scanTags(fragment); // tag 0 is the head's Fragment; a card outside the wrapper fails the tail
+  if (extra.length || outer?.start !== head[0].length) return null;
+  const wrapper = inner ? outer : undefined;
+  const card = inner ?? outer;
+  if (!isCardTag(card) || !card.selfClosing || (wrapper && (!/^(a|div)$/.test(wrapper.name) || !wrapper.close))) return null;
+  const tail = head[2] ? /^\s*\)\s*\)\s*\}\s*<\/Fragment>\s*$/ : /^\s*\)\s*\}\s*<\/Fragment>\s*$/; // `=> (<a …/>)` as Prettier prints it
+  if (!tail.test(fragment.slice(wrapper ? wrapper.close!.end : card.openEnd))) return null;
+  const list = head[0].indexOf(head[1], head[0].indexOf('{')); // after the map's `{`: never the arrow's own `(post)`
+  return { list: { start: list, end: list + head[1].length }, wrapper, card };
+}
+
+/** The slot has a posts fragment the binding did not write (custom: shown as hand-wired, never rewritten). */
+function isForeignPosts(block: string): boolean {
+  const fragment = block.match(POSTS_FRAGMENT_RE)?.[0];
+  return !!fragment && !postsShape(fragment);
+}
+
+/**
+ * Re-emit a posts fragment of the binding's own shape IN PLACE: only the spans the binding owns change — the list,
+ * the card tag by THE card swap (cardTagEdits: another card keeps the page's props, as in the card picker), and the
+ * wrapper's kind, link, stamp and owned class token (cardWrapper). Everything else — instance override props on the
+ * card tag (the only place they live), the wrapper's own classes, the formatting — stays byte-for-byte.
+ */
+function rewritePosts(fragment: string, { list, wrapper, card }: PostsShape, o: { list: string; cardName: string; cardProp: string; w: CardWrapper }): string {
+  const { kind, link, stamp, want, open } = o.w;
+  const edits: Splice[] = [{ ...list, text: o.list }, ...cardTagEdits(fragment, card, o.cardName, null, o.cardProp)];
+  if (!wrapper) return applySplices(fragment, [...edits, { start: card.start, end: card.start, text: open }, { start: card.openEnd, end: card.openEnd, text: `</${kind}>` }]);
+  if (wrapper.name !== kind) edits.push(...renameTag(fragment, wrapper, kind));
+  const nameEnd = wrapper.start + 1 + wrapper.name.length;
+  const inserts: string[] = [];
+  const href = attrOf(wrapper, 'href');
+  if (kind === 'a') { if (href) edits.push({ start: href.start, end: href.end, text: link }); else inserts.push(link); }
+  else if (href) edits.push(removeAttr(fragment, href));
+  const cls = attrOf(wrapper, 'class');
+  if (cls?.kind === 'quoted') {
+    const tokens = cls.value.split(/\s+/).filter(Boolean);
+    const next = tokens.filter((t) => (t !== 'block' && t !== 'contents') || t === want); // both binding-owned: never `contents block`
+    if (want && !next.includes(want)) next.unshift(want);
+    const v = next.join(' '), q = v.includes('"') ? "'" : '"'; // `font-["Inter"]` needs single quotes (ast-updater attrQuote)
+    if (v !== tokens.join(' ')) edits.push(next.length ? { start: cls.start, end: cls.end, text: `class=${q}${v}${q}` } : removeAttr(fragment, cls));
+  } else if (!cls && want) inserts.push(`class="${want}"`); // class={…} / class:list: the page's own expression, left alone
+  if (inserts.length) edits.push({ start: nameEnd, end: nameEnd, text: ` ${inserts.join(' ')}` });
+  const slug = attrOf(wrapper, 'data-sq-post-slug');
+  edits.push(slug ? { start: slug.start, end: slug.end, text: stamp } : { start: wrapper.openEnd - 1, end: wrapper.openEnd - 1, text: ` ${stamp}` });
+  return applySplices(fragment, edits);
 }
 
 /**
@@ -290,21 +390,20 @@ export function emitBlogBinding(source: string, binding: BlogBinding, opts: Emit
       return setFetchRegion(b, fetchRegion(binding, v), v);
     });
 
-    // The post link is PAGE markup around the card (`<a … class="block">`), not
-    // a card prop: it works for any card — an imported site's own copy too.
-    // The wrapper (a plain <div> when the project has no detail route) is
-    // stamped data-sq-post-slug: the bridge reads the nearest stamp, so every
-    // element of the card offers "Go to post" (the editor), route or no route.
     const list = kind === 'numbered' ? 'page.data' : v;
     const id = (opts.contentLayer ?? siteUsesContentLayer()) ? 'post.id' : 'post.slug';
-    const card = binding.href !== null && !opts.cardLinks
-      ? `<a href={\`${binding.href}\${${id}}\`} class="block" data-sq-post-slug={${id}}><${cardName} ${cardProp}={post} /></a>`
-      // A self-linking card's wrapper has no box (`contents`): the cards lay out
-      // exactly as without it (live 2026-10-10: a site styling every element
-      // `display: flow-root` lost the cards' margin collapse to a plain div).
-      : `<div${opts.cardLinks ? ' class="contents"' : ''} data-sq-post-slug={${id}}><${cardName} ${cardProp}={post} /></div>`;
+    const w = cardWrapper(binding.href, !!opts.cardLinks, id);
+    const card = `${w.open}<${cardName} ${cardProp}={post} /></${w.kind}>`;
+    // The page's own posts fragment is edited in place (custom shapes were refused above, by the parse); a card the
+    // page imports under another name keeps that name.
+    const at = slotSpans(out)[slot];
+    const old = out.slice(at.start, at.end).match(POSTS_FRAGMENT_RE)?.[0];
+    const shape = old ? postsShape(old) : null;
+    const tagName = shape && out.match(importStatementRe(shape.card.name))?.[1] === opts.cardImport ? shape.card.name : cardName;
     const fragments = (indent: string) => {
-      const posts = `${indent}  <Fragment slot="posts">\n${indent}    {${list}.map((post) => ${card})}\n${indent}  </Fragment>`;
+      const posts = old && shape
+        ? rewritePosts(old, shape, { list, cardName: tagName, cardProp, w }).trimEnd()
+        : `${indent}  <Fragment slot="posts">\n${indent}    {${list}.map((post) => ${card})}\n${indent}  </Fragment>`;
       const tag = kind === 'numbered' ? `<${chrome} page={page} />` : kind === 'load-more' ? `<${chrome} pageSize={${binding.pagination.pageSize}} />` : null;
       return tag ? `${posts}\n${indent}  <Fragment slot="pagination">\n${indent}    ${tag}\n${indent}  </Fragment>` : posts;
     };
@@ -315,8 +414,9 @@ export function emitBlogBinding(source: string, binding: BlogBinding, opts: Emit
   // the previous card after a re-bind to another card, the other chrome after
   // a pagination change (a used import — another slot's card too — is kept).
   out = dropImportIfUnused(out, GET_COLLECTION_IMPORT, /getCollection\(/);
-  const cards = cardTagsOf(source); // the card(s) the page rendered
-  for (const name of [...new Set(['BlogCard', ...cards]), ...Object.values(PAGINATION_CHROME)]) {
+  const span = slotSpans(source)[slot];
+  const cards = cardTagsOf(source.slice(span.start, span.end)); // the card this slot rendered (only it can lose its last use)
+  for (const name of [...new Set(['BlogCard', cardName, ...cards]), ...Object.values(PAGINATION_CHROME)]) {
     const line = out.match(new RegExp(`${importStatementRe(name).source}.*$`, 'm'))?.[0] ?? importOf(name);
     out = dropImportIfUnused(out, line, new RegExp(`<${name}\\b`));
   }

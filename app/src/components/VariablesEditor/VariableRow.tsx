@@ -5,7 +5,7 @@ import type { DesignVariable, VariableMode, VariableValue } from '@/core/variabl
 import { VariableColorCell } from './VariableColorCell';
 import { VariableNumberCell } from './VariableNumberCell';
 import { VariableStringCell } from './VariableStringCell';
-import { Menu, MenuItem, IconButton, InlineEdit } from '@/components/ui';
+import { Menu, MenuItem, IconButton, InlineEdit, fieldBox } from '@/components/ui';
 import { TYPE_ICONS, VARIABLE_TYPES, defaultValueForType, CELL_CLASS, type VariableType } from './constants';
 
 interface VariableRowProps {
@@ -90,7 +90,7 @@ export const VariableRow = memo(function VariableRow({
       {modes.map(mode => {
         const val = variable.values[mode.id] || defaultValueForType(variable.type);
         return (
-          <td key={mode.id} className={`${CELL_CLASS} px-2 py-1`}>
+          <td key={mode.id} {...fieldBox} className={`${CELL_CLASS} px-2 py-1 cursor-text`}>
             {renderValueCell(val, (v) => onValueChange(variable.id, mode.id, v))}
           </td>
         );

@@ -5,7 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { AIContextElement, AIFailureCode, AIMessage } from '@/ai/types';
 import { aiFailureCopy } from '@/ai/failure';
-import { Badge, Button, IconButton, Row, cx } from '@/components/ui';
+import { Badge, Button, IconButton, Row, cx, fieldBox } from '@/components/ui';
 import { OperationNotice } from '@/components/ui/OperationNotice';
 import { ArrowUpIcon, CloseIcon, StopIcon } from '@/assets/icons';
 import { PROSE, ReplyFeed } from './AIActivityFeed';
@@ -113,7 +113,7 @@ export function AIChat({
           <Row size="sm" className="h-6 px-1" hover={false} left={[{ type: 'spinner' }]} rightText="Esc to stop"
             title={<span className="text-text-secondary">Working…{genSeconds >= 2 ? ` ${genSeconds}s` : ''}</span>} />
         )}
-        <div className={cx('flex flex-col gap-1 rounded-outer border border-input-stroke bg-input-fill px-2 pt-1.5 pb-1', empty && 'flex-1 min-h-0')}>
+        <div {...fieldBox} className={cx('flex flex-col gap-1 rounded-outer border border-input-stroke bg-input-fill px-2 pt-1.5 pb-1 cursor-text', empty && 'flex-1 min-h-0')}>
           {contextElements.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {contextElements.map(el => (

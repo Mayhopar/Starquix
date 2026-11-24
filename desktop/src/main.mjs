@@ -5,7 +5,8 @@ import fsp from 'node:fs/promises';
 import gitHttp from 'isomorphic-git/http/node';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { editorResponse, originOf, resolveEditor } from './editor.mjs';
+import { editorResponse, originOf, resolveEditor, strays } from './editor.mjs';
+import { freePath } from './downloads.mjs';
 import { probeInvisible, probeWindowOptions } from './probe-mode.mjs';
 import { createProjects, projectDirFor } from './projects.mjs';
 import { createAuth } from './git/auth.mjs';
@@ -45,17 +46,18 @@ if (app.isPackaged) protocol.registerSchemesAsPrivileged([{ scheme: 'starquix',
 const projectsRoot = process.env.SQ_PROJECTS_ROOT ?? path.join(app.getPath('home'), 'Starquix');
 const projects = createProjects(projectsRoot);
 let win; let allowQuit = false; let quitting = false;
-/** Navigation stays on the editor; web links open in the system browser; editor
- *  pages (help) open in a plain window that never gets the preload. */
+/** Navigation stays on the editor, in every frame (the canvas also on its loopback preview: editor.mjs `strays`); web
+ *  links open in the system browser; editor pages (help) open in a plain window that never gets the preload. */
 function guard(contents) {
+  const openWeb = url => { if (/^https?:$/.test(new URL(url).protocol)) void shell.openExternal(url); };
   contents.setWindowOpenHandler(({ url }) => {
     if (originOf(url) === editorOrigin) {
       const help = new BrowserWindow({ width: 900, height: 800, webPreferences: { sandbox: true, contextIsolation: true } });
       guard(help.webContents); void help.loadURL(url);
-    } else if (/^https?:$/.test(new URL(url).protocol)) void shell.openExternal(url);
+    } else openWeb(url);
     return { action: 'deny' };
   });
-  contents.on('will-navigate', (event, url) => { if (originOf(url) !== editorOrigin) event.preventDefault(); });
+  contents.on('will-frame-navigate', event => { if (strays(event, editorOrigin)) { event.preventDefault(); openWeb(event.url); } });
   contents.on('will-attach-webview', event => event.preventDefault());
 }
 const depsDir = process.env.SQ_RUNTIME_DEPS ?? (app.isPackaged ? path.join(resources, 'runtime-deps/node_modules')
@@ -276,9 +278,9 @@ else {
     });
     // P0: a renderer crash needs an app relaunch; Astro child crashes self-recover.
     win.webContents.on('render-process-gone', () => { void sessions.closeAll(); });
-    // Chrome-like: Export's blob download lands in Downloads without a modal dialog.
+    // Chrome-like: Export's blob download lands in Downloads without a modal dialog, beside a same-named file, never over it.
     win.webContents.session.on('will-download', (_event, item) => {
-      const file = path.join(process.env.SQ_DOWNLOADS ?? app.getPath('downloads'), path.basename(item.getFilename()));
+      const file = freePath(path.join(process.env.SQ_DOWNLOADS ?? app.getPath('downloads'), path.basename(item.getFilename())));
       item.setSavePath(file);
       // No browser download bubble here: bounce the Dock's Downloads stack (macOS).
       item.once('done', (_e, state) => { if (state === 'completed') app.dock?.downloadFinished(file); });

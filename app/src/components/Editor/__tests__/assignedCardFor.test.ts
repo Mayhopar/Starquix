@@ -26,6 +26,11 @@ describe('assignedCardFor — the card a Blog bound to a collection renders', ()
     expect(assignedCardFor('blog', PAGE, page('WorkCard', 'work'))).toBe('src/components/WorkCard.astro');
     expect(assignedCardFor('blog', PAGE, page('BlogCard', 'post'))).toBe('src/components/BlogCard.astro');
   });
+  it('keeps the card the page renders when the editor wrote override props before its entry prop', () => {
+    // Without it a Blog Settings change swapped BlogCard for the typed WorkCard and dropped the overrides with it.
+    const withProps = page('BlogCard', 'post').replace('<BlogCard post={post}', '<BlogCard h2Class="text-4xl" post={post}');
+    expect(assignedCardFor('blog', PAGE, withProps)).toBe('src/components/BlogCard.astro');
+  });
   it('otherwise the collection\'s card from its folder, typed first; none → null (create WorksCard)', () => {
     expect(assignedCardFor('blog', PAGE, page('FeaturedWork', 'work'))).toBe('src/components/WorkCard.astro');
     expect(assignedCardFor('works', PAGE, '')).toBe('src/components/FeaturedWork.astro');

@@ -646,7 +646,7 @@ export function LeftSidebar() {
       {/* Pages/Assets/Content Section — full height for every tab except the
           Pages tree (which shares vertical space with the Layers/SEO panel). */}
       <div
-        className={`flex flex-col overflow-hidden ${isFullHeightTopSection ? 'flex-1' : 'flex-shrink-0'}`}
+        className={`flex flex-col overflow-hidden ${isFullHeightTopSection ? 'flex-1' : ''}`}
         style={isFullHeightTopSection ? undefined : { height: pagesHeight }}
       >
         {/* Tab header */}
@@ -689,7 +689,9 @@ export function LeftSidebar() {
             />
           </div>
 
-          <div className={`flex-1 min-h-0 flex flex-col overflow-hidden border-t transition-colors ${isDragging ? 'border-stroke-active' : 'border-stroke peer-hover:border-stroke-active'}`}>
+          {/* #31: Layers never goes under its minimum — on load, in a shorter window, while dragging. The pages section
+              above gives way instead, and keeps its saved height for a window tall enough. */}
+          <div className={`flex-1 flex flex-col overflow-hidden border-t transition-colors ${isDragging ? 'border-stroke-active' : 'border-stroke peer-hover:border-stroke-active'}`} style={{ minHeight: MIN_LAYERS_HEIGHT }}>
             <div className="flex items-stretch gap-2 px-3 h-10 box-border border-b border-stroke flex-shrink-0">
               <Tabs
                 options={[

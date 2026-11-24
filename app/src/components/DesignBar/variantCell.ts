@@ -14,6 +14,9 @@ export interface Cell {
   state: StateName;     // 'default' = base
 }
 
+/** A token's leading variant chain; named groups/peers (group-hover/card:) are one variant. */
+export const VARIANT_LEAD = /^((?:[\w/-]+:)*)/;
+
 const BP = BREAKPOINT_PREFIXES as readonly string[];
 const TH = THEME_PREFIXES as readonly string[];
 const ST = STATE_PREFIXES as readonly string[];
@@ -21,12 +24,11 @@ const ST = STATE_PREFIXES as readonly string[];
 /**
  * Decompose a token into its cell, or null if it's base (no variants) or can't be
  * represented in the 3-axis grid (unknown variant, or two of the same axis).
- * Leading variants are matched with /^((?:[\w-]+:)*)/ — the same pattern
- * deletePrefixClasses uses, so ':' inside arbitrary values (bg-[url(https://…)])
- * is never mistaken for a variant separator.
+ * Leading variants are matched with VARIANT_LEAD, so ':' inside arbitrary values
+ * (bg-[url(https://…)]) is never mistaken for a variant separator.
  */
 export function classifyToken(token: string): Cell | null {
-  const lead = token.match(/^((?:[\w-]+:)*)/)?.[1] ?? '';
+  const lead = token.match(VARIANT_LEAD)?.[1] ?? '';
   if (!lead) return null; // base token (no variants)
   const variants = lead.split(':').filter(Boolean);
 
@@ -72,4 +74,10 @@ export function extractCells(classes: string): Cell[] {
 export function tokenMatchesCell(token: string, cell: Cell): boolean {
   const c = classifyToken(token);
   return !!c && c.bp === cell.bp && c.theme === cell.theme && c.state === cell.state;
+}
+
+/** True when the token's own cell carries `variant` (md, dark, hover…) — never a substring hit like group-hover:. */
+export function tokenHasVariant(token: string, variant: string): boolean {
+  const c = classifyToken(token);
+  return !!c && (c.bp === variant || c.theme === variant || c.state === variant);
 }

@@ -11,6 +11,7 @@ import { Field, Button } from '@/components/ui';
 import { ColorPicker } from '../ColorPicker';
 import { DeleteIcon } from '@/assets/icons';
 import { useMixedValue, ownsGroups, type Owns } from '../multi/mixed';
+import { OPACITY_SUFFIX } from '../classPatterns';
 
 // ============================================================================
 // Types
@@ -111,8 +112,8 @@ const SATURATE_OPTIONS = [
 
 // What the writers set and remove
 const SHADOW_SIZE_RE = /^shadow(-none|-sm|-md|-lg|-xl|-2xl)?$/;
-const SHADOW_NAMED_RE = /^shadow-(transparent|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(-\d+)?$/;
-const SHADOW_HEX_RE = /^shadow-\[#[0-9a-fA-F]+\]$/;
+const SHADOW_NAMED_RE = new RegExp(`^shadow-(transparent|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(-\\d+)?${OPACITY_SUFFIX.source}`);
+const SHADOW_HEX_RE = new RegExp(`^shadow-\\[#[0-9a-fA-F]+\\]${OPACITY_SUFFIX.source}`);
 
 // Effect IDs are generated from type for stable React keys (each type can only appear once)
 const generateEffectId = (type: EffectType) => `effect-${type}`;

@@ -73,10 +73,19 @@ describe('handleKeyDown forwards every bare-key editor shortcut', () => {
     ]);
   });
 
-  // The parent's repeat guards (wrap, delete) only see what the relay carries.
-  it('forwards key repeat', () => {
-    expect(forwarded(mount(), { key: 'g', code: 'KeyG', metaKey: true, repeat: true })).toEqual([
-      expect.objectContaining({ code: 'KeyG', repeat: true }),
+  it('forwards ⌘\\ / Ctrl+\\ (show / hide sidebars) with the code the parent matches on', () => {
+    expect(forwarded(mount(), { key: '\\', code: 'Backslash', metaKey: true })).toEqual([
+      expect.objectContaining({ key: '\\', code: 'Backslash', metaKey: true }),
+    ]);
+    expect(forwarded(mount(), { key: '#', code: 'Backslash', ctrlKey: true })).toEqual([
+      expect.objectContaining({ code: 'Backslash', ctrlKey: true }),
+    ]);
+  });
+
+  // A held ⌘\ must toggle once: the parent drops auto-repeats, so it has to see them as such.
+  it('says whether the key is an auto-repeat', () => {
+    expect(forwarded(mount(), { key: '\\', code: 'Backslash', metaKey: true, repeat: true })).toEqual([
+      expect.objectContaining({ repeat: true }),
     ]);
   });
 

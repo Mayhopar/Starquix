@@ -8,7 +8,7 @@ import { memo, useCallback, useState, useMemo, useRef } from 'react';
 import { useYjsValue, useDispatch } from '@/store/hooks';
 import { selectVariableCollections } from '@/store/variableSelectors';
 import { useUndoContext } from '@/context/UndoContext';
-import { Row, Button, EmptyState, Popover } from '@/components/ui';
+import { Row, Button, EmptyState, Popover, fieldBox } from '@/components/ui';
 import { PlusIcon, PencilIcon } from '@/assets/icons';
 import { CustomColorPicker } from '@/components/DesignBar/CustomColorPicker';
 import { VariableNumberCell } from '@/components/VariablesEditor/VariableNumberCell';
@@ -87,20 +87,22 @@ function VariableItem({ variable, modeId, collectionId }: {
         triggerRef={editBtnRef}
         placement="bottom-end"
         width={260}
-        className="p-2"
       >
-        {val.type === 'color' && (
-          <CustomColorPicker
-            value={val.hex}
-            onChange={(hex) => handleChange({ type: 'color', hex, opacity: val.opacity })}
-            onClose={() => setIsOpen(false)}
-          />
-        )}
-        {val.type === 'number' && (
-          <VariableNumberCell value={val} onChange={handleChange} />
-        )}
-        {val.type === 'string' && (
-          <VariableStringCell value={val} onChange={handleChange} />
+        {val.type === 'color' ? (
+          <div className="p-2">
+            <CustomColorPicker
+              value={val.hex}
+              onChange={(hex) => handleChange({ type: 'color', hex, opacity: val.opacity })}
+              onClose={() => setIsOpen(false)}
+            />
+          </div>
+        ) : (
+          // one value in the popover: its padding is the value's box
+          <div {...fieldBox} className="p-2 cursor-text">
+            {val.type === 'number'
+              ? <VariableNumberCell value={val} onChange={handleChange} />
+              : <VariableStringCell value={val} onChange={handleChange} />}
+          </div>
         )}
       </Popover>
     </>

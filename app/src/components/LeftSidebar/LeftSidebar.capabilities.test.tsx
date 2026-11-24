@@ -75,6 +75,18 @@ describe('LeftSidebar project capabilities', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'SEO' }));
     expect(screen.getByText('SEO panel')).toBeInTheDocument();
   });
+
+  // Finding #31: a pages height saved in a taller window pushed Layers and its divider off-screen, even after a
+  // restart. jsdom has no layout, so this pins the rule; the flex result was measured in Chromium.
+  it('Layers keeps its minimum height and the pages section gives way, whatever height was saved', () => {
+    localStorage.setItem('starquix:left-sidebar-pages-height', '652');
+    render(<LeftSidebar />);
+    const pages = screen.getByText('File panel').parentElement!.parentElement!;
+    expect(pages.style.height).toBe('652px'); // the saved height is kept for a window tall enough
+    expect(pages.className).not.toMatch(/\bflex-shrink-0\b/); // …and shrinks in a shorter one
+    expect(screen.getByText('Layers tree').parentElement!.parentElement!.style.minHeight).toBe('100px');
+    localStorage.removeItem('starquix:left-sidebar-pages-height');
+  });
 });
 
 // Owner 2026-11-17: the Assets tab is the component editor — it never shows the

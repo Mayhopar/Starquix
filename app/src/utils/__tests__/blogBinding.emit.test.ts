@@ -2,7 +2,7 @@
 // + posts fragment; re-bind replaces the fetch in place; unbind restores the
 // bare slot byte-for-byte; a custom fetch is refused (null) — never rewritten.
 import { describe, it, expect } from 'vitest';
-import { emitBlogBinding, parseBlogBinding, parseBlogBindings, UNBOUND } from '../blogBinding';
+import { cardTagsOf, emitBlogBinding, parseBlogBinding, parseBlogBindings, renameCardTags, UNBOUND, type BlogBinding, type EmitOptions } from '../blogBinding';
 import { firstSlot, TWO_SLOTS } from './fixtures/lists';
 
 const UNBOUND_PAGE = `---
@@ -166,3 +166,109 @@ describe('getCollection import spelled differently', () => {
   });
 });
 
+// Instance overrides live as props on the card tag (utils/propOverrides.ts) and the editor writes them FIRST;
+// the page's own markup on the wrapper is the user's too. A re-emit owns only the fetch, the list, the link and
+// the card's entry prop — it must never drop the rest (investigation 2026-11-23: a Blog Settings change or the
+// quiet upgrade wiped every override of the blog card).
+describe('re-emit keeps what the page added to the card tag and its wrapper', () => {
+  const reemit = (page: string, patch: Partial<BlogBinding> = {}, opts: EmitOptions = OPTS) => emitBlogBinding(page, { ...parseBlogBinding(page), ...patch }, opts);
+  const once = emitBlogBinding(UNBOUND_PAGE, bound, OPTS)!;
+  const CARD_TAG = '<BlogCard h2Class={"font-[\\"KTF_Rublena\\"] text-4xl"} imgClass="hidden" post={post} />';
+  const edited = once.replace('<BlogCard post={post} />', CARD_TAG).replace('class="block"', 'class="block no-underline"');
+
+  it('the same settings are a no-op', () => {
+    expect(reemit(edited)).toBe(edited);
+  });
+
+  it('a settings change keeps the card tag and the wrapper class', () => {
+    const out = reemit(edited, { limit: 5 })!;
+    expect(out).toContain(CARD_TAG);
+    expect(out).toContain('class="block no-underline"');
+    expect(parseBlogBinding(out).limit).toBe(5);
+  });
+
+  it('a new detail route updates the link and keeps the rest of the wrapper', () => {
+    const out = reemit(edited, { href: '/blog/' })!;
+    expect(out).toContain(`<a href={\`/blog/\${post.slug}\`} class="block no-underline" data-sq-post-slug={post.slug}>${CARD_TAG}</a>`);
+  });
+
+  it('a wrapper of another kind keeps the page\'s attributes and the card tag (the link and its `block` go)', () => {
+    const out = reemit(edited, { href: null })!;
+    expect(out).toContain(`<div class="no-underline" data-sq-post-slug={post.slug}>${CARD_TAG}</div>`);
+  });
+
+  it("another card takes the page's props with it (the Blog Settings card picker's rule)", () => {
+    const out = reemit(edited, {}, { cardImport: '../components/WorksCard.astro' })!;
+    expect(out).toContain(CARD_TAG.replace('<BlogCard', '<WorksCard'));
+    expect(out).toContain("import WorksCard from '../components/WorksCard.astro';");
+    expect(out).not.toContain('import BlogCard');
+  });
+
+  it('a self-linking card gets the box-less wrapper and loses it again (contents follows cardLinks)', () => {
+    const div = reemit(edited, { href: null })!;
+    const linked = reemit(div, {}, { ...OPTS, cardLinks: true })!;
+    expect(linked).toContain(`<div class="contents no-underline" data-sq-post-slug={post.slug}>${CARD_TAG}</div>`);
+    const unlinked = reemit(linked)!;
+    expect(unlinked).toContain(`<div class="no-underline" data-sq-post-slug={post.slug}>${CARD_TAG}</div>`);
+  });
+
+  it('a prop with a division or a multi-line card tag is kept byte-for-byte', () => {
+    const multi = once.replace('<BlogCard post={post} />', '<BlogCard\n        ratio={16 / 9}\n        post={post}\n      />');
+    expect(cardTagsOf(multi)).toEqual(['BlogCard']);
+    expect(reemit(multi)).toBe(multi);
+    expect(reemit(multi, { limit: 3 })).toContain('<BlogCard\n        ratio={16 / 9}\n        post={post}\n      />');
+  });
+
+  it('markup the binding did not write makes the slot hand-wired: never rewritten', () => {
+    const own = once.replace('<BlogCard post={post} />', '<span class="badge">New</span><BlogCard post={post} />');
+    expect(parseBlogBinding(own).custom).toBe(true);
+    expect(reemit(own, { custom: false, limit: 3 })).toBeNull();
+  });
+
+  it('a wrapper class holding a project font keeps working quotes (font-["Inter"])', () => {
+    const font = once.replace('class="block"', `class='flex font-["Inter"]'`);
+    expect(reemit(font)).toContain(`class='block flex font-["Inter"]'`);
+    expect(reemit(font, { href: null })).toContain(`<div class='flex font-["Inter"]' data-sq-post-slug={post.slug}>`);
+  });
+
+  it('a list named like the arrow parameter is still the list (numbered switch)', () => {
+    const p = once.replace('const posts = ', 'const p = ').replace('{posts.map(', '{p.map(');
+    expect(parseBlogBinding(p)).toMatchObject({ custom: false, postsVar: 'p' });
+    expect(reemit(p, { pagination: { kind: 'numbered', pageSize: 6 } })).toContain('{page.data.map((post) => <a');
+  });
+
+  it('a card imported under another name stays as it is: no second import', () => {
+    const aliased = once.replace("import BlogCard from '../components/BlogCard.astro';", "import Card from '../components/WorksCard.astro';")
+      .replace('<BlogCard post={post} />', '<Card h2Class="x" post={post} />');
+    expect(reemit(aliased, {}, { cardImport: '../components/WorksCard.astro' })).toBe(aliased);
+  });
+
+  it('a map body in parentheses (as Prettier prints it) is still the binding\'s own', () => {
+    const pretty = edited.replace('{posts.map((post) => <a', '{posts.map((post) => (<a').replace('</a>)}', '</a>))}');
+    expect(parseBlogBinding(pretty).custom).toBe(false);
+    expect(reemit(pretty)).toBe(pretty);
+  });
+
+  it('a card name with _ or $ and an entry written `post={ post }` are still the card', () => {
+    expect(cardTagsOf('<Blog_Card h2Class="x" post={ post } /><Blog$Card post={post}></Blog$Card>')).toEqual(['Blog_Card', 'Blog$Card']);
+  });
+
+  it('the card tag is found whatever the attribute order', () => {
+    expect(cardTagsOf(edited)).toEqual(['BlogCard']);
+  });
+});
+
+describe('renameCardTags (the card picker / missing-card swap)', () => {
+  it('renames the tag and its entry prop by span: override props before the entry, `>` in a value, all kept', () => {
+    const tpl = '{posts.map((post) => <a href="/x"><BlogCard pHtml={"Hi <b>there</b>"} h2Class="text-4xl" post={post} /></a>)}';
+    expect(renameCardTags(tpl, 'BlogCard', 'WorkCard', 'post', 'work'))
+      .toBe('{posts.map((post) => <a href="/x"><WorkCard pHtml={"Hi <b>there</b>"} h2Class="text-4xl" work={post} /></a>)}');
+  });
+  it('a gone card: the {post} entry wins over an earlier identifier-valued prop', () => {
+    expect(renameCardTags('<WorkCard variant={v} post={post} />', 'WorkCard', 'BlogCard', null, 'post')).toBe('<BlogCard variant={v} post={post} />');
+  });
+  it('a gone card (no source to read): its entry is the prop passing a bare identifier, not the first braced prop', () => {
+    expect(renameCardTags('<Old h2Class={"text-4xl"} post={post} />', 'Old', 'BlogCard', null, 'post'))
+      .toBe('<BlogCard h2Class={"text-4xl"} post={post} />');
+  });
+});

@@ -177,6 +177,27 @@ describe('pasteEnvelopeIntoLocal', () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
+  // Audit #9: ⌘D on a container wrote the copy INSIDE the original (li-in-li,
+  // a-in-a) and deleting the original took the copy with it.
+  it('⌘D → the copy is the original\'s next sibling; ⌘V into the selected container stays inside-end', async () => {
+    for (const tagName of ['li', 'a', 'div']) {
+      const original = el({ tagName });
+      writeInsert.mockClear();
+      await pasteEnvelopeIntoLocal(envelope([`<${tagName}>a</${tagName}>`]), makeDeps({
+        scannedElements: [original], scannedByKey: new Map([[original.key, original]]), duplicateOf: original.key,
+      }));
+      expect(writeInsert).toHaveBeenCalledWith({ file: PAGE, line: 8, column: 3 }, `<${tagName}>a</${tagName}>`, 'after', expect.anything());
+    }
+    // An original inside a component: the copy goes into its page-file ancestor, as a paste would.
+    const main = el({ tagName: 'main' });
+    const inner = el({ key: 'src/components/Card.astro:3:5', tagName: 'li', parentKey: main.key, sourceLocation: { file: 'src/components/Card.astro', line: 3, column: 5 } });
+    writeInsert.mockClear();
+    await pasteEnvelopeIntoLocal(envelope(['<li>a</li>']), makeDeps({
+      scannedElements: [main, inner], scannedByKey: new Map([[main.key, main], [inner.key, inner]]), selectedKey: inner.key, duplicateOf: inner.key,
+    }));
+    expect(writeInsert.mock.calls[0][2]).toBe('inside-end');
+  });
+
   it('multi-root envelope → ONE write with joined markup', async () => {
     const deps = makeDeps({ selectedKey: null, scannedElements: [], scannedByKey: new Map() });
     await pasteEnvelopeIntoLocal(envelope(['<div>a</div>', '<p>b</p>']), deps);
@@ -230,7 +251,7 @@ describe('duplicate paints its copy at once', () => {
     expect(clones(post.mock.calls)).toEqual([{ type: 'SYNC_CLONE_ELEMENT_IN_DOM', payload: { key: p.key, anchorKey: p.key, position: 'after' } }]);
     post.mockClear();
     await pasteEnvelopeIntoLocal(envelope(['<div>a</div>']), makeDeps({ duplicateOf: `${PAGE}:8:3` }));
-    expect(clones(post.mock.calls)[0].payload).toEqual({ key: `${PAGE}:8:3`, anchorKey: `${PAGE}:8:3`, position: 'inside-end' });
+    expect(clones(post.mock.calls)[0].payload).toEqual({ key: `${PAGE}:8:3`, anchorKey: `${PAGE}:8:3`, position: 'after' });
     post.mockRestore();
   });
 
