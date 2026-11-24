@@ -52,6 +52,8 @@ function parse(value: string, mode: Mode): Lab {
   if ((m = /^light-dark\((.*)\)$/.exec(v))) return parse(sides(m[1])[mode === 'light' ? 0 : 1], mode);
   if ((m = /^--alpha\((.*)\/\s*([\d.]+)%\)$/.exec(v))) return mix(parse(m[1], mode), +m[2], CLEAR);
   if ((m = /^color-mix\(in oklab, (.*) ([\d.]+)%, (.*)\)$/.exec(v))) return mix(parse(m[1], mode), +m[2], parse(m[3], mode));
+  // With transparent the mixing space does not matter: the color stays, only its alpha scales.
+  if ((m = /^color-mix\(in srgb, (.*) ([\d.]+)%, transparent\)$/.exec(v))) return mix(parse(m[1], mode), +m[2], CLEAR);
   throw new Error(`themeSelection.test cannot read "${v}"`);
 }
 function srgb({ L, a, b }: Lab): Rgb {
@@ -84,6 +86,10 @@ const SURFACES: Record<string, string[]> = {
   'bg-selected on bg (a selected row)': ['--color-bg', '--color-bg-selected'],
   'bg-selected-hover on bg': ['--color-bg', '--color-bg-selected-hover'],
   'bg-input-editing (a rename in Pages / Assets)': ['--color-bg-input-editing'],
+  'error-subtle on bg (a notice)': ['--color-bg', '--color-error-subtle'],
+  'success-subtle on bg (a notice)': ['--color-bg', '--color-success-subtle'],
+  'warning-subtle on bg (a notice)': ['--color-bg', '--color-warning-subtle'],
+  'info-subtle on bg-contrast (a notice in a card)': ['--color-bg-contrast', '--color-info-subtle'],
 };
 const CELLS = (['light', 'dark'] as const).flatMap(mode => Object.entries(SURFACES).map(([surface, layers]) => ({ mode, surface, layers })));
 
