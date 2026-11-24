@@ -210,9 +210,19 @@ function buildStubProps(source: string, videoHint = false): Record<string, unkno
   }
   const destructure = source.match(/(?:const|let)\s*{([^}]*)}\s*=\s*Astro\.props/);
   if (destructure) {
+    // A name the component never uses as a local is destructured only to keep it
+    // out of a rest spread — how the editor declares instance override props
+    // (app/src/utils/propOverrides.ts declareProp), read as `Astro.props.x ?? "master"`
+    // or forwarded to a child. A stub would replace the master's own value in its
+    // own preview ('' ?? "lit" is ''), so it stays absent — unless every prop is
+    // forwarded (`{...Astro.props}`).
+    const forwardsAll = /\{\s*\.\.\.\s*Astro\.props\s*\}/.test(source);
+    // Occurrences of the bare name (`...name` too), the destructure's own included. Not a use: an optional
+    // type member `name?:`, an attribute name / assignment target `name=` (a child's prop of the same name).
+    const occurrences = (name: string) => source.match(new RegExp(`(?:(?<=\\.\\.\\.)|(?<![\\w$.]))${name}(?![\\w$])(?!\\s*(?:\\?\\s*:|=(?![=>])))`, 'g'))?.length ?? 0;
     for (const part of destructure[1].split(',')) {
       const m = part.trim().match(/^(\w+)\s*$/); // names WITH defaults are skipped
-      if (m) props[m[1]] = stubForName(m[1], videoHint);
+      if (m && (forwardsAll || occurrences(m[1]) > 1)) props[m[1]] = stubForName(m[1], videoHint);
     }
   }
   // USAGE beats name guessing: if the template feeds a prop into <video>/<source>

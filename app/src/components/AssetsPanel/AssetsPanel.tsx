@@ -109,9 +109,8 @@ export function docRowSelected(
 
 /**
  * Right-click context menu anchored under a row: tracks open state, positions
- * the menu at the row's bottom-right, and closes on outside click. Shared by the
- * component and category rows (VariableCollectionRow positions at the cursor and
- * keeps its own state).
+ * the menu at the row's bottom-right, and closes on outside click or resize. Shared by the
+ * component, category, layout and variable-collection rows.
  */
 function useContextMenu(
   rowRef: React.RefObject<HTMLDivElement | null>,
@@ -137,8 +136,14 @@ function useContextMenu(
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
     };
+    // The menu sits at a fixed point: a layout change (⌘\ hides the sidebars) leaves it stranded.
+    const close = () => setShowMenu(false);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', close);
+    };
   }, [showMenu]);
 
   return { showMenu, setShowMenu, menuRef, menuPos };
@@ -576,22 +581,12 @@ function VariableCollectionRow({
 }) {
   const [editValue, setEditValue] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-  const menuRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [cursor, setCursor] = useState<{ top: number; left: number } | null>(null);
+  const { showMenu, setShowMenu, menuRef, menuPos } = useContextMenu(rowRef, cursor);
 
   useEffect(() => { setEditValue(name); }, [name]);
   useEffect(() => { if (isEditing) inputRef.current?.select(); }, [isEditing]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!showMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showMenu]);
 
   const commitEdit = () => {
     const trimmed = editValue.trim();
@@ -600,7 +595,7 @@ function VariableCollectionRow({
   };
 
   return (
-    <div className="relative">
+    <div ref={rowRef} className="relative">
       <Row
         depth={0}
         selected={isSelected}
@@ -631,7 +626,7 @@ function VariableCollectionRow({
         className="h-7 px-2 rounded gap-1"
         onClick={onSelect}
         onDoubleClick={onStartEditing}
-        onContextMenu={(e) => { e.preventDefault(); setMenuPos({ top: e.clientY, left: e.clientX }); setShowMenu(true); }}
+        onContextMenu={(e) => { e.preventDefault(); setCursor({ top: e.clientY, left: e.clientX }); setShowMenu(true); }}
       />
 
       {showMenu && createPortal(

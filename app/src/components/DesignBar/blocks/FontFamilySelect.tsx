@@ -1,4 +1,3 @@
-import { ChevronDownIcon as SharedChevronDownIcon } from '@/assets/icons';
 /**
  * Font family dropdown with live previews. Each row renders in its own font
  * (Google families via subsetted css2 preview links, project fonts via their
@@ -8,7 +7,7 @@ import { ChevronDownIcon as SharedChevronDownIcon } from '@/assets/icons';
  */
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import fontCatalog from '@/assets/fontCatalog.json';
-import { Popover, MenuItem, Button } from '@/components/ui';
+import { Popover, MenuItem, Button, FieldChevron, fieldTrigger } from '@/components/ui';
 import { ensurePreviewFont, ensureProjectPreviewFont } from './fontPreview';
 import { SYSTEM_FONT_VALUES, isSystemFontValue } from './fontFamilyClass';
 import type { ProjectFontEntry } from '@/store/fontCommands';
@@ -119,10 +118,8 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
         variant="outline"
         disabled={disabled}
         onClick={() => setIsOpen(o => !o)}
-        className="w-full h-7 px-2 gap-1 justify-between font-normal text-sm bg-input-fill inset-ring-input-stroke"
-        iconRight={
-          <SharedChevronDownIcon className="w-4 h-4 shrink-0 opacity-60" />
-        }
+        className={`${fieldTrigger} w-full pl-2 gap-1 justify-between text-sm`}
+        iconRight={<FieldChevron />}
       >
         <span
           className="flex-1 min-w-0 truncate text-left"

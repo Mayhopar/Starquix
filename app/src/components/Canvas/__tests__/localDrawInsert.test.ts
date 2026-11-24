@@ -175,6 +175,32 @@ describe('insertLocalDrawnElement — placement', () => {
   });
 });
 
+// Audit #28: the drawn slot (insertIndex) was dropped — a text box drawn
+// between a heading and a paragraph landed at the END of the section.
+describe('insertLocalDrawnElement — lands where it was drawn', () => {
+  const h1 = scanned({ key: `${PAGE}:13:5`, tagName: 'h1', parentKey: sectionEl.key, sourceLocation: { file: PAGE, line: 13, column: 5 } });
+  const card = scanned({
+    key: 'src/components/Card.astro:2:1', tagName: 'article', parentKey: sectionEl.key,
+    sourceLocation: { file: 'src/components/Card.astro', line: 2, column: 1 }, usageLocation: { file: PAGE, line: 15, column: 5 },
+  });
+  const scan = [mainEl, sectionEl, h1, imgEl, card];
+  const text = { tag: 'p', classes: 'w-[200px]', textContent: 'Type here', parentKey: sectionEl.key };
+  const drawAt = (insertIndex: number) => insertLocalDrawnElement(args({ draw: { ...text, insertIndex }, scannedElements: scan }));
+
+  it('before the sibling at the drawn slot; after the last one at the end', async () => {
+    await drawAt(1);
+    expect(writeInsert).toHaveBeenLastCalledWith({ file: PAGE, line: 14, column: 5 }, '<p class="w-[200px]">Type here</p>', 'before', expect.anything());
+    await drawAt(3);
+    expect(writeInsert).toHaveBeenLastCalledWith({ file: PAGE, line: 15, column: 5 }, expect.any(String), 'after', expect.anything());
+  });
+
+  it('next to a rendered component: anchored on its <Card /> tag in the page', async () => {
+    await drawAt(2);
+    expect(writeInsert).toHaveBeenLastCalledWith({ file: PAGE, line: 15, column: 5 }, expect.any(String), 'before', expect.anything());
+    expect(refusals).toEqual([]);
+  });
+});
+
 describe('insertLocalDrawnElement — serialization', () => {
   it('text draw: textContent is HTML-escaped', async () => {
     await insertLocalDrawnElement(

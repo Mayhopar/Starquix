@@ -32,7 +32,7 @@ import toast from 'react-hot-toast';
 import * as Y from 'yjs';
 import { Button, Row, Tabs } from '@/components/ui';
 import { HeaderTags } from './HeaderTags';
-import { tokenMatchesCell, type Cell } from './variantCell';
+import { tokenMatchesCell, tokenHasVariant, VARIANT_LEAD, type Cell } from './variantCell';
 import { useActiveTheme } from '@/context/ThemeContext';
 import { DesignBarProvider, type DesignBarContextValue } from './DesignBarContext';
 import { OrphanedOverridesBadge } from './OrphanedOverridesBadge';
@@ -1438,12 +1438,7 @@ export const DesignBar: React.FC<DesignBarProps> = ({ onClassesChange }) => {
 
   // Remove prefixed classes matching a block pattern (e.g. hover:bg-* for Fill block)
   const deletePrefixClasses = useCallback((prefix: string, blockPattern: RegExp) => {
-    const prefixStr = prefix + ':';
-    deleteClassesByPredicate(t => {
-      if (!t.startsWith(prefixStr) && !t.includes(':' + prefix + ':')) return true;
-      const base = t.replace(/^(?:[\w-]+:)*/, '');
-      return !blockPattern.test(base);
-    });
+    deleteClassesByPredicate(t => !(tokenHasVariant(t, prefix) && blockPattern.test(t.replace(VARIANT_LEAD, ''))));
   }, [deleteClassesByPredicate]);
 
   // Remove every class whose variant cell exactly equals `cell` (header pill ×).
@@ -1820,6 +1815,7 @@ export const DesignBar: React.FC<DesignBarProps> = ({ onClassesChange }) => {
         </>
       ) : activeTab === 'classes' ? (
         <ClassesTab
+          key={key} // an unapplied draft belongs to the element it was typed for
           classes={fullClasses}
           onClassesChange={handleClassesTabChange}
         />

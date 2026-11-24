@@ -73,6 +73,22 @@ describe('handleKeyDown forwards every bare-key editor shortcut', () => {
     ]);
   });
 
+  it('forwards ⌘\\ / Ctrl+\\ (show / hide sidebars) with the code the parent matches on', () => {
+    expect(forwarded(mount(), { key: '\\', code: 'Backslash', metaKey: true })).toEqual([
+      expect.objectContaining({ key: '\\', code: 'Backslash', metaKey: true }),
+    ]);
+    expect(forwarded(mount(), { key: '#', code: 'Backslash', ctrlKey: true })).toEqual([
+      expect.objectContaining({ code: 'Backslash', ctrlKey: true }),
+    ]);
+  });
+
+  // A held ⌘\ must toggle once: the parent drops auto-repeats, so it has to see them as such.
+  it('says whether the key is an auto-repeat', () => {
+    expect(forwarded(mount(), { key: '\\', code: 'Backslash', metaKey: true, repeat: true })).toEqual([
+      expect.objectContaining({ repeat: true }),
+    ]);
+  });
+
   it('forwards nothing for a plain typed character that is not a shortcut', () => {
     expect(forwarded(mount(), { key: 'q', code: 'KeyQ' })).toEqual([]);
     expect(forwarded(mount(), { key: '7', code: 'Digit7' })).toEqual([]);

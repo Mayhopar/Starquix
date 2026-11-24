@@ -109,6 +109,19 @@ describe('ui/Popover', () => {
     expect(screen.getByText('drop content')).toBeInTheDocument();
   });
 
+  // ⌘\ hides the sidebars under an open flyout: with its control gone it has nowhere to sit.
+  it('closes when its trigger leaves the layout, and stays while the trigger is laid out', () => {
+    const onClose = vi.fn();
+    render(<ControlledHost open onClose={onClose} />);
+    const trigger = screen.getByRole('button', { name: 'trigger' });
+    trigger.checkVisibility = () => true;
+    fireEvent(window, new Event('resize'));
+    expect(onClose).not.toHaveBeenCalled();
+    trigger.checkVisibility = () => false; // display: none on it or on an ancestor
+    fireEvent(window, new Event('resize'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('uses flyout tokens', () => {
     render(<ControlledHost open onClose={() => {}} />);
     const panel = screen.getByText('popover content').parentElement!.parentElement!;
@@ -134,6 +147,12 @@ describe('ui/Menu', () => {
     expect(locked).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(locked);
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('MenuItem keeps 16px between the label and its shortcut', () => {
+    render(<MenuItem label="Create container" shortcut="⌘G" />);
+    expect(screen.getByText('Create container').className).toContain('pr-4');
+    expect(screen.getByText('⌘G')).toBeInTheDocument();
   });
 
   it('Menu renders items via uncontrolled Popover trigger', () => {

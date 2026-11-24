@@ -86,6 +86,7 @@ import type {
   KeyedRect,
 } from '@/bridge';
 import toast from 'react-hot-toast';
+import { layerMenu } from '@/components/Editor/layerMenuStore';
 import { useSourceTextPersistence, restoreSourceText } from '@/hooks/useSourceTextPersistence';
 import {
   useSourceClassesPersistence,
@@ -2252,6 +2253,23 @@ export function ViewportFrame({ breakpoint, scale = 1, isDragging = false, isDra
     <div className="flex flex-col items-center">
       <div
         data-testid="editor-canvas"
+        onContextMenu={(e) => {
+          const iframe = iframeRef.current;
+          if (isPreview || isEditingText || !iframe) return;
+          e.preventDefault();
+          const frame = iframe.getBoundingClientRect();
+          const x = (e.clientX - frame.left) / scale;
+          const y = (e.clientY - frame.top) / scale;
+          const at = { x: e.clientX, y: e.clientY };
+          // Inside a selected layer: keep the (multi-)selection. Elsewhere: select by plain-click rules first.
+          const onSelection = [selectedKey, ...additionalSelections.map(a => a.key)].some(key => {
+            const r = key ? scannedElementsRef.current.find(el => el.key === key)?.rect : undefined;
+            return !!r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
+          });
+          if (onSelection) { layerMenu.open(at); return; }
+          layerMenu.arm(at);
+          iframe.contentWindow?.postMessage({ type: 'SIMULATE_CLICK', payload: { x, y } }, '*');
+        }}
         // task-116: no device frame in preview (D1) — the border/shadow would
         // hairline through behind the full-window iframe.
         className={`overflow-visible relative select-none ${!isIframeReady || isPreview ? '' : 'bg-bg shadow-flyout border border-stroke'}`}
@@ -2286,6 +2304,8 @@ export function ViewportFrame({ breakpoint, scale = 1, isDragging = false, isDra
           ref={overlayRef}
           className="absolute inset-0 z-[100] select-none" // ui-lint-line: overlay stacking order (above iframe, below slot chrome + selection)
           onMouseDown={(e) => {
+            // Right button: keep pointer events so the contextmenu lands here, not in the iframe.
+            if (e.button === 2) return;
             setOverlayPointerEvents(false);
 
             // Arm the restore FIRST, before any hit-testing. This overlay is also

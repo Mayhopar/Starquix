@@ -68,7 +68,8 @@ export function MenuItem({
       disabled={disabled}
       onClick={onSelect}
       left={iconSpec ? [iconSpec] : undefined}
-      title={<span className={danger ? 'text-error' : undefined}>{label}</span>}
+      // pr-4: in a fit-content menu the longest label would otherwise touch its shortcut
+      title={<span className={cx(danger && 'text-error', shortcut && 'pr-4') || undefined}>{label}</span>}
       caption={caption}
       rightText={shortcut}
       right={selected && showCheck ? [{ type: 'icon', icon: <CheckIcon /> }] : undefined}

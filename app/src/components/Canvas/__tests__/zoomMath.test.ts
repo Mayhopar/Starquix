@@ -99,3 +99,19 @@ describe('fitView', () => {
     expect(v.y + FRAME_TOP_PADDING * v.scale).toBeCloseTo(0, 6);
   });
 });
+
+describe('fitView with floating side panels', () => {
+  it('fits the frame into the gap between the panels and centres it there', () => {
+    const v = fitView({ canvasWidth: 1400, canvasHeight: 900, viewportWidth: 1280, frameHeight: 0, insetLeft: 240, insetRight: 280 });
+    const frameLeft = (1400 - 1280) / 2; // the content layer centres the frame in the full canvas width
+    const screenLeft = v.x + frameLeft * v.scale, screenRight = screenLeft + 1280 * v.scale;
+    expect(screenLeft - 240).toBeCloseTo(1400 - 280 - screenRight); // equal margins inside the gap
+    expect(screenLeft).toBeGreaterThan(240);
+    expect(screenRight).toBeLessThan(1400 - 280);
+  });
+  it('without insets it is the plain fit', () => {
+    const a = fitView({ canvasWidth: 1400, canvasHeight: 900, viewportWidth: 1280, frameHeight: 0 });
+    const b = fitView({ canvasWidth: 1400, canvasHeight: 900, viewportWidth: 1280, frameHeight: 0, insetLeft: 0, insetRight: 0 });
+    expect(b).toEqual(a);
+  });
+});

@@ -123,7 +123,7 @@ const baseStorage = freshClasses ? parseClasses(freshClasses) : storageRef.curre
 // Don't rely on React state - it may be stale
 ```
 
-**Why:** React state can be stale. Yjs is the source of truth.
+**Why:** React state can be stale. The Yjs doc is the live working copy; the project files are the truth (see `docs/architecture.md`).
 
 ## Testing Rules
 

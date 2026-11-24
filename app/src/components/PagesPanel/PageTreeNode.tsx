@@ -138,8 +138,14 @@ export function PageTreeNode({
       }
     };
 
+    // The menu sits at a fixed point: a layout change (⌘\ hides the sidebars) leaves it stranded.
+    const close = () => setShowMenu(false);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', close);
+    };
   }, [showMenu]);
 
   const { clearPreviewPost } = usePostEditor();
