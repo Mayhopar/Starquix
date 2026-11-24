@@ -119,7 +119,7 @@ it('E2/25/27/28. publishInto, unrelated history: one version on GitHub\'s tip wi
     .toEqual({ wrote: true });
   expect(gh.git('log', '-1', '--format=%P %s', 'master')).toBe(`${head} ${tip.oid} Publish from Starquix`);
   expect(gh.git('ls-tree', '-r', '--name-only', 'master').split('\n')).toEqual(['.gitignore', '.vscode/settings.json', 'src/new.astro', 'src/pages/index.astro']);
-  expect(gh.git('show', 'master:.gitignore')).toBe('node_modules\n.env\n.sq/\ndist/'); // GitHub's + our runtime entries
+  expect(gh.git('show', 'master:.gitignore')).toBe('node_modules\n.env\n.sq/\ndist/\n.astro/\n.DS_Store'); // GitHub's + our runtime entries
   expect(await p.engine.branch()).toBe('master');
   expect(await p.engine.remote()).toBe(gh.url);
   expect(await fsp.readFile(path.join(p.dir, '.vscode/settings.json'), 'utf8')).toBe('{}');

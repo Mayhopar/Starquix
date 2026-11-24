@@ -124,6 +124,20 @@ it('a symlinked node_modules is never part of a version', async () => {
   expect((await engine.status()).files.sort()).toEqual(['.gitignore', 'index.astro']);
 });
 
+// #30 (audit 2026-11-24): the first version kept Astro's .astro/ cache and .DS_Store. Astro rewrites its cache by itself,
+// so the project showed changes nobody made, and Restore, branch switch and Pull refused.
+it('Astro\'s .astro/ cache and .DS_Store are never part of a version', async () => {
+  const dir = await tmp();
+  await fsp.mkdir(path.join(dir, '.astro')); await fsp.writeFile(path.join(dir, '.astro/settings.json'), '{"lastUpdateCheck":1}');
+  await fsp.mkdir(path.join(dir, 'src')); await fsp.writeFile(path.join(dir, 'src/.DS_Store'), 'x');
+  await fsp.writeFile(path.join(dir, '.DS_Store'), 'x'); await fsp.writeFile(path.join(dir, 'index.astro'), 'hi');
+  const engine = createEngine(dir);
+  expect((await engine.status()).files.sort()).toEqual(['.gitignore', 'index.astro']);
+  await engine.save('one', author);
+  await fsp.writeFile(path.join(dir, '.astro/settings.json'), '{"lastUpdateCheck":2}');
+  expect((await engine.status()).changed).toBe(0);
+});
+
 it('an imported project .gitignore keeps its lines and gains the runtime entries it lacks', async () => {
   const dir = await tmp();
   await fsp.writeFile(path.join(dir, '.gitignore'), '.env\ndist/\n');
