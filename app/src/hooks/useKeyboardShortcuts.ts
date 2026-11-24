@@ -11,6 +11,7 @@ import { useSelectionContext, useScannedElementsRef } from '@/context/SelectionC
 import { findNode, findSiblings } from '@/utils/treeUtils';
 import { getModifierKey, isMac } from '@/utils/platform';
 import { useWrapSelection } from '@/hooks/useWrapSelection';
+import { unwrapLocalElement } from '@/components/Editor/localStructuralOps';
 import { dispatchZoomCommand, type ZoomCommandAction } from '@/components/Canvas/zoomCommands';
 import { toggleGrid } from '@/components/Canvas/gridPreferences';
 import { isDrawnKey, parseKey } from '@/store/types';
@@ -293,6 +294,7 @@ export function useKeyboardShortcuts(): void {
   stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview };
 
   const wrapSelection = useWrapSelection();
+  const unwrapSelection = useWrapSelection(unwrapLocalElement);
 
   // Helper to select an element with full metadata from scannedElements
   const selectElement = useCallback((key: string) => {
@@ -374,12 +376,12 @@ export function useKeyboardShortcuts(): void {
         return;
       }
 
-      // Create container: ⌘G on a Mac, Ctrl+Alt+G elsewhere (Ctrl+G is the grid there).
-      // `code`, not `key`: ⌥ and AltGr change the letter.
-      const wrapCombo = isMac() ? e.metaKey && !e.ctrlKey && !e.altKey : e.ctrlKey && e.altKey && !e.metaKey;
-      if (wrapCombo && !e.shiftKey && e.code === 'KeyG') {
+      // Create / Remove container: ⌘G / ⇧⌘G on a Mac; Ctrl+Alt+G / Ctrl+Shift+G
+      // elsewhere (Ctrl+G is the grid there). `code`, not `key`: ⌥ and AltGr change the letter.
+      const groupCombo = isMac() ? e.metaKey && !e.ctrlKey && !e.altKey : e.ctrlKey && !e.metaKey && e.altKey !== e.shiftKey;
+      if (groupCombo && e.code === 'KeyG') {
         e.preventDefault();
-        if (!e.repeat) wrapSelection();
+        if (!e.repeat) (e.shiftKey ? unwrapSelection : wrapSelection)();
         return;
       }
 
@@ -704,7 +706,7 @@ export function useKeyboardShortcuts(): void {
       dispatch, doc, selectedElementId,
       setActiveTool, setPreview,
       clearSelection, clearAdditionalSelections, enterContext, exitContext, selectElement,
-      scannedElementsRef, treeNodesRef, wrapSelection
+      scannedElementsRef, treeNodesRef, wrapSelection, unwrapSelection
     ]
   );
 

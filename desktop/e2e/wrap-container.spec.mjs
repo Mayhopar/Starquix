@@ -1,6 +1,7 @@
 // Create container (#5), against the file on disk: the shortcut, the canvas and the
 // Layers right-click menu wrap the selected layers in a class-less <div>; ⌘Z gives
 // back the exact bytes; layers of different parents are refused and nothing changes.
+// Remove container (⇧⌘G / Ctrl+Shift+G) is its inverse: wrap + unwrap = the original bytes.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -22,6 +23,7 @@ const AB = '    <p id="a">Alpha</p>\n\n    <p id="b">Beta</p>\n';
 const SECTION = '    <section class="p-4">\n      <p id="c">Gamma</p>\n    </section>\n';
 const ORIGINAL = page(H1 + AB + SECTION);
 const WRAP = process.platform === 'darwin' ? 'Meta+g' : 'Control+Alt+g';
+const UNWRAP = process.platform === 'darwin' ? 'Meta+Shift+g' : 'Control+Shift+g';
 
 test('W1: Create container wraps in the file, undo restores the bytes, different parents are refused', async ({}, info) => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'sq-wrap-'));
@@ -70,6 +72,26 @@ test('W1: Create container wraps in the file, undo restores the bytes, different
     await p.waitForTimeout(1000);
     await undo();
     await expect(frame.locator('main > div')).toHaveCount(0, { timeout: 15_000 });
+
+    // Remove container: wrap two siblings, the container becomes the selection, ⇧⌘G → the
+    // file is byte-identical to before the wrap; ⌘Z brings the container back.
+    const WRAPPED_H1_A = page(`    <div>\n  ${H1}      <p id="a">Alpha</p>\n    </div>\n\n    <p id="b">Beta</p>\n${SECTION}`);
+    await select(p, frame.locator('#title'));
+    await addToSelection('#a');
+    await expect(p.getByText('2 elements', { exact: true })).toBeVisible();
+    await p.keyboard.press(WRAP);
+    await fileIs(WRAPPED_H1_A);
+    await expect(p.getByTestId('layer-item').filter({ hasText: /^\s*div\s*$/ })).toHaveClass(/bg-bg-selected/, { timeout: 15_000 });
+    await p.screenshot({ path: info.outputPath('container-selected.png') });
+    await p.keyboard.press(UNWRAP);
+    await fileIs(ORIGINAL);
+    await expect(frame.locator('main > div')).toHaveCount(0, { timeout: 15_000 });
+    await expect(p.getByTestId('layer-item').filter({ hasText: /^\s*h1\s*$/ })).toHaveClass(/bg-bg-selected/, { timeout: 15_000 });
+    await p.waitForTimeout(1000);
+    await p.keyboard.press('ControlOrMeta+z');
+    await fileIs(WRAPPED_H1_A);
+    await p.waitForTimeout(1000);
+    await undo();
 
     // Canvas: right-click the selected layer → Create container.
     await select(p, frame.locator('#c'));
