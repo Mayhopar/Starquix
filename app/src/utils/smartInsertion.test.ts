@@ -72,6 +72,19 @@ describe('findInsertionTarget', () => {
     expect(result.parentKey).toBe('el-hero');
   });
 
+  // Audit #28: a frame drawn over a heading was nested INSIDE the <h1>.
+  it('a draw over an element that cannot hold children (h1, a, img) goes beside it, at its slot', () => {
+    const main = makeScanned({ key: 'main', tagName: 'main', rect: { top: 0, left: 0, width: 800, height: 1000 } });
+    const h1 = makeScanned({ key: 'h1', tagName: 'h1', parentKey: 'main', rect: { top: 0, left: 0, width: 800, height: 120 } });
+    const a = makeScanned({ key: 'a', tagName: 'a', parentKey: 'h1', rect: { top: 10, left: 0, width: 800, height: 100 } });
+    const p = makeScanned({ key: 'p', tagName: 'p', parentKey: 'main', rect: { top: 140, left: 0, width: 800, height: 40 } });
+    const img = makeScanned({ key: 'img', tagName: 'img', parentKey: 'main', rect: { top: 200, left: 0, width: 800, height: 400 } });
+    expect(findInsertionTarget({ top: 20, left: 100, width: 300, height: 60 }, [main, h1, a, p, img]))
+      .toMatchObject({ parentKey: 'main', insertIndex: 1 });
+    expect(findInsertionTarget({ top: 300, left: 100, width: 300, height: 60 }, [main, h1, a, p, img]))
+      .toMatchObject({ parentKey: 'main', insertIndex: 3 });
+  });
+
   // ledger F2: a DRAWN container is NOT a locked instance — the lock must still let it parent.
   it('lockInstances=true STILL allows a drawn-container parent', () => {
     const drawnBox = makeScanned({ key: 'drawn-box1', tagName: 'div', rect: { top: 0, left: 0, width: 300, height: 300 } });

@@ -99,6 +99,9 @@ export async function pasteEnvelopeIntoLocal(env: ClipboardEnvelope, deps: Paste
         : "Page isn't ready yet — click an element first");
       return false;
     }
+    // ⌘D anchored on its original: the copy is its next sibling, never its
+    // child (li-in-li, a-in-a — deleting the original took the copy along).
+    if (anchor && anchor.key === deps.duplicateOf && 'loc' in target) target.position = 'after';
     const pageBody = 'pageBody' in target;
     const targetFile = pageBody ? deps.pageFile : target.loc.file;
     if (classifyStructuralTarget(targetFile, deps.pageFile) === 'cross-file') {
