@@ -21,6 +21,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui';
+import { LayerContextMenu } from './LayerContextMenu';
 import { EditorProvider, useEditorDoc, useDispatch, useScopedYjsValue, useCurrentPageId } from '@/store';
 import { applyCommand } from '@/store/commands';
 import { readComponentSource } from '@/utils/componentSourceReader';
@@ -875,6 +876,7 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
       onDragCancel={clearDropZone}
     >
       <CardTitleLockSync />
+      <LayerContextMenu />
       <ListConversionOnOpen />
       {/* Editor Layout */}
       <div ref={layoutRef} className="relative h-screen flex overflow-hidden">

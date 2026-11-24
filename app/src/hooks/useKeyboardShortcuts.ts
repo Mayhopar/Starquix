@@ -9,7 +9,9 @@ import { useTool } from '@/context';
 import { flushDurableSourceWrites } from '@/services/durableEdits/sourceMaterialization';
 import { useSelectionContext, useScannedElementsRef } from '@/context/SelectionContext';
 import { findNode, findSiblings } from '@/utils/treeUtils';
-import { getModifierKey } from '@/utils/platform';
+import { getModifierKey, isMac } from '@/utils/platform';
+import { useWrapSelection } from '@/hooks/useWrapSelection';
+import { unwrapLocalElement } from '@/components/Editor/localStructuralOps';
 import { dispatchZoomCommand, type ZoomCommandAction } from '@/components/Canvas/zoomCommands';
 import { toggleGrid } from '@/components/Canvas/gridPreferences';
 import { isDrawnKey, parseKey } from '@/store/types';
@@ -291,6 +293,9 @@ export function useKeyboardShortcuts(): void {
   const stateRef = useRef({ selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview });
   stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview };
 
+  const wrapSelection = useWrapSelection();
+  const unwrapSelection = useWrapSelection(unwrapLocalElement);
+
   // Helper to select an element with full metadata from scannedElements
   const selectElement = useCallback((key: string) => {
     const element = scannedByKeyRef.current.get(key);
@@ -381,6 +386,15 @@ export function useKeyboardShortcuts(): void {
       if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'g') {
         e.preventDefault();
         toggleGrid(selectProjectId(doc));
+        return;
+      }
+
+      // Create / Remove container: ⌘G / ⇧⌘G on a Mac; Ctrl+Alt+G / Ctrl+Shift+G
+      // elsewhere (Ctrl+G is the grid there). `code`, not `key`: ⌥ and AltGr change the letter.
+      const groupCombo = isMac() ? e.metaKey && !e.ctrlKey && !e.altKey : e.ctrlKey && !e.metaKey && e.altKey !== e.shiftKey;
+      if (groupCombo && e.code === 'KeyG') {
+        e.preventDefault();
+        if (!e.repeat) (e.shiftKey ? unwrapSelection : wrapSelection)();
         return;
       }
 
@@ -705,7 +719,7 @@ export function useKeyboardShortcuts(): void {
       dispatch, doc, selectedElementId,
       setActiveTool, setPreview, toggleSidebars,
       clearSelection, clearAdditionalSelections, enterContext, exitContext, selectElement,
-      scannedElementsRef, treeNodesRef
+      scannedElementsRef, treeNodesRef, wrapSelection, unwrapSelection
     ]
   );
 

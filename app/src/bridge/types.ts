@@ -175,6 +175,7 @@ export interface KeyboardEventPayload {
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
+  /** Absent from the preview-mode Escape relay and from a stale cached bridge. */
   repeat?: boolean;
 }
 

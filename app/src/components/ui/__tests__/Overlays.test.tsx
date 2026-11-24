@@ -149,6 +149,12 @@ describe('ui/Menu', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
+  it('MenuItem keeps 16px between the label and its shortcut', () => {
+    render(<MenuItem label="Create container" shortcut="⌘G" />);
+    expect(screen.getByText('Create container').className).toContain('pr-4');
+    expect(screen.getByText('⌘G')).toBeInTheDocument();
+  });
+
   it('Menu renders items via uncontrolled Popover trigger', () => {
     render(
       <Menu trigger={<button>menu</button>}>

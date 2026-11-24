@@ -93,4 +93,27 @@ describe('flow-drag rAF coalescing', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
     expect(onMove).not.toHaveBeenCalled();
   });
+
+  // Issue #5: the right button opens the layer menu; it must not start a drag or re-click on release.
+  it.each([
+    ['flow drag', { isFlowDraggable: true }],
+    ['absolute move', { isMovable: true }],
+  ])('a right-button press starts no %s', (_, mode) => {
+    const onFlowDragStart = vi.fn();
+    const onFlowDragEnd = vi.fn();
+    const onMove = vi.fn();
+    const { container } = render(
+      <SelectionOverlay selectedRect={rect} scale={1} containerOffset={{ x: 0, y: 0 }} {...mode}
+        onFlowDragStart={onFlowDragStart} onFlowDragMove={vi.fn()} onFlowDragEnd={onFlowDragEnd} onMove={onMove} />,
+    );
+    const overlay = container.querySelector('.z-\\[1000\\]') as HTMLElement;
+    const pressed = fireEvent.mouseDown(overlay, { button: 2, clientX: 50, clientY: 30 });
+    fireEvent.mouseMove(document, { clientX: 90, clientY: 60 });
+    fireEvent.mouseUp(document, { button: 2, clientX: 90, clientY: 60 });
+    flushRaf();
+    expect(pressed).toBe(true);
+    expect(onFlowDragStart).not.toHaveBeenCalled();
+    expect(onFlowDragEnd).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+  });
 });
