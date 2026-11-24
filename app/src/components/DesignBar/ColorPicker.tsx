@@ -12,6 +12,7 @@ import { TailwindPaletteGrid } from './TailwindPaletteGrid';
 import { Popover, Button, Swatch, FieldChevron, fieldTrigger } from '@/components/ui';
 import { VariablePicker } from './VariablePicker';
 import { getColorClass } from '@/core/classes/vocabulary';
+import { OPACITY_SUFFIX } from './classPatterns';
 
 // ============================================================================
 // Types
@@ -56,8 +57,9 @@ const parseColorValue = (value: string, prefix: ColorPrefix): { type: 'tailwind'
 
   // Handle side-specific colors like border-b-red-600, border-t-[#fff]
   // Pattern: prefix-{side}-{color} where side is t, r, b, l, x, y
-  const sideMatch = value.match(new RegExp(`^${prefix}-([trblxy])-(.+)$`));
-  const colorPart = sideMatch ? sideMatch[2] : value.replace(new RegExp(`^${prefix}-`), '');
+  const bare = value.replace(OPACITY_SUFFIX, ''); // white/10 is still white
+  const sideMatch = bare.match(new RegExp(`^${prefix}-([trblxy])-(.+)$`));
+  const colorPart = sideMatch ? sideMatch[2] : bare.replace(new RegExp(`^${prefix}-`), '');
 
   // Check for CSS variable reference: [var(--name)] or the typed [color:var(--name)]
   const varMatch = colorPart.match(/^\[(?:color:)?var\(--(.+)\)\]$/);
