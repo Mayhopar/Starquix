@@ -756,7 +756,8 @@ function buildPlacementPropReplacements(
  * injector splices an attribute into the string and the module stops parsing
  * (rollup `Unexpected token`, HTTP 500 on the page). It cannot be skipped by
  * the same rule, because `${…}` also carries `$$renderComponent(…)` slot bodies
- * full of REAL elements. `is:raw` on a COMPONENT (`<Card is:raw>`) is likewise
+ * full of REAL elements. THE ALIGNMENT GATE catches it by count instead: that
+ * tag gets no address. `is:raw` on a COMPONENT (`<Card is:raw>`) is likewise
  * out — its body lands in a nested `$$render\`` slot with no anchor tag of its
  * own. See tasks.json.
  * ------------------------------------------------------------------ */
@@ -836,6 +837,28 @@ function buildElementOccurrences(elements) {
       fallbacks: el.fallbacks ?? null,
     };
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * THE ALIGNMENT GATE (issue #7 investigation, 2026-11-24) — the check THE
+ * PARSE GATE cannot make. Read THE OPAQUE REGIONS first.
+ *
+ * `(tagName, occurrence)` pairing is only true when the scan saw exactly as
+ * many `<T` as the AST holds. A JS string inside a template expression breaks
+ * that and still parses: `set:html={`… <a href="/terms">…`}` compiles to
+ * `${$$unescapeHTML(`… <a href="/terms">…`)}`. Measured in the editor: the
+ * ghost took the next link's address, that link took the one after it, and
+ * editing it rewrote its neighbour's line on disk. A missed `<T` shifts the
+ * other way. So a tag whose counts differ gets NO address (not editable),
+ * never a neighbour's. Per tag, fail closed.
+ * shortcut: equal counts do not prove ORDER (named-slot content is emitted
+ * after the default slot's, so `<p slot="x">` between two plain `<p>` still
+ * swaps them); pair by the compiler's own location if that ever bites.
+ * ------------------------------------------------------------------ */
+function alignedOnly(tags, matchCounters, elementOccurrences) {
+  // Occurrences ascend per tag, so the last one written is the AST's count.
+  const astCount = new Map(elementOccurrences.map((e) => [e.tagName, e.occurrence]));
+  return tags.filter((t) => matchCounters.get(t.tagName) === astCount.get(t.tagName));
 }
 
 /* ------------------------------------------------------------------ *
@@ -956,7 +979,7 @@ function injectTagsDirectly(
   const templateSection = compiledCode.slice(templateStart, templateSectionEnd);
 
   const matchCounters = new Map();
-  const replacements = [];
+  const tags = [];
 
   // `["'`]` = the dynamic-first form: this chunk of the string array ends at
   // the tag name. See THE OCCURRENCE SHIFT above.
@@ -1014,14 +1037,16 @@ function injectTagsDirectly(
             ` data-sq-usage-version=\\"${USAGE_VERSION_SENTINEL_SRC}\\"`
           : '');
       const replacement = `<${tagName}${attr}${after}`;
-      replacements.push({
+      tags.push({
         start: templateStart + match.index,
         end: templateStart + match.index + fullMatch.length,
         replacement,
+        tagName,
       });
     }
   }
 
+  const replacements = alignedOnly(tags, matchCounters, elementOccurrences);
   const taggedElementCount = replacements.length;
 
   /*
@@ -1115,10 +1140,9 @@ function injectTagsDirectly(
  *
  * ── What it does NOT do ────────────────────────────────────────────────────
  * It cannot see a wrong-but-VALID address. `<p>{'<i class="x">i</i>'}</p>`
- * splices into a single-quoted literal, parses cleanly, leaks `data-sq-*` into
- * the user's HTML and still steals the next `<i>`'s coordinates. That is the
- * scan's job (the mode-stack lexer + alignment gate, task-176 proper) and is
- * deliberately NOT built here.
+ * splices into a single-quoted literal and parses cleanly. That is THE
+ * ALIGNMENT GATE's job: the ghost leaves the `<i>` counts unequal, so no `<i>`
+ * in the file is tagged.
  * ------------------------------------------------------------------ */
 
 /**
@@ -1250,7 +1274,7 @@ export async function transformCompiledOutput(
   // See THE OCCURRENCE SHIFT above.
   const tagPattern = /<([A-Za-z][A-Za-z0-9-]*|\$\{[^}]+\})(\s|>|\/|\$\{)/g;
   let match;
-  const replacements = [];
+  const tags = [];
 
   // Comments and script/style bodies: NOT counted, NOT injected into.
   // See THE OPAQUE REGIONS above.
@@ -1297,14 +1321,16 @@ export async function transformCompiledOutput(
         fallbackAttrs(elementInfo.fallbacks, '"') +
         (emitPlacements ? PLACEMENT_ATTR : '');
       const newMatch = `<${tagName}${attr}${after}`;
-      replacements.push({
+      tags.push({
         start: match.index,
         end: match.index + fullMatch.length,
         replacement: newMatch,
+        tagName,
       });
     }
   }
 
+  const replacements = alignedOnly(tags, matchCounters, elementOccurrences);
   if (emitPlacements) {
     for (const r of buildPlacementPropReplacements(
       templateContent,
