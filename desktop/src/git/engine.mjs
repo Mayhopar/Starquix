@@ -6,8 +6,9 @@ import path from 'node:path';
 import git from 'isomorphic-git';
 // `node_modules` without a slash: projects symlink it to the app's shared runtime deps, and a
 // dir-only pattern would not match the symlink. Astro's cache and macOS's .DS_Store rewrite themselves: kept in a
-// version they show changes nobody made, which block Restore, branch switch and Pull (#30).
-const IGNORE = ['node_modules', '.sq/', 'dist/', '.astro/', '.DS_Store'];
+// version they show changes nobody made, which block Restore, branch switch and Pull (#30). An imported site keeps its
+// .env (#16); like Astro's starter .gitignore, its secrets never go into a version or to GitHub.
+const IGNORE = ['node_modules', '.sq/', 'dist/', '.astro/', '.DS_Store', '.env', '.env.production'];
 // A git op never writes these into the project folder: node_modules is a symlink to the shared runtime deps, .sq/ is ours,
 // dist/ is build output (docs/plans/2026-10-18-publish-into-existing-repo-design.md: GitHub's tip may carry them).
 const RUNTIME = new Set(['node_modules', '.sq', 'dist']);

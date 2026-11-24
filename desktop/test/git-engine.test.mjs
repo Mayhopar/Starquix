@@ -138,6 +138,15 @@ it('Astro\'s .astro/ cache and .DS_Store are never part of a version', async () 
   expect((await engine.status()).changed).toBe(0);
 });
 
+// An imported site now keeps its .env (#16): a version or a GitHub publish must never carry its secrets, even when the
+// site's own .gitignore forgot them (Astro's starter ignores .env and .env.production).
+it('.env files are never part of a version', async () => {
+  const dir = await tmp();
+  await fsp.writeFile(path.join(dir, '.env'), 'SECRET=1'); await fsp.writeFile(path.join(dir, '.env.production'), 'SECRET=2');
+  await fsp.writeFile(path.join(dir, 'index.astro'), 'hi');
+  expect((await createEngine(dir).status()).files.sort()).toEqual(['.gitignore', 'index.astro']);
+});
+
 it('an imported project .gitignore keeps its lines and gains the runtime entries it lacks', async () => {
   const dir = await tmp();
   await fsp.writeFile(path.join(dir, '.gitignore'), '.env\ndist/\n');
