@@ -362,6 +362,7 @@ export function handleKeyboardEvent(ctx: ViewportMessageContext, payload: unknow
     ctrlKey: p.ctrlKey,
     metaKey: p.metaKey,
     altKey: p.altKey,
+    repeat: p.repeat,
     bubbles: true,
     cancelable: true,
   });

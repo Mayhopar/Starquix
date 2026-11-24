@@ -15,11 +15,11 @@ Troubleshooting guide for cross-iframe communication problems.
 ## Architecture Quick Reference
 
 ```
-React App (localhost:5173)
+Editor (localhost:3061)
     ↓ postMessage
 ViewportFrame.tsx
     ↓ postMessage
-Astro iframe (localhost:4321)
+Astro iframe (the project's dev server port)
     ↓ handled by
 bridge.js (injected script)
 ```

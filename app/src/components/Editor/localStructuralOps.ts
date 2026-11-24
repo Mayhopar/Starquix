@@ -1,4 +1,4 @@
-import { recoverStaleCanvas, sourceActionFailure } from '@/utils/sourceActionFeedback';
+import { recoverStaleCanvas, sourceActionFailure, type SourceAction } from '@/utils/sourceActionFeedback';
 /**
  * task-133 Task 6: delete + move/reorder for SOURCE-KEYED elements in the
  * local (files-truth) runtime. Source-keyed elements (`data-sq-source`
@@ -22,17 +22,20 @@ import toast from 'react-hot-toast';
 import { containsCardTitle } from '@/utils/cardTitleLock';
 import { acquireStructuralWrite, releaseStructuralWrite } from '@/store/structuralWriteGuard';
 import { parseKey } from '@/store/types';
-import { viteStructuralWriter, type StructuralInsertPosition, type StructuralMoveResult, type StructuralRemoveResult } from '@/services/ViteStructuralWriter';
+import { viteStructuralWriter, type StructuralInsertPosition, type StructuralInsertResult, type StructuralMoveResult, type StructuralRemoveResult } from '@/services/ViteStructuralWriter';
 import { acceptFileChanges, finishAcceptedFiles } from '@/services/durableEdits/fileAcceptance';
 import { prepareSourceGesture } from '@/services/durableEdits/sourceGesture';
 import type { StructuralOp } from '@/store/structuralUndo';
 // @ts-expect-error shared JavaScript transforms
-import { unusedDefaultImports, findFrontmatterFences } from '../../../../preview-template/src/plugins/sq-source-transforms.js';
+import { unusedDefaultImports, findFrontmatterFences, resolveElementSpan, widenToGuardExpression, scanTopLevelElements, lineNumberAt, columnNumberAt } from '../../../../preview-template/src/plugins/sq-source-transforms.js';
 import { getActiveSaveProjectId } from '@/services/pendingProjectMutations';
 import { setLocalPendingSelection, getSelectionEpoch } from '@/utils/localPendingSelection';
 import { isContainerNode, type DropPosition } from '@/store/planLayersDrop';
 import { insertRegionInverseOp, type PushStructuralUndo } from '@/store/structuralUndo';
 import { markLocalScanStaleAfterWrite } from '@/utils/localPageSync';
+import { pruneDescendants } from '@/store/multiSelect';
+import { isContainerTag } from '@/utils/localStructural';
+import type { SourceLocation } from '@/bridge/types';
 import { resolveLocalUsageTarget, type UsageTargetNode } from '@/utils/localUsageTarget';
 import {
   classifyLocalWriteTarget,
@@ -200,6 +203,13 @@ export async function pruneUnusedImports(gesture: ReturnType<typeof prepareSourc
  *  `pageFile`: the page the element was picked on (the page being left while a
  *  switch is pending — captureLocalElementOrigin; its delete lands there). */
 export function planLocalElementDeletion(key: string, scannedByKey: ReadonlyMap<string, UsageTargetNode> | undefined, pageFile: string | null) {
+  const plan = planLocalElementTarget(key, scannedByKey, pageFile);
+  // The post title can never leave a card (owner 2026-10-09): nothing happens; Layers shows why (lock).
+  return plan && !containsCardTitle(plan.target) ? plan : null;
+}
+
+/** The write target of one selected layer, or null after its refusal toast. */
+function planLocalElementTarget(key: string, scannedByKey: ReadonlyMap<string, UsageTargetNode> | undefined, pageFile: string | null) {
   if (!pageFile) return null; // nothing on screen yet
   const parsed = parseStructuralTargetKey(key);
   if (!parsed) { toast(NOT_SOURCE_BACKED); return null; }
@@ -208,8 +218,6 @@ export function planLocalElementDeletion(key: string, scannedByKey: ReadonlyMap<
     scannedByKey?.get(key)?.sourceLocation ?? { file: parsed.file, line: parsed.line, column: parsed.column };
   const scope = classifyLocalWriteTarget(target.file, pageFile);
   if (scope === 'cross-file') { refuseCrossFileEdit(target.file); return null; }
-  // The post title can never leave a card (owner 2026-10-09): nothing happens; Layers shows why (lock).
-  if (containsCardTitle(target)) return null;
   return { target, allowRootRemoval: scope === 'same-file' };
 }
 
@@ -429,6 +437,199 @@ export async function moveLocalElement(
     releaseStructuralWrite();
   }
 }
+
+export const WRAP_DIFFERENT_PARENTS = 'Select layers with the same parent';
+export const WRAP_NOT_SIBLINGS = 'Text or code sits between these layers — select layers with nothing between them';
+export const WRAP_IN_PARAGRAPH = "A paragraph can only hold text and inline layers — select the paragraph itself";
+export const WRAP_IN_LIST_OR_TABLE = "A list, table or select can only hold its own items — select the whole list or table";
+export const WRAP_PAGE_ROOT = "The page body can't be changed this way — select the layers inside it";
+export const UNWRAP_EMPTY = 'This layer holds no layers — select a container';
+export const UNWRAP_TEXT_OR_CODE = 'Text or code sits in or around this container — select a container that holds only layers';
+export const UNWRAP_COMPONENT = "A component can't be removed like a container — select an element";
+
+type WrapNode = UsageTargetNode & { tagName?: string };
+
+export interface LocalWrapArgs {
+  /** The selected keys, primary first: the wrap takes them all in source order; the unwrap takes the primary. */
+  keys: string[];
+  scannedByKey: ReadonlyMap<string, WrapNode>;
+  pushUndo?: PushStructuralUndo;
+  /** select(null): once accepted the old keys stop being the selection; the result takes it on the next scan. */
+  deselect: () => void;
+}
+
+/** One write target per layer, or null after the refusal toast. All or
+ *  nothing: a partial wrap would change which layers share the container. The
+ *  parent receives new children either way (the container on a wrap, its
+ *  layers on an unwrap), so it must be able to hold them. */
+function planLocalWrap(keys: string[], scannedByKey: ReadonlyMap<string, WrapNode>, pageFile: string | null): SourceLocation[] | null {
+  const members = pruneDescendants(keys.map(key => ({ key, elementId: null })), k => scannedByKey.get(k)?.parentKey).map(e => e.key);
+  const targets = new Map<string, SourceLocation>();
+  for (const key of members) {
+    const plan = planLocalElementTarget(key, scannedByKey, pageFile);
+    if (!plan) return null;
+    if (/^(html|head|body)$/i.test(scannedByKey.get(key)?.tagName ?? '')) { toast(WRAP_PAGE_ROOT); return null; }
+    // Two roots of one component invocation are one `<Card />` tag.
+    targets.set(`${plan.target.line}:${plan.target.column}`, plan.target);
+  }
+  const parents = new Set(members.map(key => scannedByKey.get(key)?.parentKey ?? null));
+  if (parents.size > 1) { toast(WRAP_DIFFERENT_PARENTS); return null; }
+  const [parent] = parents;
+  const parentTag = parent ? scannedByKey.get(parent)?.tagName : undefined;
+  if (parentTag && !isContainerTag(parentTag)) { toast(WRAP_IN_PARAGRAPH); return null; }
+  // A <div> there is invalid; in a table the parser hoists it out, so the preview would not match the file.
+  if (parentTag && /^(ul|ol|menu|dl|table|thead|tbody|tfoot|tr|colgroup|select|optgroup)$/i.test(parentTag)) { toast(WRAP_IN_LIST_OR_TABLE); return null; }
+  return [...targets.values()];
+}
+
+/** DOM siblings are not always source siblings: between two wrapped layers the
+ *  file may hold only whitespace, `<!-- -->` and whole elements (a guarded
+ *  `{cond && <el/>}` counts as one). Text, an `{expression}`, the `)}` of a
+ *  loop body or a ternary `:` would be split across the container. */
+function onlySiblingsBetween(between: string): boolean {
+  const roots = (scanTopLevelElements(between) as Array<{ start: number; end: number; unclosed?: boolean }>)
+    .map(r => widenToGuardExpression(between, r) as { start: number; end: number; unclosed?: boolean });
+  if (roots.some(r => r.unclosed)) return false;
+  let rest = '', pos = 0;
+  for (const r of roots) { rest += between.slice(pos, r.start); pos = r.end; }
+  return !(rest + between.slice(pos)).replace(/<!--[\s\S]*?-->/g, '').trim();
+}
+
+type SourceGesture = ReturnType<typeof prepareSourceGesture>;
+/** A refusal found while the gesture reads the source: a toast, nothing written. */
+class Refusal extends Error {}
+
+/**
+ * Create / Remove container: ONE gesture of existing ops (`body` applies them
+ * and records each one's inverse through `step`), ONE accepted write, ONE undo
+ * record. `body` returns where the selection goes on the next scan.
+ */
+async function regroupLocal(
+  { keys, scannedByKey, pushUndo, deselect }: LocalWrapArgs,
+  failure: SourceAction,
+  body: (gesture: SourceGesture, targets: SourceLocation[], step: (fwd: StructuralOp, inv: StructuralOp[]) => void) => Promise<SourceLocation>,
+): Promise<boolean> {
+  const origin = captureLocalElementOrigin();
+  const selectionEpoch = getSelectionEpoch();
+  const targets = planLocalWrap(keys, scannedByKey, origin.pageFile);
+  if (!targets?.length) return false;
+  await acquireStructuralWrite();
+  try {
+    const forward: StructuralOp[] = [];
+    const inverse: StructuralOp[] = [];
+    let next!: SourceLocation;
+    let accepted;
+    try {
+      const projectId = getActiveSaveProjectId();
+      if (!projectId) throw new Error('Project storage is not ready');
+      const gesture = prepareSourceGesture(projectId, [], origin);
+      accepted = await acceptFileChanges(`wc://${projectId}`, async () => {
+        next = await body(gesture, targets, (fwd, inv) => { forward.push(fwd); inverse.unshift(...inv); });
+        return [...gesture.files.values()];
+      });
+    } catch (err) {
+      if (err instanceof Refusal) { toast(err.message); return false; }
+      if (recoverStaleCanvas(err)) return false;
+      console.error(`${failure} failed:`, err);
+      toast.error(sourceActionFailure(failure, err));
+      return false;
+    }
+    markLocalScanStaleAfterWrite();
+    pushUndo?.({ origin, structuralOp: { sourceFiles: accepted.files, forward, inverse } });
+    // Keys are positional: the old ones now name other elements.
+    if (getSelectionEpoch() === selectionEpoch) {
+      deselect();
+      setLocalPendingSelection(next.file, next.line, getSelectionEpoch());
+    }
+    void finishAcceptedFiles(accepted);
+    return true;
+  } finally {
+    releaseStructuralWrite();
+  }
+}
+
+/** The current text of `file` in the gesture, LF-normalised like the transforms read it. */
+const gestureSource = (gesture: SourceGesture, file: string) => gesture.files.get(file)!.afterSource!.replace(/\r\n/g, '\n');
+
+/**
+ * Issue #5 — wrap the selected layers in a new class-less `<div>` at the first
+ * one's source position, holding them in source order (unselected siblings
+ * between them stay outside, after it): insert, then a move per layer (moves
+ * keep element identity, so queued edits follow), then a tidy of the blank
+ * lines the moves left.
+ */
+export const wrapLocalElements = (args: LocalWrapArgs) => regroupLocal(args, 'wrap-elements', async (gesture, targets, step) => {
+  const resolved: Array<{ target: SourceLocation; loc: SourceLocation }> = [];
+  for (const target of targets) resolved.push({ target, loc: await gesture.resolve(target) });
+  resolved.sort((a, b) => a.loc.line - b.loc.line || a.loc.column - b.loc.column);
+  const file = resolved[0].loc.file;
+  const source = () => gestureSource(gesture, file);
+  const spans = resolved.map(({ loc }) => widenToGuardExpression(source(), resolveElementSpan(source(), loc)) as { start: number; end: number });
+  const gaps = spans.slice(1).map((s, i) => source().slice(spans[i].end, s.start));
+  if (spans.slice(1).some((s, i) => s.start < spans[i].end) || !gaps.every(onlySiblingsBetween)) throw new Refusal(WRAP_NOT_SIBLINGS);
+
+  const insert: StructuralOp = { kind: 'insert', loc: resolved[0].loc, markup: '<div></div>', position: 'before' };
+  const ins = await gesture.apply(insert) as unknown as StructuralInsertResult;
+  step(insert, [insertRegionInverseOp(ins)!]);
+  const line = ins.insertedLine;
+  const container = { file, line, column: source().split('\n')[line - 1].match(/^[ \t]*/)![0].length + 1 };
+  // Re-resolve after every apply: each one moves the coordinates.
+  for (const { target } of resolved) {
+    const move: StructuralOp = { kind: 'move', from: await gesture.resolve(target), to: container, position: 'inside-end', allowRootRemoval: true };
+    const res = await gesture.apply(move) as unknown as StructuralMoveResult;
+    step(move, [insertRegionInverseOp(res)!, { kind: 'restore', loc: { file, line: res.removedLine, column: res.removedColumn ?? 1 }, text: res.removedSource }]);
+  }
+  // Blank lines that separated adjacent layers would pile up behind `</div>`.
+  const blank = gaps.every(gap => !gap.trim()) ? gaps.reduce((n, gap) => n + Math.max(0, (gap.match(/\n/g)?.length ?? 0) - 1), 0) : 0;
+  if (blank) {
+    const close = lineNumberAt(source(), resolveElementSpan(source(), container).closeStart) as number;
+    const lines = source().split('\n');
+    const dropped = lines.slice(close, close + blank);
+    if (dropped.every(l => !l.trim())) {
+      const at = { file, line: close, column: 1 };
+      const tidy: StructuralOp = { kind: 'restore-region', loc: at, lineCount: 1 + blank, segment: lines[close - 1] + '\n' };
+      await gesture.apply(tidy);
+      step(tidy, [{ kind: 'restore-region', loc: at, lineCount: 1, segment: [lines[close - 1], ...dropped].join('\n') + '\n' }]);
+    }
+  }
+  return container;
+});
+
+/**
+ * Remove container (⇧⌘G), the inverse of the wrap, on the PRIMARY selected
+ * element: its child layers move out before it, in order, then the emptied
+ * element is removed (comments between the children go with it). The first
+ * former child becomes the selection.
+ */
+export const unwrapLocalElement = (args: LocalWrapArgs) => regroupLocal({ ...args, keys: args.keys.slice(0, 1) }, 'unwrap-element', async (gesture, [target], step) => {
+  const file = target.file;
+  const source = () => gestureSource(gesture, file);
+  const loc = await gesture.resolve(target); // loads the file into the gesture
+  const own = resolveElementSpan(source(), loc) as { start: number; end: number; tag: string; openEnd: number; closeStart: number | null };
+  // A capitalised or dotted tag is a component usage (`<Card>`), whose children are slot content.
+  if (/^[A-Z]|\./.test(own.tag)) throw new Refusal(UNWRAP_COMPONENT);
+  const inner = own.closeStart === null ? '' : source().slice(own.openEnd, own.closeStart);
+  const count = (scanTopLevelElements(inner) as unknown[]).length;
+  if (!count) throw new Refusal(UNWRAP_EMPTY);
+  // Moved out of a `{cond && …}` the children would stop being conditional.
+  if (!onlySiblingsBetween(inner) || widenToGuardExpression(source(), own).start !== own.start) throw new Refusal(UNWRAP_TEXT_OR_CODE);
+
+  let first!: SourceLocation;
+  for (let i = 0; i < count; i++) {
+    // Always the container's current first child; re-resolve after every apply.
+    const to = await gesture.resolve(target);
+    const at = (scanTopLevelElements(source(), resolveElementSpan(source(), to).openEnd) as Array<{ start: number }>)[0].start;
+    const from = { file, line: lineNumberAt(source(), at) as number, column: columnNumberAt(source(), at) as number };
+    const move: StructuralOp = { kind: 'move', from, to, position: 'before' };
+    const res = await gesture.apply(move) as unknown as StructuralMoveResult;
+    step(move, [insertRegionInverseOp(res)!, { kind: 'restore', loc: { file, line: res.removedLine, column: res.removedColumn ?? 1 }, text: res.removedSource }]);
+    first ??= { file, line: res.insertedLine, column: 1 };
+  }
+  const remove: StructuralOp = { kind: 'remove', loc: await gesture.resolve(target) };
+  const res = await gesture.apply(remove) as unknown as StructuralRemoveResult;
+  step(remove, [{ kind: 'restore', loc: { file, line: res.removedLine, column: res.removedColumn ?? 1 }, text: res.removedSource }]);
+  return first;
+});
 
 /** The siblings' order after moving `key` before/after `targetKey` in their
  *  shared parent (scan order = document order), or null when not that case. */

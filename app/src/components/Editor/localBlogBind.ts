@@ -14,7 +14,7 @@ import { importSpecifierFor } from '@/utils/localStructural';
 import { readLocalFile, rewriteLocalFile } from '@/utils/localElementSource';
 import { settleAcceptedWrites } from '@/utils/acceptedSource';
 import { CARD_FILE, cardCopy, cardFileFor, DEFAULT_CARD, ownCardFile } from '@/utils/cardFields';
-import { detectPostRoute, emitBlogBinding, importStatementRe, parseBlogBindings, rebaseRelativeImports, resolveImportPath, slotSpans, type BlogBinding } from '@/utils/blogBinding';
+import { cardTagsOf, detectPostRoute, emitBlogBinding, importStatementRe, parseBlogBindings, rebaseRelativeImports, resolveImportPath, slotSpans, type BlogBinding } from '@/utils/blogBinding';
 import { allCardAssignments, cardSourceOf } from '@/utils/cardTitleLock';
 import { cardEmitOptions } from '@/utils/cardAssignment';
 import type { PushStructuralUndo, StructuralOp } from '@/store/structuralUndo';
@@ -85,12 +85,12 @@ export function renderedCardOf(pageFile: string, pageSource: string, slot?: numb
   return renderedFiles(pageFile, pageSource, slot).find((f) => allCardAssignments().get(f)?.card) ?? null;
 }
 
-/** Files of the `<X y={post} />` tags in the slot's fragment (relative imports only). */
+/** Files of the `<X … y={post} />` card tags in the slot's fragment (relative imports only). */
 function renderedFiles(pageFile: string, pageSource: string, slot?: number): string[] {
   const span = slot === undefined ? undefined : slotSpans(pageSource)[slot];
   const scope = span ? pageSource.slice(span.start, span.end) : pageSource;
-  return [...scope.matchAll(/<([A-Z][\w$]*)\s+[\w$]+=\{post\}/g)].flatMap((m) => {
-    const spec = pageSource.match(importStatementRe(m[1]))?.[1];
+  return cardTagsOf(scope).flatMap((name) => {
+    const spec = pageSource.match(importStatementRe(name))?.[1];
     return spec?.startsWith('.') ? [resolveImportPath(pageFile, spec)] : [];
   });
 }

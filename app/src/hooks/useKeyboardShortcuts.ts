@@ -9,7 +9,9 @@ import { useTool } from '@/context';
 import { flushDurableSourceWrites } from '@/services/durableEdits/sourceMaterialization';
 import { useSelectionContext, useScannedElementsRef } from '@/context/SelectionContext';
 import { findNode, findSiblings } from '@/utils/treeUtils';
-import { getModifierKey } from '@/utils/platform';
+import { getModifierKey, isMac } from '@/utils/platform';
+import { useWrapSelection } from '@/hooks/useWrapSelection';
+import { unwrapLocalElement } from '@/components/Editor/localStructuralOps';
 import { dispatchZoomCommand, type ZoomCommandAction } from '@/components/Canvas/zoomCommands';
 import { toggleGrid } from '@/components/Canvas/gridPreferences';
 import { isDrawnKey, parseKey } from '@/store/types';
@@ -271,7 +273,7 @@ export function useKeyboardShortcuts(designSurface = true): void {
   const dispatch = useDispatch();
   const doc = useEditorDoc();
   const { undo, redo, takeSnapshot, claimSnapshot, pushStructuralUndo } = useUndoContext();
-  const { activeTool, setActiveTool, isPreview, setPreview } = useTool();
+  const { activeTool, setActiveTool, isPreview, setPreview, toggleSidebars } = useTool();
 
   const {
     selectedKey,
@@ -292,6 +294,9 @@ export function useKeyboardShortcuts(designSurface = true): void {
   // Consolidated ref for event handler access (avoid stale closures)
   const stateRef = useRef({ selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview, designSurface });
   stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview, designSurface };
+
+  const wrapSelection = useWrapSelection();
+  const unwrapSelection = useWrapSelection(unwrapLocalElement);
 
   // Helper to select an element with full metadata from scannedElements
   const selectElement = useCallback((key: string) => {
@@ -316,6 +321,19 @@ export function useKeyboardShortcuts(designSurface = true): void {
           // Edits are already durable; ⌘S only hurries their source projection.
           void flushDurableSourceWrites(projectId).catch(() => {});
         }
+        return;
+      }
+
+      // Show / hide both sidebars: ⌘\ (Ctrl+\), as in Figma. Global like Save, so the
+      // canvas gets the whole window wherever focus is. `code` is the key's position
+      // (layouts that print another character there), `key` the character itself.
+      // No Alt: AltGr (Ctrl+Alt on Windows) is how several layouts type a backslash.
+      if (cmdOrCtrl && !e.shiftKey && !e.altKey && (e.code === 'Backslash' || e.key === '\\')) {
+        if (e.defaultPrevented || e.isComposing || e.keyCode === 229 || stateRef.current.isPreview) return;
+        e.preventDefault();
+        // The focused field must not act on it too, not even a held key's repeats: a terminal sends Ctrl+\ to the shell as SIGQUIT.
+        e.stopPropagation();
+        if (!e.repeat) toggleSidebars();
         return;
       }
 
@@ -380,6 +398,15 @@ export function useKeyboardShortcuts(designSurface = true): void {
       const focus = document.activeElement;
       const canvasKeys = stateRef.current.designSurface && !document.querySelector('[aria-modal="true"]') &&
         (!focus || focus === document.body || !!focus.closest('[data-canvas-keys]'));
+
+      // Create / Remove container: ⌘G / ⇧⌘G on a Mac; Ctrl+Alt+G / Ctrl+Shift+G
+      // elsewhere (Ctrl+G is the grid there). `code`, not `key`: ⌥ and AltGr change the letter.
+      const groupCombo = isMac() ? e.metaKey && !e.ctrlKey && !e.altKey : e.ctrlKey && !e.metaKey && e.altKey !== e.shiftKey;
+      if (canvasKeys && groupCombo && e.code === 'KeyG') {
+        e.preventDefault();
+        if (!e.repeat) (e.shiftKey ? unwrapSelection : wrapSelection)();
+        return;
+      }
 
       // Bare-key shortcuts (no modifiers). Both the keys handled here and the
       // set the bridge forwards out of the preview iframe come from ONE list:
@@ -702,9 +729,9 @@ export function useKeyboardShortcuts(designSurface = true): void {
     [
       undo, redo, takeSnapshot, claimSnapshot, pushStructuralUndo,
       dispatch, doc, selectedElementId,
-      setActiveTool, setPreview,
+      setActiveTool, setPreview, toggleSidebars,
       clearSelection, clearAdditionalSelections, enterContext, exitContext, selectElement,
-      scannedElementsRef, treeNodesRef
+      scannedElementsRef, treeNodesRef, wrapSelection, unwrapSelection
     ]
   );
 

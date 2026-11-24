@@ -22,6 +22,7 @@ export const SQ_DEFAULTS_DIR: string;
 
 export function routeForPageFile(relFile: string): string;
 export function discoverLocalPages(dir: string): LocalPage[];
+export function importGraph(dir: string): Map<string, string[]>;
 export function findComponentUsages(dir: string, relFile: string): ComponentUsages;
 export function findImagePropAt(source: string, imgIndex: number): string;
 export function writeComponentDefaultImage(dir: string, componentRel: string, imgIndex: number, asset: string | null): Promise<DefaultImageResult>;

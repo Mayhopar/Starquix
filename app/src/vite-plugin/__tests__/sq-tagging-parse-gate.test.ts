@@ -10,11 +10,12 @@
  * `GET /gate` answered **500** with rollup's
  * `Unexpected token \`ident\`. Expected \`}\`` — the page dead.
  *
- * The gate does not fix the scan (that is the mode-stack lexer, deliberately
- * NOT built here). It makes the whole failure class survivable: the assembled
- * module is parsed before it is returned, and a module that does not parse is
- * dropped (`null`) so astro serves its own untagged one. Degraded and honest,
- * never broken.
+ * The gate does not fix the scan. It makes the whole failure class survivable:
+ * the assembled module is parsed before it is returned, and a module that does
+ * not parse is dropped (`null`) so astro serves its own untagged one. Degraded
+ * and honest, never broken. (Since THE ALIGNMENT GATE, the `gate` fixture no
+ * longer reaches it: its ghost leaves the `<u>` counts unequal, so no `<u>` is
+ * spliced at all.)
  *
  * `fixtures/sq-tagging-parse-gate-fixtures.json` holds VERBATIM compiled
  * modules from a dev server running WITHOUT our plugin (`:4781`) — the tagger's
@@ -84,23 +85,27 @@ afterEach(() => {
 });
 
 describe('sq-tagging — the parse gate', () => {
-  it('the ungated local output really is unparseable — this is the 500, in a unit test', async () => {
-    // Without the gate the tagger returns code. That code is what astro served
-    // when `GET /gate` answered 500.
+  it('the 500 fixture now parses: the ghost leaves the <u> counts unequal, so no <u> is spliced', async () => {
+    // This output used to be what astro served when `GET /gate` answered 500.
     const out = await tag('gate', { placements: true });
-    expect(out).not.toBeNull();
     const code = (out as { code: string }).code;
-    expect(code).toContain('data-sq-source');
-    expect(parses(code)).toBe(false);
-    expect(() => parseAst(code)).toThrow();
+    expect(parses(code)).toBe(true);
+    expect(code).toContain('"<u>x</u>"');
+    expect(code).not.toMatch(/<u data-sq-source/);
+    expect(code).toMatch(/<p data-sq-source="src\/pages\/gate\.astro:9:5"/);
   });
 
   it('with parseJs injected, a module the tagger broke is dropped instead of served', async () => {
+    // No known shape breaks the module any more, so the parser refuses the tagged output.
+    const refuseTagged = (s: string) => {
+      if (s.includes('data-sq-source')) throw new Error('Unexpected token');
+      return parseJs(s);
+    };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const out = await tag('gate', { placements: true, parseJs });
+    const out = await tag('clean', { placements: true, parseJs: refuseTagged });
     expect(out).toBeNull();
     const message = warn.mock.calls.map((c) => String(c[0])).join('\n');
-    expect(message).toContain('/rig/src/pages/gate.astro');
+    expect(message).toContain('/rig/src/pages/clean.astro');
     expect(message).toContain('does not parse');
   });
 
@@ -143,10 +148,5 @@ describe('sq-tagging — the parse gate', () => {
         (withOptions as { code: string } | null)?.code,
       );
     }
-    // …including the file that 500s in local mode: WC/server behaviour is
-    // untouched by this commit, for better and for worse.
-    const sixArg = await tag('gate');
-    expect(sixArg).not.toBeNull();
-    expect(parses((sixArg as { code: string }).code)).toBe(false);
   });
 });

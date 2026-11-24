@@ -158,9 +158,14 @@ function PopoverPanel({
   }, [isOpen, registerWithParent]);
   const [position, setPosition] = useState<Position>({ top: 0, left: 0, actualPlacement: placement });
   const [measuredWidth, setMeasuredWidth] = useState<number>(0);
+  // A ref, not a dependency: callers pass a fresh onClose per render, and that would re-measure on every one.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const updatePosition = useCallback(() => {
     if (!isOpen || !triggerRef.current || !popoverRef.current) return;
+    // The trigger left the layout (its panel was hidden): there is nothing to sit next to.
+    if (triggerRef.current.checkVisibility?.() === false) { onCloseRef.current(); return; }
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();

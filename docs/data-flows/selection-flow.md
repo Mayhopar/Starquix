@@ -115,6 +115,18 @@ if (isDoubleClick && hasChildren) {
 
 **Context stack:** Tracks nested drill-down path. Clicking outside exits context.
 
+## Right-click menu and Create container
+
+The canvas and the Layers panel share one menu: `components/Editor/LayerContextMenu.tsx`, opened through `layerMenuStore.ts`. It has one item today, **Create container** (`⌘G` on macOS, `Ctrl+Alt+G` elsewhere, because `Ctrl+G` is the grid toggle).
+
+- **Layers:** right-clicking a row keeps the selection if the row is part of it; otherwise the row is selected first.
+- **Canvas:** right-clicking inside a selected layer keeps the selection. Elsewhere, `ViewportFrame` posts a plain `SIMULATE_CLICK`, and the menu opens once that click's `ELEMENT_CLICK` has selected the layer (`viewportMessages/selection.ts`). The right button never starts a drag or a left-click selection.
+- **Wrap:** every trigger calls `useWrapSelection()` → `wrapLocalElements` (`localStructuralOps.ts`). It writes one source gesture: a class-less `<div>` at the first selected layer, holding the selected layers in document order. Unselected siblings between them stay outside, after the container. It pushes one structural undo record, so `⌘Z` gives back the exact bytes.
+- **Remove container** (`⇧⌘G` on macOS, `Ctrl+Shift+G` elsewhere; no menu item yet): `useWrapSelection(unwrapLocalElement)` moves the primary layer's child layers out before it, in order, removes it, and selects the first of them. Same runner, guards and single undo record as the wrap; it refuses an element with no child layers, text or code inside it or a `{cond && …}` around it, and a component usage (`UNWRAP_*`).
+- **Key repeat:** the shortcut ignores auto-repeat, also with focus in the preview: the bridge's `KEYBOARD_EVENT` carries `repeat` and the parent's re-dispatched keydown keeps it.
+- **Selection:** cleared when the write is accepted, then the container is selected after the next scan.
+- **Refusals** show a toast and change nothing: layers with different parents, text or code between them in the source, a `<p>` parent, a list, table or select parent (`ul`, `tr`, `select` …: a `<div>` there is invalid, and in a table the parser hoists it out of the file's place), `html`/`head`/`body`, loop copies, and layers with no source location or inside a component opened from a page. Messages are the `WRAP_*` constants and the existing structural-op feedback.
+
 ## Key Files
 
 | File | Role |

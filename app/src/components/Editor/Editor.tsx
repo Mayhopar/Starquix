@@ -2,7 +2,7 @@ import { GripIcon as SharedGripIcon } from '@/assets/icons';
 import { dispatchDurableAction } from '@/store/durableDispatch';
 import { sourceActionFailure } from '@/utils/sourceActionFeedback';
 // src/components/Editor/Editor.tsx
-import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCoverCapture } from '@/hooks/useCoverCapture';
 import type * as Y from 'yjs';
@@ -21,6 +21,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui';
+import { LayerContextMenu } from './LayerContextMenu';
 import { EditorProvider, useEditorDoc, useDispatch, useScopedYjsValue, useCurrentPageId } from '@/store';
 import { applyCommand } from '@/store/commands';
 import { readComponentSource } from '@/utils/componentSourceReader';
@@ -193,7 +194,17 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
   const { activeCollectionId } = useVariables();
   const { editingPost, closePost } = usePostEditor();
   const { activeTopTab } = useSidebarTab();
-  const { isPreview } = useTool();
+  const { isPreview, sidebarsHidden } = useTool();
+  // ⌘\ hides the panels while the window keeps its size. Open flyouts (ui/Popover), the
+  // post editor's toolbars and the frame's fixed-layer repaint (ViewportFrame) all follow
+  // `resize` already, so tell them the layout moved instead of wiring each one up.
+  useEffect(() => { window.dispatchEvent(new Event('resize')); }, [sidebarsHidden]);
+  // The side panels float over the canvas, so ⌘\ only shows or hides them: the canvas box never
+  // changes and the artboard stays put. Their widths are the canvas chrome's insets (top bar,
+  // page-reset fit), 0 while hidden.
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = usePanelInset(layoutRef, '--sq-panel-left');
+  const rightPanelRef = usePanelInset(layoutRef, '--sq-panel-right');
   // 🏠 (sidebar top-left): snapshot the canvas as the project's cover, then leave.
   const navigate = useNavigate();
   const { captureScreenshot } = useCoverCapture({ iframeRef, projectId });
@@ -865,16 +876,20 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
       onDragCancel={clearDropZone}
     >
       <CardTitleLockSync />
+      <LayerContextMenu />
       <ListConversionOnOpen />
       {/* Editor Layout */}
-      <div className="h-screen flex overflow-hidden">
+      <div ref={layoutRef} className="relative h-screen flex overflow-hidden">
         {/* task-116: preview hides every chrome surface — the canvas iframe
             goes full-window and the footer collapses to a single ⏸. The panels
-            SLIDE out rather than pop: kept mounted and in flow (design-mode
-            layout unchanged), translated off-screen, and lifted to z-50 ONLY in
-            preview so they ride over the fixed full-window iframe (z-40) as they
-            go. motion-reduce respects the OS setting. */}
-        <div className={`relative h-full flex-shrink-0 ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 -translate-x-full' : ''}`}>
+            SLIDE out rather than pop: kept mounted, translated off-screen, and
+            lifted to z-50 ONLY in preview so they ride over the fixed full-window
+            iframe (z-40) as they go. motion-reduce respects the OS setting.
+            Both panels float over the canvas (absolute, the same positioning), so
+            the canvas is always the whole window and ⌘\ (sidebarsHidden) only hides
+            them; `hidden` keeps them mounted (widths, tabs, scroll and drafts
+            survive) and out of the Tab order. */}
+        <div ref={leftPanelRef} data-sq-panel="left" className={`absolute left-0 top-0 h-full ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 -translate-x-full' : 'z-10'} ${sidebarsHidden ? 'hidden' : ''}`}>
           <LeftSidebar />
         </div>
         <Canvas
@@ -892,8 +907,8 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
             open, or on the Content tab (no design props there) */}
         {designSurface && (
           // task-116: stays mounted in preview and slides off to the right
-          // (see the LeftSidebar wrapper above for the flow/z-50 rationale).
-          <div className={`relative flex-shrink-0 ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 translate-x-full' : ''}`} style={{ width: designBarWidth }}>
+          // (see the LeftSidebar wrapper above for the floating/z-50 rationale).
+          <div ref={rightPanelRef} data-sq-panel="right" className={`absolute right-0 top-0 h-full ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'z-50 translate-x-full' : 'z-10'} ${sidebarsHidden ? 'hidden' : ''}`} style={{ width: designBarWidth }}>
             {/* Resize Handle - absolute positioned on left edge */}
             <div
               className="absolute top-0 left-0 w-2 h-full cursor-col-resize group z-10"
@@ -1095,4 +1110,20 @@ function CardTitleLockSync() {
   const trigger = useMemo(() => ({ scanVersion, sync: settled.current }), [scanVersion, settled.current]); // eslint-disable-line react-hooks/exhaustive-deps
   useProjectCardSources(localPath, componentFiles, collectionNames, trigger);
   return null;
+}
+
+/** A ref for a floating side panel: its width goes to `name` on the editor layout (0 while hidden or unmounted). */
+function usePanelInset(layoutRef: RefObject<HTMLDivElement | null>, name: string) {
+  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = layoutRef.current;
+    if (!root) return;
+    const write = () => root.style.setProperty(name, `${panel?.offsetWidth ?? 0}px`);
+    write();
+    if (!panel || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(write);
+    observer.observe(panel);
+    return () => { observer.disconnect(); root.style.setProperty(name, '0px'); };
+  }, [layoutRef, name, panel]);
+  return setPanel;
 }

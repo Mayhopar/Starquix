@@ -282,13 +282,19 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
     const canvas = canvasRef.current;
     let view: ViewTransform = { scale: 1, x: 0, y: 0 };
     if (canvas && canvas.clientWidth > 2 && canvas.clientHeight > 2) {
+      // The floating side panels cover the canvas edges: fit and centre in the gap. Measured here, not read from
+      // Editor's --sq-panel-* (its effects run after this child's on the first load).
+      const inset = (side: string) => document.querySelector<HTMLElement>(`[data-sq-panel="${side}"]`)?.offsetWidth ?? 0;
+      const insetLeft = inset('left'), insetRight = inset('right');
       const fit = fitView({
         canvasWidth: canvas.clientWidth,
         canvasHeight: canvas.clientHeight,
         viewportWidth: viewportWidthRef.current,
         frameHeight: 0, // width-only, top-aligned
+        insetLeft,
+        insetRight,
       });
-      if (fit.scale < 1) view = fit;
+      view = fit.scale < 1 ? fit : { scale: 1, x: (insetLeft - insetRight) / 2, y: 0 };
     }
     scaleRef.current = view.scale;
     positionRef.current = { x: view.x, y: view.y };
@@ -778,7 +784,7 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
   }, [hasOverlay, scheduleOffscreenRescue]);
 
   return (
-    <div className="relative flex-1 flex flex-col bg-bg-contrast overflow-hidden min-w-0">
+    <div className="relative isolate flex-1 flex flex-col bg-bg-contrast overflow-hidden min-w-0">
       {overlay && <div className="absolute inset-0 z-50 flex">{overlay}</div>}
       <div
         className="flex-1 flex flex-col min-h-0 min-w-0"
@@ -790,7 +796,9 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
           (D1 drops the viewport-width simulation and zoom entirely). Kept
           mounted + in flow like the side panels; z-50 only in preview so it
           rides over the fixed full-window iframe (z-40) as it slides. */}
-      <div className={`flex items-center h-10 border-b border-stroke bg-bg ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'relative z-50 -translate-y-full' : ''}`}>
+      <div className={`flex items-center h-10 border-b border-stroke bg-bg ${PREVIEW_SLIDE_TRANSITION} ${isPreview ? 'relative z-50 -translate-y-full' : ''}`}
+        // The floating side panels cover the canvas edges: the chips centre between them.
+        style={{ paddingLeft: 'var(--sq-panel-left, 0px)', paddingRight: 'var(--sq-panel-right, 0px)' }}>
         <BreakpointBar>
           <ZoomChip scale={scale} labelRef={zoomLabelRef} />
         </BreakpointBar>

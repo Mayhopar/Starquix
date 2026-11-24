@@ -4,7 +4,8 @@
  *  - merge: a group every member shares is shown; any difference ("some have none" too) is mixed;
  *  - diff: the groups a block's output changed against what it was shown;
  *  - apply: each member keeps its own tokens except the changed (or owned) ones.
- * Effective tokens hold at most one token per group (getEffectiveClasses), so a Map per group is exact.
+ * A Map per group keeps a group's last token: a slot's second token of one group (ring-2 ring-blue-500) stays
+ * unchanged unless that group itself is edited.
  */
 import { getPropertyGroup } from './properties';
 import { getEffectiveClasses, computeSlotContent } from './cascade';

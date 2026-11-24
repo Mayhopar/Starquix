@@ -35,6 +35,7 @@ import {
 } from '@/assets/icons';
 import type { ComputedStyles } from '../../../context/SelectionContext';
 import { useMixedValue, ownsGroups, type Owns } from '../multi/mixed';
+import { OPACITY_SUFFIX } from '../classPatterns';
 
 // ============================================================================
 // Constants
@@ -130,7 +131,7 @@ const TEXT_SIZE = 'standalone:textSize';
 const parseFontSize = (classes: string): string =>
   getClassesByGroup(parseClasses(classes), TEXT_SIZE)[0]?.slice('text-'.length) ?? '';
 
-const TEXT_VAR_COLOR = /^text-\[(color:)?var\(--.+\)\]$/;
+const TEXT_VAR_COLOR = new RegExp(`^text-\\[(color:)?var\\(--.+\\)\\]${OPACITY_SUFFIX.source}`);
 
 // Which font-* token is the WEIGHT is the registry's call too (font-[var(--x)]
 // and font-[650] are weights, font-["Inter"] is a family).
@@ -158,8 +159,8 @@ const arbitraryWeightLabel = (classes: string): string | undefined => {
  *  explicit default read the same); distinct arbitrary weights stay distinct. */
 const readWeight = (classes: string): string => weightToken(classes) ?? 'font-normal';
 
-const TEXT_NAMED_COLOR = /^text-(transparent|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(-\d+)?$/;
-const TEXT_HEX_COLOR = /^text-\[#[0-9a-fA-F]+\]$/;
+const TEXT_NAMED_COLOR = new RegExp(`^text-(transparent|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(-\\d+)?${OPACITY_SUFFIX.source}`);
+const TEXT_HEX_COLOR = new RegExp(`^text-\\[#[0-9a-fA-F]+\\]${OPACITY_SUFFIX.source}`);
 
 /** What each control's write owns: while ≥2 are selected, only these tokens change on every member
  *  (design §2 "each write declares what it owns"). Colour = exactly what its writer removes. */

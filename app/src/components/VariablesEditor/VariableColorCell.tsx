@@ -3,7 +3,7 @@
 import { memo, useState, useCallback, useRef } from 'react';
 import { CustomColorPicker } from '@/components/DesignBar/CustomColorPicker';
 import { TailwindPaletteGrid } from '@/components/DesignBar/TailwindPaletteGrid';
-import { Popover, Swatch } from '@/components/ui';
+import { IconButton, Popover, Swatch, fieldBox } from '@/components/ui';
 import type { VariableValue } from '@/core/variables/types';
 import { arrowKeyDelta } from './constants';
 
@@ -19,7 +19,7 @@ function clampOpacity(n: number): number {
 export const VariableColorCell = memo(function VariableColorCell({ value, onChange }: VariableColorCellProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerTab, setPickerTab] = useState<'palette' | 'custom'>('palette');
-  const swatchRef = useRef<HTMLSpanElement>(null);
+  const swatchRef = useRef<HTMLButtonElement>(null);
 
   const handleHexChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const hex = e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`;
@@ -54,15 +54,10 @@ export const VariableColorCell = memo(function VariableColorCell({ value, onChan
 
   return (
     <div className="flex items-center h-full gap-1.5">
-      <span ref={swatchRef} className="flex shrink-0">
-        <Swatch
-          size="lg"
-          color={value.hex}
-          title="Pick color"
-          onClick={() => setIsPickerOpen(!isPickerOpen)}
-          className="rounded cursor-pointer"
-        />
-      </span>
+      <IconButton ref={swatchRef} size="sm" title="Pick color" aria-label="Pick color"
+        onClick={() => setIsPickerOpen(!isPickerOpen)} className="bg-transparent">
+        <Swatch size="lg" color={value.hex} className="rounded" />
+      </IconButton>
 
       <Popover
         isOpen={isPickerOpen}
@@ -106,7 +101,7 @@ export const VariableColorCell = memo(function VariableColorCell({ value, onChan
         className="flex-1 min-w-0 h-full px-1 text-xs bg-transparent text-text font-mono outline-none"
       />
 
-      <div className="flex items-center shrink-0">
+      <div {...fieldBox} className="flex items-center shrink-0">
         <input
           type="text"
           inputMode="numeric"

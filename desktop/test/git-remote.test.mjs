@@ -114,6 +114,52 @@ it('abort restores the pre-pull tree', async () => {
   expect((await A.status()).changed).toBe(0);
 });
 
+// #1 (audit 2026-11-24): Abort force-checked-out HEAD and deleted every file that differed from it, so pages, images and
+// edits made while the merge waited went too. Like `git merge --abort`: only what the pull wrote goes back.
+it('abort takes back only what the pull wrote: pages, images and edits made while the merge waited stay', async () => {
+  const { dirA, A, dirB, B } = await pair();
+  const page = (...edited) => ['top', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'end'].map(l => (edited.includes(l) ? `${l}!` : l)).join('\n');
+  await write(dirA, 'm.txt', page()); await A.save('m', author); await A.push(); await B.pull(author);
+  await write(dirB, 'a.txt', 'theirs\n'); await write(dirB, 'm.txt', page('end')); await write(dirB, 'c.txt', 'new\n');
+  await B.save('B edits', author); await B.push();
+  await write(dirA, 'a.txt', 'mine\n'); await write(dirA, 'm.txt', page('top')); await A.save('A edits', author);
+  expect(await A.pull(author)).toEqual({ conflicts: ['a.txt'] });
+  expect(await read(dirA, 'm.txt')).toBe(page('top', 'end')); // merged cleanly: the index holds the merged blob
+  await A.resolve('a.txt', 'theirs');
+  await write(dirA, 'b.txt', 'edited while merging\n');
+  await write(dirA, 'd.txt', 'page made while merging\n');
+  await fsp.mkdir(path.join(dirA, 'assets')); await write(dirA, 'assets/photo.png', 'PNG');
+  await A.abort();
+  expect(await read(dirA, 'a.txt')).toBe('mine\n');
+  expect(await read(dirA, 'm.txt')).toBe(page('top'));
+  expect(fs.existsSync(path.join(dirA, 'c.txt'))).toBe(false);
+  expect(await read(dirA, 'b.txt')).toBe('edited while merging\n');
+  expect(await read(dirA, 'd.txt')).toBe('page made while merging\n');
+  expect(await read(dirA, 'assets/photo.png')).toBe('PNG');
+  expect(await A.status()).toMatchObject({ merging: false, files: ['assets/photo.png', 'b.txt', 'd.txt'] });
+  await A.save('after abort', author); // nothing of the merge is left in the index: the version is the work tree
+  expect((await A.status()).changed).toBe(0);
+});
+
+it('abort keeps a file the pull wrote once it was edited after the pull', async () => {
+  const { dirA, A } = await conflicted();
+  await write(dirA, 'a.txt', 'mine, edited while merging\n'); // the conflicted page shows Mine and is still being worked on
+  await write(dirA, 'c.txt', 'new, edited while merging\n');
+  await A.abort();
+  expect(await read(dirA, 'a.txt')).toBe('mine, edited while merging\n');
+  expect(await read(dirA, 'c.txt')).toBe('new, edited while merging\n');
+  expect(await A.status()).toMatchObject({ merging: false, files: ['a.txt', 'c.txt'] });
+});
+
+it('a merge parked by an older version (no record of what the pull wrote) aborts without taking anything back', async () => {
+  const { dirA, A } = await conflicted();
+  const file = path.join(dirA, '.git/sq-merge.json');
+  const m = JSON.parse(await fsp.readFile(file, 'utf8')); delete m.wrote; await fsp.writeFile(file, JSON.stringify(m));
+  await A.abort();
+  expect(await A.status()).toMatchObject({ merging: false, files: ['c.txt'] }); // GitHub's new file stays, unsaved
+  await A.save('after abort', author);
+});
+
 it('merge state survives a new engine instance (app restart)', async () => {
   const { dirA } = await conflicted();
   const again = createEngine(dirA, { http });
