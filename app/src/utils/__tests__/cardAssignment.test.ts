@@ -108,6 +108,11 @@ describe('planCardMove (drop a card on a collection = its listings render it)', 
     expect(page).toContain('<BlogSlot>'); // non-cards untouched
     expect(writes['src/components/WorkCard.astro']).toContain('CollectionEntry<"blog">');
   });
+  it('a commented-out card tag does not keep the old card\'s import', () => {
+    const page = BLOG_PAGE.replace('<BlogSlot>', '<!-- <BlogCard post={post} /> -->\n<BlogSlot>');
+    const { writes } = planCardMove({ ...files, 'src/pages/blog.astro': page }, 'src/components/WorkCard.astro', 'blog');
+    expect(writes['src/pages/blog.astro']).not.toContain('import BlogCard');
+  });
   it('no page shows that collection → only the card, zero listings', () => {
     const { writes, listings } = planCardMove(files, 'src/components/WorkCard.astro', 'notes');
     expect(listings).toEqual([]);
