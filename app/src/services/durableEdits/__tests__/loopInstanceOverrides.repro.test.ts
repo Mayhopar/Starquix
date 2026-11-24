@@ -140,6 +140,7 @@ describe('REPRO: a loop usage (one tag, N copies) — Reset / Push / edit', () =
     const origin = { armed: true, pageFile: PAGE } as Parameters<typeof capturePropOverride>[2];
     const target = capturePropOverride(t.key(1), t.loc, origin);
     expect(target).not.toBeNull(); // Today null → "kept in the editor only", stored under the per-copy key `…#1`.
+    expect((target as { refused?: string } | null)?.refused).toBeUndefined(); // A refused capture (fix/refuse-unwritable-edits) is not a capture.
   });
 
   it.fails('Push never writes two different values to one source element (per-copy entries that disagree)', async () => {
