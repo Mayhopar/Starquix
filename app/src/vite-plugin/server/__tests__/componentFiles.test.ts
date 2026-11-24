@@ -114,6 +114,38 @@ describe('local component create', () => {
     });
     expect(res.status()).toBe(400);
   });
+
+  it('puts a deleted file back in its own folder, as ⌘Z asks (#11)', async () => {
+    const file = path.join(userDir, 'src', 'components', 'ui', 'Card.astro');
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, '<div>Card</div>', 'utf-8');
+    const removed = await post('/__sq/local/component-delete', { path: userDir, componentPath: 'src/components/ui/Card.astro' });
+    const res = await post('/__sq/local/component-create', {
+      path: userDir, name: 'Card', astroContent: (removed.json() as { content: string }).content, subDir: 'ui',
+    });
+    expect(res.status() ?? 200).toBe(200);
+    expect(await readFile(file, 'utf-8')).toBe('<div>Card</div>');
+    expect(existsSync(path.join(userDir, 'src', 'components', 'Card.astro'))).toBe(false);
+  });
+});
+
+describe('local component rename', () => {
+  it('refuses while other files import the component, naming them (#11)', async () => {
+    const hero = path.join(userDir, 'src', 'components', 'Hero.astro');
+    await writeFile(hero, '<section>Hero</section>', 'utf-8');
+    await mkdir(path.join(userDir, 'src', 'pages'), { recursive: true });
+    for (const page of ['index', 'about']) {
+      await writeFile(path.join(userDir, 'src', 'pages', `${page}.astro`), "---\nimport Hero from '../components/Hero.astro';\n---\n<Hero />\n", 'utf-8');
+    }
+    const res = await post('/__sq/local/component-rename', { path: userDir, componentPath: 'src/components/Hero.astro', newName: 'Banner' });
+    expect(res.status()).toBe(409);
+    const { error } = res.json() as { error: string };
+    expect(error).toMatch(/^Can't rename Hero: imported by /);
+    expect(error).toContain('src/pages/index.astro');
+    expect(error).toContain('src/pages/about.astro');
+    expect(existsSync(hero)).toBe(true);
+    expect(existsSync(path.join(userDir, 'src', 'components', 'Banner.astro'))).toBe(false);
+  });
 });
 
 describe('resolveInRoot guard', () => {

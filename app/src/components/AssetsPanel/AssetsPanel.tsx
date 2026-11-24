@@ -1345,7 +1345,8 @@ export function AssetsPanel({ activeComponentPath, onSelectComponent, onClearCom
 
     takeSnapshot({
       reverse: () => {
-        for (const d of deleted) componentFiles.create(d.name, d.content);
+        // Back in its own folder under src/components, not the root (#11).
+        for (const d of deleted) componentFiles.create(d.name, d.content, d.componentPath.replace(/^src\/components\//, '').replace(/\/?[^/]*$/, ''));
       },
       forward: () => {
         for (const d of deleted) componentFiles.remove(d.componentPath);

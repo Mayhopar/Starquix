@@ -10,7 +10,7 @@
  * selection-gating under test. A component in the 'Uncategorized' category
  * flattens to a root-level row (no category expansion needed).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import * as Y from 'yjs';
 
@@ -28,6 +28,10 @@ const h = vi.hoisted(() => {
     name: 'Card', path: 'src/components/Card.astro', source: 'user-project', html: '',
     category: 'Uncategorized', props: [], slots: [], dependencies: [], pageTemplate: null,
   }];
+  const uiCard = [{
+    name: 'Card', path: 'src/components/ui/Card.astro', source: 'user-project', html: '',
+    category: 'Uncategorized', props: [], slots: [], dependencies: [], pageTemplate: null,
+  }];
   const sqComp = [{
     name: 'Media', path: 'src/components/sq/Media.astro', source: 'user-project', html: '',
     category: 'Uncategorized', props: [], slots: [], dependencies: [], pageTemplate: null,
@@ -41,6 +45,7 @@ const h = vi.hoisted(() => {
     selectedKey: null as string | null,
     localPath: null as string | null,
     userComp,
+    uiCard,
     sqComp,
     builtIn,
     defaultBuiltIn: builtIn,
@@ -51,6 +56,8 @@ const h = vi.hoisted(() => {
     empty: [] as unknown[],
     refresh: () => {},
     createLayout: vi.fn(async () => 'layouts/Layout1.astro'),
+    create: vi.fn(),
+    remove: vi.fn(),
   };
 });
 const mockCreateLayout = h.createLayout;
@@ -58,7 +65,7 @@ const mockCreateLayout = h.createLayout;
 vi.mock('@/hooks/useLocalProjectPath', () => ({ useLocalProjectPath: () => h.localPath }));
 vi.mock('@/hooks/useComponentFileOps', () => ({
   useComponentFileOps: () => ({
-    create: vi.fn(), rename: vi.fn(), remove: vi.fn(),
+    create: h.create, rename: vi.fn(), remove: h.remove,
     createLayout: h.createLayout,
     deleteLayout: vi.fn(async () => true),
   }),
@@ -417,5 +424,28 @@ describe('AssetsPanel folder outcome feedback', () => {
     expect(screen.queryByText('Loading component folders…')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(h.folderReload).toHaveBeenCalledTimes(1); expect(h.folderRetry).not.toHaveBeenCalled();
+  });
+});
+
+describe('AssetsPanel — delete a component', () => {
+  beforeEach(() => {
+    h.folderIssue = null; h.folderLoaded = true;
+    h.localPath = '/tmp/their-site';
+    h.builtIn = h.uiCard as typeof h.builtIn;
+    h.takeSnapshot.mockClear();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+  afterEach(() => { h.builtIn = h.defaultBuiltIn; h.localPath = null; });
+
+  it('⌘Z puts the file back in its own folder, not the components root (#11)', async () => {
+    h.remove.mockResolvedValueOnce('<div>Card</div>');
+    render(<AssetsPanel activeComponentPath={null} onSelectComponent={vi.fn()} onClearComponent={vi.fn()} />);
+    const row = screen.getByDisplayValue('Card').closest('[class*="group/row"]')!;
+    fireEvent.click(row);
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByText('Delete'));
+    await vi.waitFor(() => expect(h.takeSnapshot).toHaveBeenCalled());
+    (h.takeSnapshot.mock.calls[0][0] as { reverse: () => void }).reverse();
+    expect(h.create).toHaveBeenCalledWith('Card', '<div>Card</div>', 'ui');
   });
 });
