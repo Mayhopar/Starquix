@@ -18,7 +18,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSy
 import * as path from 'node:path';
 import {
   discoverLocalPages, createLocalPage, deleteLocalPage, restoreLocalPage, renameLocalPage, moveLocalPage,
-  resolvePageFilePath, findComponentUsages, writeComponentDefaultImage, writeDefaultImageAsset,
+  resolvePageFilePath, findComponentUsages, importGraph, writeComponentDefaultImage, writeDefaultImageAsset,
   readBinaryBody, createBundledAsset, listLocalAssets, resolveLocalAssetFile, writeLocalAsset, writeLocalContentAsset,
   writeLocalFontFile, mergeLocalFontCss, ensureLocalFontsLink, rebindLocalAsset, rebindToExisting,
   listLocalContentFiles, ensureSqComponent, writeLocalFile,
@@ -540,7 +540,8 @@ export function registerProjectFsRoutes(server, opts) {
     if (req.method !== 'POST') return next();
     try {
       const body = await readBody(req);
-      const created = await createComponentFile(localRoot(resolveRoot(req, body), 'components'), body.name, body.astroContent);
+      // subDir: ⌘Z of a delete puts the file back in its own folder (#11).
+      const created = await createComponentFile(localRoot(resolveRoot(req, body), 'components'), body.name, body.astroContent, body.subDir);
       changed([path.posix.join('src/components', created)]);
       notify('sq:components-changed');
       json(res, 200, { success: true, path: created });
@@ -553,8 +554,13 @@ export function registerProjectFsRoutes(server, opts) {
     if (req.method !== 'POST') return next();
     try {
       const body = await readBody(req);
+      const dir = resolveRoot(req, body);
+      const root = localRoot(dir, 'components');
       const rel = body.componentPath.replace(/^src\/components\//, '');
-      const nextPath = await renameComponentFile(localRoot(resolveRoot(req, body), 'components'), rel, body.newName);
+      // Nothing repoints imports (#11): a rename would leave every importer pointing at a missing file.
+      const importers = importGraph(dir).get(path.posix.join('src/components', rel));
+      if (importers) throw new ComponentFileError(`Can't rename ${path.posix.basename(rel, '.astro')}: imported by ${importers.join(', ')}`, 409);
+      const nextPath = await renameComponentFile(root, rel, body.newName);
       changed([unlink(path.posix.join('src/components', rel)), path.posix.join('src/components', nextPath)]);
       notify('sq:components-changed');
       json(res, 200, { success: true, path: path.posix.join('src/components', nextPath) });

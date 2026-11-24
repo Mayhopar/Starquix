@@ -137,14 +137,11 @@ export function discoverLocalPages(dir) {
   return pages.sort((a, b) => (a.route === '/' ? -1 : b.route === '/' ? 1 : a.route.localeCompare(b.route)));
 }
 
-/** task-143: pages that (transitively) render a component — reverse import
- *  graph over src/**‍/*.{astro,md,mdx}, walked from the component up to
- *  src/pages/** (page usage) or src/content/** (content usage).
- *  ponytail: relative import specifiers only (no aliases); content slug =
- *  lowercased filename (astro's default). */
-export function findComponentUsages(dir, relFile) {
+/** Reverse import graph over src/**‍/*.{astro,md,mdx}: imported file → its
+ *  importers (both project-relative).
+ *  ponytail: relative import specifiers only (no aliases). */
+export function importGraph(dir) {
   const srcRoot = path.join(dir, 'src');
-  if (!existsSync(srcRoot) || !relFile.startsWith('src/')) return { usages: [], contentUsages: [] };
   const sourceFiles = [];
   const walk = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
@@ -153,8 +150,7 @@ export function findComponentUsages(dir, relFile) {
       if (/\.(astro|md|mdx)$/.test(entry.name)) sourceFiles.push(path.relative(dir, full).replace(/\\/g, '/'));
     }
   };
-  walk(srcRoot);
-  // imported file → its importers (both project-relative)
+  if (existsSync(srcRoot)) walk(srcRoot);
   const importersOf = new Map();
   for (const f of sourceFiles) {
     let text = '';
@@ -168,6 +164,15 @@ export function findComponentUsages(dir, relFile) {
       else importersOf.set(resolved, [f]);
     }
   }
+  return importersOf;
+}
+
+/** task-143: pages that (transitively) render a component — importGraph walked
+ *  from the component up to src/pages/** (page usage) or src/content/**
+ *  (content usage). ponytail: content slug = lowercased filename (astro's default). */
+export function findComponentUsages(dir, relFile) {
+  if (!existsSync(path.join(dir, 'src')) || !relFile.startsWith('src/')) return { usages: [], contentUsages: [] };
+  const importersOf = importGraph(dir);
   const pages = discoverLocalPages(dir);
   const pageByFile = new Map(pages.map(p => [p.file, p]));
   const seen = new Set([relFile]);

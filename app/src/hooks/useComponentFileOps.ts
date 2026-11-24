@@ -11,6 +11,7 @@
  * entry; delete returns the previous bytes so that undo can restore the file.
  */
 import { useCallback, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { useLocalProjectPath } from '@/hooks/useLocalProjectPath';
 import { layoutAstroSource } from '@/utils/astroAssetPaths';
 import { localFetch } from '../utils/sqLocalBase';
@@ -31,10 +32,12 @@ export type PromoteResult =
   | { ok: false; reason?: string };
 
 export interface ComponentFileOps {
-  /** Create `<name>.astro`. Returns the new scanned path, or null on failure. */
-  create: (name: string, astroContent: string) => Promise<string | null>;
+  /** Create `<name>.astro` (in `subDir` of the components root: ⌘Z of a delete
+   *  puts the file back where it was). Returns the new scanned path, or null on failure. */
+  create: (name: string, astroContent: string, subDir?: string) => Promise<string | null>;
   /** Rename in place. Returns the NEW scanned path (the folder manifest is
-   *  keyed by path and must be repointed), or null on failure. */
+   *  keyed by path and must be repointed), or null on failure — a refusal
+   *  (name taken, other files import it) toasts its reason. */
   rename: (componentPath: string, newName: string) => Promise<string | null>;
   /** Delete. Returns the previous file contents for undo, or null on failure. */
   remove: (componentPath: string) => Promise<string | null>;
@@ -77,7 +80,7 @@ export interface ComponentFileOps {
   restoreFiles: (files: LayoutFileSnapshot[], snapshot?: MutationSnapshot) => Promise<boolean>;
 }
 
-async function postJson(url: string, body: unknown): Promise<Record<string, unknown> | null> {
+async function postJson(url: string, body: unknown, onRefused?: (reason: string) => void): Promise<Record<string, unknown> | null> {
   try {
     const init = {
       method: 'POST',
@@ -87,7 +90,12 @@ async function postJson(url: string, body: unknown): Promise<Record<string, unkn
     // /__sq/local/* rides the local transport (localFetch); the
     // built-in-library routes stay on the app host.
     const resp = url.startsWith('/__sq/local/') ? await localFetch(url, init) : await fetch(url, init);
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      // Only a 409's text is written for the user (ComponentFileError); other failures carry no UI copy.
+      const reason = resp.status === 409 ? ((await resp.json()) as { error?: unknown }).error : null;
+      if (typeof reason === 'string') onRefused?.(reason);
+      return null;
+    }
     return (await resp.json()) as Record<string, unknown>;
   } catch {
     return null;
@@ -97,9 +105,9 @@ async function postJson(url: string, body: unknown): Promise<Record<string, unkn
 export function useComponentFileOps(): ComponentFileOps {
   const localPath = useLocalProjectPath();
 
-  const create = useCallback(async (name: string, astroContent: string) => {
+  const create = useCallback(async (name: string, astroContent: string, subDir?: string) => {
     const r = localPath
-      ? await postJson('/__sq/local/component-create', { path: localPath, name, astroContent })
+      ? await postJson('/__sq/local/component-create', { path: localPath, name, astroContent, subDir })
       : await postJson('/__sq/save-component', { name, astroContent, targetDir: 'built-in' });
     if (!r) return null;
     const path = typeof r.path === 'string' ? r.path : `library/${name}.astro`;
@@ -109,8 +117,8 @@ export function useComponentFileOps(): ComponentFileOps {
   const rename = useCallback(async (componentPath: string, newName: string) => {
     if (localPath) await settleSourceWrites(projectIdFromPath(localPath));
     const r = localPath
-      ? await postJson('/__sq/local/component-rename', { path: localPath, componentPath, newName })
-      : await postJson('/__sq/rename-component', { componentPath, newName });
+      ? await postJson('/__sq/local/component-rename', { path: localPath, componentPath, newName }, toast.error)
+      : await postJson('/__sq/rename-component', { componentPath, newName }, toast.error);
     if (!r) return null;
     const nextPath = typeof r.path === 'string' ? r.path : null;
     return nextPath;
