@@ -114,10 +114,7 @@ export async function createScaffoldProject(name: string): Promise<string> {
   const projectId = `browser_${uuidv4()}`;
   const enc = new TextEncoder();
   const scaffold = Object.entries(SCAFFOLD_FILES).map(([path, text]) => ({ path, content: enc.encode(text) }));
-  const prepared = prepareImportMetadata(
-    scaffold.map((entry) => ({ ...entry, size: entry.content.byteLength })),
-    { skipIgnored: false },
-  );
+  const prepared = prepareImportMetadata(scaffold.map((entry) => ({ ...entry, size: entry.content.byteLength })));
   const entries = prepared.entries.map((entry) => ({ path: entry.path, content: entry.source.content }));
   await persistFilesTruthProject(projectId, name, entries);
   return projectId;

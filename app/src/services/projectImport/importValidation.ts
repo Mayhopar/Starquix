@@ -11,7 +11,8 @@ export class ImportValidationError extends Error {
   }
 }
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.astro', '.vercel', '.netlify', '.output']);
+// .sq is Starquix's own runtime dir: the desktop seed refuses it (desktop/src/projects.mjs seedPathFor).
+const SKIP_DIRS = new Set(['node_modules', '.git', '.sq', 'dist', '.astro', '.vercel', '.netlify', '.output']);
 
 export interface ImportMetadata {
   path: string;
@@ -27,11 +28,9 @@ export interface PreparedImportMetadata<T extends ImportMetadata> {
   size: number;
 }
 
-/** node_modules/.git/dist/dot-dirs anywhere in a project-relative path. */
+/** Build output, vendor and VCS dirs anywhere in the path; every other file, dot-files too, is the project's. */
 export function isSkippedDir(path: string): boolean {
-  const parts = path.split('/');
-  return parts.some((part) => SKIP_DIRS.has(part))
-    || parts.some((part) => part.startsWith('.') && part !== '.');
+  return path.split('/').some((part) => SKIP_DIRS.has(part));
 }
 
 function normalizeSafePath(path: string): string {
@@ -81,7 +80,6 @@ export function assertTotalSize(sizes: Iterable<number>): void {
  */
 export function prepareImportMetadata<T extends ImportMetadata>(
   rawEntries: T[],
-  options: { skipIgnored?: boolean } = {},
 ): { entries: PreparedImportMetadata<T>[]; skipped: number } {
   const normalized = rawEntries.map((source) => {
     const sourcePath = normalizeSafePath(source.path);
@@ -89,15 +87,12 @@ export function prepareImportMetadata<T extends ImportMetadata>(
     return { source, sourcePath };
   });
   const destinationPaths = stripPickedFolderPaths(normalized.map((entry) => entry.sourcePath));
-  const prepared = normalized.map(({ source, sourcePath }, index) => ({
+  const entries = normalized.map(({ source, sourcePath }, index) => ({
     source,
     sourcePath,
     path: destinationPaths[index],
     size: source.size,
-  }));
-  const entries = options.skipIgnored === false
-    ? prepared
-    : prepared.filter((entry) => !isSkippedDir(entry.path));
+  })).filter((entry) => !isSkippedDir(entry.path));
 
   if (entries.length > MAX_FILE_COUNT) {
     throw new ImportValidationError('too-many-files', `Too many files (${entries.length}). Maximum is ${MAX_FILE_COUNT}.`);

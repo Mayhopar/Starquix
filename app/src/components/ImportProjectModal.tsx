@@ -6,6 +6,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Button, Field, Modal, OperationNotice, Row } from '@/components/ui';
 import { CloseIcon } from '@/assets/icons';
 import { entriesFromFileList } from '@/services/projectImport/processFolder';
+import { isSkippedDir, stripPickedFolderPaths } from '@/services/projectImport/importValidation';
 import { importFilesTruthProject } from '@/services/projectImport/createFilesTruthProject';
 import { importFeedback } from '@/services/projectImport/importFeedback';
 import type { IssueCopy } from '@/utils/operationIssue';
@@ -26,7 +27,9 @@ export const ImportProjectModal: React.FC<ImportProjectModalProps> = ({ isOpen, 
   const [error, setError] = useState<IssueCopy | null>(null);
 
   const reset = useCallback(() => { setFiles([]); setName(''); setState('idle'); setError(null); }, []);
-  const handleClose = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
+  const busy = state === 'reading' || state === 'importing';
+  // A running import can't be stopped (#29): the window stays until it lands or fails.
+  const handleClose = useCallback(() => { if (!busy) { reset(); onClose(); } }, [busy, reset, onClose]);
 
   const handlePick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const list = Array.from(e.target.files ?? []);
@@ -60,13 +63,15 @@ export const ImportProjectModal: React.FC<ImportProjectModalProps> = ({ isOpen, 
     }
   }, [files, name, reset, onImported]);
 
-  const busy = state === 'reading' || state === 'importing';
+  // The import's own rule (prepareImportMetadata), so node_modules and the like don't count (#47).
+  const importable = stripPickedFolderPaths(files.map((file) => (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name))
+    .filter((path) => !isSkippedDir(path)).length;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} aria-label="Import Astro project" size="sm" className="flex flex-col">
       <Row title="Import Astro project" className="pl-4 pr-2 border-b border-stroke" hover={false}
         right={[{ type: 'custom', unboxed: true, node: (
-          <Button variant="ghost" size="sm" iconOnly aria-label="Close" icon={<CloseIcon className="w-4 h-4" />} onClick={handleClose} />
+          <Button variant="ghost" size="sm" iconOnly aria-label="Close" icon={<CloseIcon className="w-4 h-4" />} onClick={handleClose} disabled={busy} />
         ) }]} />
 
       <div className="px-4 py-2 space-y-2">
@@ -86,7 +91,7 @@ export const ImportProjectModal: React.FC<ImportProjectModalProps> = ({ isOpen, 
               size="sm"
               onClick={() => inputRef.current?.click()}
               disabled={busy}
-              label={files.length > 0 ? `${files.length} files selected` : 'Choose folder…'}
+              label={files.length > 0 ? `${importable} files selected` : 'Choose folder…'}
             />
           ) }]} />
 
@@ -104,12 +109,12 @@ export const ImportProjectModal: React.FC<ImportProjectModalProps> = ({ isOpen, 
 
         {error && <OperationNotice title={error.title} detail={error.detail} />}
 
-        <div className="text-2xs text-text-secondary">Skips node_modules, build output and hidden files like .env. Up to 2,000 files / 500 MB.</div>
+        <div className="text-2xs text-text-secondary">Skips node_modules, .git and build output. Up to 2,000 files / 500 MB.</div>
       </div>
 
       <div className="flex items-center gap-2 border-t border-stroke px-4 py-2">
         <div className="flex-1" />
-        <Button variant="ghost" size="md" onClick={handleClose} label="Cancel" />
+        <Button variant="ghost" size="md" onClick={handleClose} disabled={busy} label="Cancel" />
         <Button
           variant="primary"
           size="md"

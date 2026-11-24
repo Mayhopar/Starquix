@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { isSkippedDir, entriesFromFileList } from '@/services/projectImport/processFolder';
+import { entriesFromFileList } from '@/services/projectImport/processFolder';
+import { prepareImportMetadata } from '@/services/projectImport/importValidation';
 
 describe('import entries (files-truth)', () => {
-  it('skip-dirs and dot-dirs anywhere in the path', () => {
-    expect(isSkippedDir('node_modules/x.js')).toBe(true);
-    expect(isSkippedDir('src/.cache/x')).toBe(true);
-    expect(isSkippedDir('dist/index.html')).toBe(true);
-    expect(isSkippedDir('src/pages/index.astro')).toBe(false);
+  it('skips only build, vendor and VCS dirs; dot-files are the project\'s (#16)', () => {
+    const kept = ['package.json', 'src/pages/index.astro', '.gitignore', '.env', '.npmrc', '.starquix/folders.json',
+      '.github/workflows/starquix-pages.yml', 'public/.well-known/security.txt', 'public/.htaccess', 'src/content/.gitkeep'];
+    const skipped = ['node_modules/x.js', 'src/node_modules/y.js', '.git/HEAD', '.sq/seed-complete.json', 'dist/index.html', '.astro/types.d.ts',
+      '.vercel/project.json', '.netlify/state.json', '.output/server.mjs'];
+    const { entries, skipped: count } = prepareImportMetadata([...kept, ...skipped].map((path) => ({ path: `site/${path}`, size: 1 })));
+    expect(entries.map((entry) => entry.path)).toEqual(kept);
+    expect(count).toBe(skipped.length);
   });
   it('entriesFromFileList keeps the picked folder as segment 0 and drops skip-dirs below it', async () => {
     // jsdom's File has no arrayBuffer(); the adapter only needs that + the relative path.
