@@ -1560,6 +1560,26 @@ export function propFallbackText(inner, newText) {
   return lead + `{${valueExpr(p.prop, JSON.stringify(decodeInnerHtmlEntities(newText).trim()))}}` + trail;
 }
 
+const TAG_RE = /<([A-Za-z][\w.:-]*)/g;
+/** The first tag a markup commit would write that the element's source content
+ *  lacks — HTML a component (<Icon/> → <svg>) or a script rendered, which must
+ *  never replace its call (audit #3) — else null. Typed line breaks and the link
+ *  tool's <a> are the editor's own; a component or <slot/> never round-trips. */
+function foreignTag(source, markup) {
+  if (!hasMarkup(markup)) return null;
+  const have = {};
+  for (const [, tag] of source.matchAll(TAG_RE)) {
+    if (/^[A-Z]|\.|^slot$/.test(tag)) return tag;
+    have[tag] = (have[tag] || 0) + 1;
+  }
+  for (const [, tag] of markup.matchAll(TAG_RE)) {
+    if (/^(?:br|wbr|a)$/.test(tag)) continue;
+    if (!have[tag]) return tag;
+    have[tag]--;
+  }
+  return null;
+}
+
 /**
  * Replace the text content between opening and closing tags (ast-updater.ts updateTextContent).
  */
@@ -1601,11 +1621,16 @@ export async function updateTextContent(content, location, newText) {
   // binding for every page (measured 2026-09-10: `{work.data.description}`
   // became "Sample description text for this placeholder entry."). Refuse
   // honestly; the editor surfaces this error.
-  const propText = propFallbackText(normalizedContent.slice(openingTag.endOffset, closingTagStart), newText);
+  const inner = normalizedContent.slice(openingTag.endOffset, closingTagStart);
+  const propText = propFallbackText(inner, newText);
   if (propText !== null) newText = propText;
-  else if (normalizedContent.slice(openingTag.endOffset, closingTagStart).includes('{')) {
+  else if (inner.includes('{')) {
     throw new Error('text is a dynamic expression ({…}) — edit it in the Source tab');
-  } else newText = escapeAstroBraces(newText); // typed `{x}` is text, never code
+  } else {
+    const foreign = foreignTag(inner, newText);
+    if (foreign) throw new Error(`text includes <${foreign}> output that cannot be written back — edit it in the Source tab`);
+    newText = escapeAstroBraces(newText); // typed `{x}` is text, never code
+  }
 
   let result = normalizedContent.slice(0, openingTag.endOffset) + newText + normalizedContent.slice(closingTagStart);
   if (hasCRLF) {

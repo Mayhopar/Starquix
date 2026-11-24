@@ -160,8 +160,9 @@ export function handleEditModeExited(ctx: ViewportMessageContext, payload: unkno
 }
 
 /** A refusal the user can act on: a dynamic expression, or an edit no file can carry. */
+// The gate's refusals and the source writer's ("… — edit it in the Source tab": dynamic text, foreign markup).
 const isRefusal = (err: unknown) =>
-  err instanceof SourcePreparationRefused || /dynamic expression/.test(String((err as Error)?.message ?? err));
+  err instanceof SourcePreparationRefused || /dynamic expression|edit it in the Source tab/.test(String((err as Error)?.message ?? err));
 
 /**
  * A REJECTED text write is a divergence: the canvas shows the edit, the file

@@ -13,12 +13,13 @@
 export const BRIDGE_EDIT_MODE = `
 
 
-/** Text holding elements (<br>, <span>, <strong>…) commits as markup — flat
- *  textContent would drop them (audit #3) — unless a link carrier already owns
- *  this element's markup. Editing is plaintext-only, so the elements are the
- *  ones that were there. */
+/** Text holding elements (<br>, <span>, <a>…) commits as markup — flat
+ *  textContent would drop them (audit #3); the writer refuses any it cannot
+ *  write back. Editing is plaintext-only, so they are the ones that were there.
+ *  Outside local projects (WC) links keep their link carrier: an instance's
+ *  markup commit wipes its link overrides (cleanOrphanedLinkOverrides). */
 IFrameBridge.prototype.hasInlineMarkup = function(element) {
-    return element.children.length > 0 && !element.querySelector('a');
+    return element.children.length > 0 && (!!window.__SQ_LOCAL_MODE__ || !element.querySelector('a'));
 };
 
 /** Inner markup to commit for such text, bookkeeping attributes stripped;

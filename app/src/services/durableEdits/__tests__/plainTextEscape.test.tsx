@@ -54,8 +54,8 @@ it('typed < and & land as text, never as markup', async () => {
 });
 
 it('a markup commit is written as the canvas serialized it — no second escape', async () => {
-  expect(await commit('<p>old</p>\n', ctx => handleMarkupChanged(ctx, { key, innerHTML: '<b>a</b> &amp; x&lt;y' })))
-    .toBe('<p><b>a</b> &amp; x&lt;y</p>\n');
+  expect(await commit('<p>old</p>\n', ctx => handleMarkupChanged(ctx, { key, innerHTML: 'a<br>&amp; x&lt;y' })))
+    .toBe('<p>a<br>&amp; x&lt;y</p>\n');
 });
 
 it('the direct text writer (instance text, Push) escapes too', async () => {

@@ -10,7 +10,8 @@
 export const BRIDGE_LINKS = `
   /**
    * Sanitize innerHTML by removing dangerous attributes from all elements.
-   * Removes: event handlers (onclick, onload, etc.), javascript: URLs, class attributes from links.
+   * Removes: event handlers (onclick, onload, etc.), javascript: URLs. A link's
+   * class stays: an edit keeps every link exactly as the source has it.
    * Returns sanitized HTML string.
    */
   IFrameBridge.prototype.sanitizeLinkHtml = function(innerHTML) {
@@ -44,9 +45,6 @@ export const BRIDGE_LINKS = `
 
     // Sanitize <a> tags specifically
     tempDiv.querySelectorAll('a').forEach(function(a) {
-      // Remove class attribute
-      a.removeAttribute('class');
-
       // Sanitize href - remove javascript: URLs
       var href = a.getAttribute('href');
       if (href) {

@@ -166,7 +166,7 @@ describe('handleWrapSelectionInLink happy path (LI-3)', () => {
       href: '/about',
       target: '_blank',
     });
-    // sanitizeLinkHtml strips class from <a> but keeps the wrap
+    // the sanitized markup keeps the wrap
     expect(changed[0].payload.innerHTML).toContain('<a');
   });
 
@@ -237,7 +237,7 @@ describe('sanitizeLinkHtml (defense-in-depth used by both senders)', () => {
     bridge = mountBridgeForTest();
   });
 
-  it('strips event handlers, javascript: hrefs, link classes, and <script>', () => {
+  it('strips event handlers, javascript: hrefs and <script>; keeps link classes (an edit keeps every link exactly)', () => {
     const out = bridge.sanitizeLinkHtml(
       '<a class="x" href="javascript:alert(1)" onclick="evil()">a</a><script>evil()</script><span onfocus="evil()">s</span>',
     );
@@ -245,7 +245,6 @@ describe('sanitizeLinkHtml (defense-in-depth used by both senders)', () => {
     expect(out).not.toContain('onfocus');
     expect(out).not.toContain('javascript:');
     expect(out).not.toContain('<script');
-    expect(out).not.toContain('class=');
-    expect(out).toContain('<a>a</a>');
+    expect(out).toContain('<a class="x">a</a>');
   });
 });

@@ -4893,7 +4893,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   
   /**
    * Sanitize innerHTML by removing dangerous attributes from all elements.
-   * Removes: event handlers (onclick, onload, etc.), javascript: URLs, class attributes from links.
+   * Removes: event handlers (onclick, onload, etc.), javascript: URLs. A link's
+   * class stays: an edit keeps every link exactly as the source has it.
    * Returns sanitized HTML string.
    */
   IFrameBridge.prototype.sanitizeLinkHtml = function(innerHTML) {
@@ -4927,9 +4928,6 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
 
     // Sanitize <a> tags specifically
     tempDiv.querySelectorAll('a').forEach(function(a) {
-      // Remove class attribute
-      a.removeAttribute('class');
-
       // Sanitize href - remove javascript: URLs
       var href = a.getAttribute('href');
       if (href) {
@@ -6419,12 +6417,13 @@ IFrameBridge.prototype.handlePickElementAtPoint = function(payload) {
   
 
 
-/** Text holding elements (<br>, <span>, <strong>…) commits as markup — flat
- *  textContent would drop them (audit #3) — unless a link carrier already owns
- *  this element's markup. Editing is plaintext-only, so the elements are the
- *  ones that were there. */
+/** Text holding elements (<br>, <span>, <a>…) commits as markup — flat
+ *  textContent would drop them (audit #3); the writer refuses any it cannot
+ *  write back. Editing is plaintext-only, so they are the ones that were there.
+ *  Outside local projects (WC) links keep their link carrier: an instance's
+ *  markup commit wipes its link overrides (cleanOrphanedLinkOverrides). */
 IFrameBridge.prototype.hasInlineMarkup = function(element) {
-    return element.children.length > 0 && !element.querySelector('a');
+    return element.children.length > 0 && (!!window.__SQ_LOCAL_MODE__ || !element.querySelector('a'));
 };
 
 /** Inner markup to commit for such text, bookkeeping attributes stripped;
