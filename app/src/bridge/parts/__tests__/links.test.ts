@@ -110,6 +110,23 @@ describe('handleWrapSelectionInLink early returns (LI-3)', () => {
     expect((p as HTMLElement).contentEditable).toBe('false');
     expect(p.querySelector('a')).toBeNull();
   });
+
+  it('a failed wrap mid-edit leaves the (plain-text) edit session editable', () => {
+    document.body.innerHTML = '<p data-key="el-abc:p-0"><b>bold</b> tail text</p>';
+    const p = document.querySelector('p')!;
+    // jsdom has no isContentEditable; Chrome reports it for 'plaintext-only' too.
+    Object.defineProperty(p, 'isContentEditable', { get: () => ['true', 'plaintext-only'].includes(p.contentEditable) });
+    bridge.handleEnterEditMode({ key: 'el-abc:p-0' });
+    const range = document.createRange();
+    range.setStart(p.querySelector('b')!.firstChild!, 1);
+    range.setEnd(p.childNodes[1]!, 4);
+    selectRange(range);
+
+    bridge.handleWrapSelectionInLink({ key: 'el-abc:p-0', href: '/x' });
+
+    expect(p.contentEditable).toBe('plaintext-only');
+    expect(bridge.editingElement).toBe(p);
+  });
 });
 
 describe('handleWrapSelectionInLink happy path (LI-3)', () => {
@@ -149,7 +166,7 @@ describe('handleWrapSelectionInLink happy path (LI-3)', () => {
       href: '/about',
       target: '_blank',
     });
-    // sanitizeLinkHtml strips class from <a> but keeps the wrap
+    // the sanitized markup keeps the wrap
     expect(changed[0].payload.innerHTML).toContain('<a');
   });
 
@@ -220,7 +237,7 @@ describe('sanitizeLinkHtml (defense-in-depth used by both senders)', () => {
     bridge = mountBridgeForTest();
   });
 
-  it('strips event handlers, javascript: hrefs, link classes, and <script>', () => {
+  it('strips event handlers, javascript: hrefs and <script>; keeps link classes (an edit keeps every link exactly)', () => {
     const out = bridge.sanitizeLinkHtml(
       '<a class="x" href="javascript:alert(1)" onclick="evil()">a</a><script>evil()</script><span onfocus="evil()">s</span>',
     );
@@ -228,7 +245,6 @@ describe('sanitizeLinkHtml (defense-in-depth used by both senders)', () => {
     expect(out).not.toContain('onfocus');
     expect(out).not.toContain('javascript:');
     expect(out).not.toContain('<script');
-    expect(out).not.toContain('class=');
-    expect(out).toContain('<a>a</a>');
+    expect(out).toContain('<a class="x">a</a>');
   });
 });

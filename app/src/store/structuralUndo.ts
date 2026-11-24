@@ -112,6 +112,8 @@ export interface StructuralUndoRecord {
   /** The page the edit was made on (stamped at push): ⌘Z / ⌘⇧Z replay it
    *  there from any page — never "belongs to another surface" (owner 2026-11-10). */
   origin?: import('@/utils/localWriteScope').LocalWriteOrigin;
+  /** The selected key when the step was made (stamped at push), swapped at each replay: ⌘Z / ⌘⇧Z select it again (#18). */
+  selection?: string | null;
 }
 
 export type PushStructuralUndo = (record: StructuralUndoRecord) => void;

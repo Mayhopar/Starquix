@@ -14,16 +14,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import * as Y from 'yjs';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
+import { useComponentsModal } from '../useComponentsModal';
 import {
   TOOL_SHORTCUTS,
   BREAKPOINT_SHORTCUT_KEYS,
   SHIFTED_SHORTCUT_CODE,
+  COMBO_SHORTCUT_KEYS,
 } from '@/bridge/globalShortcuts';
 import type { DrawTool } from '@/context/ToolContext';
 
 const mockSetActiveTool = vi.fn();
 const mockDispatch = vi.fn();
 let mockActiveTool: DrawTool = 'select';
+let mockSelectedKey: string | null = null;
 
 vi.mock('@/context', () => ({
   useClassStore: () => ({ saveAll: vi.fn(), hasUnsavedChanges: false }),
@@ -36,13 +39,20 @@ vi.mock('@/store/hooks', () => ({
   useEditorDoc: () => new Y.Doc(),
 }));
 
+vi.mock('@/clipboard/clipboardActions', () => ({
+  copySelection: vi.fn(async () => true),
+  cutSelection: vi.fn(async () => {}),
+  pasteClipboard: vi.fn(async () => {}),
+  duplicateSelection: vi.fn(async () => {}),
+}));
+
 vi.mock('@/context/UndoContext', () => ({
   useUndoContext: () => ({ undo: vi.fn(), redo: vi.fn(), takeSnapshot: vi.fn() }),
 }));
 
 vi.mock('@/context/SelectionContext', () => ({
   useSelectionContext: () => ({
-    selectedKey: null,
+    selectedKey: mockSelectedKey,
     selectedElementId: null,
     selectedSourceLocation: null,
     clearSelection: vi.fn(),
@@ -92,5 +102,23 @@ describe('every forwarded bare shortcut is handled by the parent', () => {
     press({ key: '!', code: SHIFTED_SHORTCUT_CODE, shiftKey: true });
     window.removeEventListener('sq:zoom-command', zoom);
     expect(zoom).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The bridge preventDefaults exactly COMBO_SHORTCUT_KEYS in the frame (anything else is the app menu's, #42); this
+ * side proves the parent really takes each one, so a handled combo can't lose its key to the menu.
+ */
+describe('every combo the bridge takes in the frame is handled by the parent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSelectedKey = 'src/pages/index.astro:5:5'; // ⌘C/⌘X/⌘D act on a selection
+  });
+
+  it.each(COMBO_SHORTCUT_KEYS)('Ctrl+%s', (key) => {
+    renderHook(() => { useKeyboardShortcuts(); useComponentsModal(); });
+    const event = new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
   });
 });

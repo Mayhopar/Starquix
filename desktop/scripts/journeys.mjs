@@ -278,7 +278,7 @@ export const journeys = [
   { name: 'type', run: async ctx => {
     const { page } = ctx;
     await page.keyboard.press('Enter');
-    await ctx.preview().locator('[contenteditable="true"]').waitFor(); await page.keyboard.press('ControlOrMeta+a');
+    await ctx.preview().locator('[contenteditable="plaintext-only"]').waitFor(); await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('Profiled heading text', { delay: 40 });
     await page.keyboard.press('Escape');
     await ctx.preview().getByRole('heading', { name: 'Profiled heading text', exact: true }).waitFor({ timeout: 15_000 });

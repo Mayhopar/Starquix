@@ -55,7 +55,7 @@ test('O1: class + text override on one page → files; survives reopen and expor
 
     // Text override.
     await page.keyboard.press('Enter');
-    const editable = frame.locator('[contenteditable="true"]');
+    const editable = frame.locator('[contenteditable="plaintext-only"]');
     await expect(editable).toBeVisible();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('Override title');
@@ -146,7 +146,7 @@ test('O3: class:list + entity text override → files; reopen keeps the override
     await expect.poll(() => read('src/pages/index.astro'), { timeout: 20_000 }).toMatch(/pClass="[^"]*text-center[^"]*"/);
     expect(await read('src/components/Card.astro')).toContain('class:list={Astro.props.pClass ?? (["text-sm", "card-note"])}');
     await page.keyboard.press('Enter');
-    await expect(frame.locator('[contenteditable="true"]')).toBeVisible();
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('Cat and mouse');
     await page.keyboard.press('Escape');

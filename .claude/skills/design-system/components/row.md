@@ -40,7 +40,8 @@ fields: `Prop skeleton` (field.md).
 - `left`/`right` take `RowSlotSpec[]` (see slot.md) or a raw ReactNode (legacy).
 - Hidden slot = omit the spec; slots never reserve space when absent.
 - Every typed control stops propagation — never fires the row `onClick`.
-- `showOnHover` on right slots reveals actions on row hover.
+- `showOnHover` on right slots reveals actions on row hover, and an action while focus is in it: they are hidden by
+  opacity (never `invisible`), so Tab still reaches them.
 
 ## Do / don't
 - DO use `dnd` + `depth` for trees; drop-indicator/drag states are built in.

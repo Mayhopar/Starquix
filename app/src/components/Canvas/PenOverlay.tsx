@@ -131,10 +131,9 @@ export const PenOverlay = memo(function PenOverlay({
     [clientToIframe, scale],
   );
 
-  // Enter/Escape/Backspace while a path is in progress — capture phase so
-  // useKeyboardShortcuts' Escape-disarms-tool never sees them mid-draw.
-  // stopImmediatePropagation covers events whose target IS document (no
-  // focused element): plain stopPropagation can't block same-node listeners.
+  // Enter/Escape/Backspace while a path is in progress belong to the path. Window
+  // capture runs before every document listener — useKeyboardShortcuts' Delete
+  // and Escape included — so stopping here keeps them from the shortcut hook.
   useEffect(() => {
     if (!isDraw || !hasDrawAnchors) return; // not drawing yet — let Esc disarm the tool
     const handler = (e: KeyboardEvent) => {
@@ -152,8 +151,8 @@ export const PenOverlay = memo(function PenOverlay({
         applyEvent({ type: 'backspace' });
       }
     };
-    document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [isDraw, hasDrawAnchors, applyEvent]);
 
   // Terminal states: commit or cancel, then reset + disarm.
@@ -381,8 +380,9 @@ export const PenOverlay = memo(function PenOverlay({
     };
   }, [hasEditDrag, clientToElement, commitGesture]);
 
-  // Edit-mode keys, capture phase. Delete/Backspace is ALWAYS swallowed here —
-  // without a selected anchor it must not bubble to the element-delete shortcut.
+  // Edit-mode keys, window capture (ahead of the shortcut hook, as above).
+  // Delete/Backspace is ALWAYS swallowed here — without a selected anchor it
+  // must not reach the element-delete shortcut.
   useEffect(() => {
     if (!isEdit) return;
     const handler = (e: KeyboardEvent) => {
@@ -398,8 +398,8 @@ export const PenOverlay = memo(function PenOverlay({
         applyStructural({ type: 'delete-anchor', index: selectedAnchor });
       }
     };
-    document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [isEdit, exitSession, applyStructural, selectedAnchor]);
 
   // -------------------------------------------------- memoized chrome paths

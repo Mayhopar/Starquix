@@ -9,10 +9,13 @@ vi.mock('@/services/projectImport/createFilesTruthProject', () => ({
   importFilesTruthProject: vi.fn(async () => ({ projectId: 'browser_x', fileCount: 1, skipped: 0 })),
 }));
 
-function pick(input: HTMLInputElement) {
-  const file = new File(['x'], 'index.astro');
-  Object.defineProperty(file, 'webkitRelativePath', { value: 'site/src/pages/index.astro' });
-  Object.defineProperty(input, 'files', { value: [file] });
+function pick(input: HTMLInputElement, paths = ['site/src/pages/index.astro']) {
+  const files = paths.map((path) => {
+    const file = new File(['x'], path.split('/').pop()!);
+    Object.defineProperty(file, 'webkitRelativePath', { value: path });
+    return file;
+  });
+  Object.defineProperty(input, 'files', { value: files });
   fireEvent.change(input);
 }
 
@@ -20,8 +23,34 @@ describe('ImportProjectModal', () => {
   it('says what the import skips and its limits before a folder is picked', () => {
     render(<ImportProjectModal isOpen onClose={() => {}} onImported={() => {}} />);
     expect(screen.getByText('Import Astro project')).toBeInTheDocument();
-    expect(screen.getByText(/Skips node_modules, build output and hidden files like \.env\./)).toBeInTheDocument();
+    expect(screen.getByText(/Skips node_modules, \.git and build output\./)).toBeInTheDocument();
     expect(screen.getByText(/Up to 2,000 files \/ 500 MB\./)).toBeInTheDocument();
+  });
+
+  it('counts only the files the import keeps (#47)', () => {
+    render(<ImportProjectModal isOpen onClose={() => {}} onImported={() => {}} />);
+    pick(screen.getByTestId('import-folder-input') as HTMLInputElement,
+      ['site/package.json', 'site/.gitignore', 'site/node_modules/a.js', 'site/node_modules/b.js', 'site/.git/HEAD', 'site/dist/index.html']);
+    expect(screen.getByRole('button', { name: '2 files selected' })).toBeInTheDocument();
+  });
+
+  it('cannot be dismissed while the import runs (#29)', async () => {
+    const { importFilesTruthProject } = await import('@/services/projectImport/createFilesTruthProject');
+    let finish!: (result: { projectId: string; fileCount: number; skipped: number }) => void;
+    vi.mocked(importFilesTruthProject).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const onClose = vi.fn();
+    const onImported = vi.fn();
+    render(<ImportProjectModal isOpen onClose={onClose} onImported={onImported} />);
+    pick(screen.getByTestId('import-folder-input') as HTMLInputElement);
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await screen.findByRole('button', { name: /Importing…/ }); // the spinner adds 'Loading' to the name
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.mouseDown(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+    finish({ projectId: 'browser_x', fileCount: 1, skipped: 0 });
+    await waitFor(() => expect(onImported).toHaveBeenCalledWith('browser_x'));
   });
 
   it('derives the project name from the picked folder and imports on confirm', async () => {

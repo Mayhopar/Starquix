@@ -35,4 +35,5 @@ these two directly only for shapes that aren't rows:
 
 ## Tooltip
 `<Tooltip content="…">{trigger}</Tooltip>` — portal to body, 400ms delay,
-never clipped by overflow ancestors. String content only.
+never clipped by overflow ancestors. String content only. Keyboard focus (`:focus-visible`) on a focusable trigger
+shows it at once, and while it shows the trigger is `aria-describedby` the tip (`role="tooltip"`).

@@ -51,7 +51,7 @@ export async function acceptStructuralReplay(doc: Y.Doc, input: StructuralOp[], 
           const change = direction === 'before' ? { ...original, beforeSource: original.afterSource, afterSource: original.beforeSource,
             identityMaps: invertIdentityMaps(original.identityMaps ?? []) } : original;
           const current = await load(change.file);
-          if (current.afterSource !== change.beforeSource) throw new Error('Combined undo source baseline changed');
+          if (current.afterSource !== change.beforeSource) throw new Error(`Source changed before acceptance: ${change.file}`);
           current.afterSource = change.afterSource;
           current.identityMaps = [...current.identityMaps ?? [], ...change.identityMaps ?? []];
         }

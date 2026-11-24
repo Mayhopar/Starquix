@@ -1,7 +1,6 @@
-import { HomeIcon as SharedHomeIcon, TrashIcon as SharedTrashIcon } from '@/assets/icons';
+import { TrashIcon as SharedTrashIcon } from '@/assets/icons';
 // src/components/PagesPanel/PageTreeNode.tsx
-import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { usePages } from '@/context/PagesContext';
 import { usePostEditor } from '@/context/PostEditorContext';
@@ -13,7 +12,7 @@ import { useGoToPost } from '@/hooks/useGoToPost';
 import { DRAG_TYPES } from '@/types/drag';
 import type { PageData } from '@/store/types';
 import { pageRoute } from '@/store/pageRoute';
-import { useTreeNodeDnd, TreeDropIndicator, Row, MenuItem, Tooltip } from '@/components/ui';
+import { useTreeNodeDnd, TreeDropIndicator, Row, Menu, MenuItem, Tooltip } from '@/components/ui';
 import { useAI } from '@/ai/AIContext';
 import { PageIcon, SparkleIcon } from '@/assets/icons';
 
@@ -42,7 +41,6 @@ export function PageTreeNode({
     expandPages,
     renamePage,
     deletePage,
-    setHomePage,
   } = usePages();
 
   const { activeKeys, recentlyTouchedKeys } = useAI();
@@ -55,16 +53,7 @@ export function PageTreeNode({
   const [showMenu, setShowMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const skipRenameBlur = useRef(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-
-  useLayoutEffect(() => {
-    if (showMenu && rowRef.current) {
-      const rect = rowRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom, left: rect.right - 120 });
-    }
-  }, [showMenu]);
 
   const { setNodeRef, attributes, listeners, isDragging, dropZone } = useTreeNodeDnd(
     page.id,
@@ -128,25 +117,6 @@ export function PageTreeNode({
       return () => clearTimeout(timer);
     }
   }, [showNestHighlight, isExpanded, expandPages, page.id]);
-
-  useEffect(() => {
-    if (!showMenu) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-
-    // The menu sits at a fixed point: a layout change (⌘\ hides the sidebars) leaves it stranded.
-    const close = () => setShowMenu(false);
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('resize', close);
-    };
-  }, [showMenu]);
 
   const { clearPreviewPost } = usePostEditor();
 
@@ -213,12 +183,14 @@ export function PageTreeNode({
   }, [toggleExpanded, page.id]);
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative space-y-px">
+    // The row is the page's one Tab stop (dnd-kit's role="button"): the global focus ring shows on it, Enter opens it.
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative space-y-px"
+      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.stopPropagation(); handleClick(); } }}>
       {showIndicatorAbove && <TreeDropIndicator position="above" />}
 
       <Row
         ref={rowRef}
-        rowProps={{ 'data-testid': 'page-item' }}
+        rowProps={{ 'data-testid': 'page-item', title: route }}
         depth={depth}
         selected={isActive}
         left={[
@@ -238,6 +210,7 @@ export function PageTreeNode({
             <input
               ref={inputRef}
               type="text"
+              tabIndex={-1}
               value={isEditing ? editValue : route}
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -246,7 +219,7 @@ export function PageTreeNode({
               className={`flex-1 min-w-0 text-xs outline-none overflow-hidden text-ellipsis ${
                 isEditing
                   ? 'text-text border border-stroke-active rounded px-1 cursor-text bg-bg-input-editing'
-                  : 'text-inherit border-transparent cursor-grab bg-transparent'
+                  : 'text-inherit border-transparent pointer-events-none bg-transparent'
               }`}
               onClick={(e) => {
                 if (isEditing) e.stopPropagation();
@@ -283,31 +256,17 @@ export function PageTreeNode({
         onContextMenu={handleContextMenu}
       />
 
-      {showMenu && createPortal(
-        <div
-          ref={menuRef}
-          className="fixed bg-bg border border-stroke rounded shadow-flyout py-1 z-flyout min-w-[120px]"
-          style={{ top: menuPos.top, left: menuPos.left }}
-        >
-          <MenuItem
-            label="Set as home"
-            onSelect={() => { setHomePage(page.id); setShowMenu(false); }}
-            disabled={page.isHome || page.pageType === 'post'}
-            icon={
-              <SharedHomeIcon className="w-4 h-4" />
-            }
-          />
-          <MenuItem
-            label="Delete"
-            onSelect={handleDelete}
-            disabled={!canDelete}
-            icon={
-              <SharedTrashIcon className="w-4 h-4" />
-            }
-          />
-        </div>,
-        document.body
-      )}
+      {/* No "Set as home": a project's home is its index.astro, so that item could only fail (#35). */}
+      <Menu isOpen={showMenu} onClose={() => setShowMenu(false)} triggerRef={rowRef} placement="bottom-end">
+        <MenuItem
+          label="Delete"
+          onSelect={handleDelete}
+          disabled={!canDelete}
+          icon={
+            <SharedTrashIcon className="w-4 h-4" />
+          }
+        />
+      </Menu>
 
       {showIndicatorBelow && <TreeDropIndicator position="below" />}
 

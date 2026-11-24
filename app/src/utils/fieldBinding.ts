@@ -5,7 +5,6 @@
  * or a plain path, so no schema knowledge is needed. Pure transforms over the
  * component file; the writer (components/Editor/localFieldBind) commits them.
  */
-import { TEXT_EDITABLE_TAGS } from '@/components/Canvas/viewportMessages/selection';
 import { getElementSource, updateElementSource, updateTextContent, updateAttributeExpression } from '@/vite-plugin/ast-updater';
 import type { SourceLocation } from '@/store/types';
 import { entryVarOf } from '@/utils/cardFields';
@@ -69,13 +68,20 @@ export function readDateFormat(elementSource: string, tagName: string): string |
 /** The opening tag incl. quoted / `{…}` attribute values. */
 const OPEN_TAG_RE = /^<[a-zA-Z][\w.:-]*(?:\s+(?:[^>"'{}]|"[^"]*"|'[^']*'|\{[^}]*\})*)?>/;
 const BOX_TAGS = new Set(['div', 'figure', 'picture']);
+/** Tags whose content binds as a text field. */
+const TEXT_TAGS = new Set([
+  'p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'label', 'li', 'td', 'th',
+  'dt', 'dd', 'figcaption', 'blockquote', 'q', 'cite', 'em', 'strong', 'small',
+  'mark', 'del', 'ins', 'sub', 'sup', 'code', 'pre', 'abbr', 'time', 'b', 'i', 'u', 's',
+  'button',
+]);
 /** A box is bindable while its content is a placeholder: nothing, text, or inline img/span/br only. */
 const BOX_BLOCK_CHILD_RE = /<(?!\/?(?:img|span|br)\b)[a-zA-Z]/;
 
 export function bindingKindFor(tagName: string): FieldKind | null {
   if (tagName === 'img') return 'img';
   if (BOX_TAGS.has(tagName)) return 'box';
-  return TEXT_EDITABLE_TAGS.has(tagName) ? 'text' : null;
+  return TEXT_TAGS.has(tagName) ? 'text' : null;
 }
 
 /** May an IMAGE field fill this element? A box only while it holds no block children (their loss would be silent). */

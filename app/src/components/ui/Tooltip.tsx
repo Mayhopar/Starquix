@@ -1,8 +1,9 @@
 /**
  * Tooltip - portal to body (never clipped by overflow ancestors), positioned
- * above the trigger, clamped into the viewport. 400ms show delay.
+ * above the trigger, clamped into the viewport. 400ms show delay on hover; keyboard
+ * focus shows it at once, and the trigger is aria-describedby it while it shows.
  */
-import { useState, useRef, useLayoutEffect, type ReactNode } from 'react';
+import { useState, useRef, useLayoutEffect, useId, cloneElement, isValidElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface TooltipProps {
@@ -16,6 +17,7 @@ export function Tooltip({ content, children }: TooltipProps) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
+  const id = useId();
 
   const show = () => {
     clearTimeout(timeoutRef.current);
@@ -39,10 +41,15 @@ export function Tooltip({ content, children }: TooltipProps) {
   }, [visible, content]);
 
   return (
-    <span ref={triggerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
-      {children}
+    <span ref={triggerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onBlur={hide}
+      onFocus={(e) => { if (e.target.matches(':focus-visible')) setVisible(true); }}>
+      {visible && isValidElement<{ 'aria-describedby'?: string }>(children)
+        ? cloneElement(children, { 'aria-describedby': id })
+        : children}
       {visible && createPortal(
         <span
+          id={id}
+          role="tooltip"
           ref={tipRef}
           className="fixed px-2 py-1 text-xs rounded-inner bg-bg-contrast text-text border border-stroke whitespace-pre-line w-max z-flyout pointer-events-none shadow-flyout"
           style={{ top: pos.top, left: pos.left }}

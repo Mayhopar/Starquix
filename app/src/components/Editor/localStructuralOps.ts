@@ -27,7 +27,7 @@ import { acceptFileChanges, finishAcceptedFiles } from '@/services/durableEdits/
 import { prepareSourceGesture } from '@/services/durableEdits/sourceGesture';
 import type { StructuralOp } from '@/store/structuralUndo';
 // @ts-expect-error shared JavaScript transforms
-import { unusedDefaultImports, findFrontmatterFences, resolveElementSpan, widenToGuardExpression, scanTopLevelElements, lineNumberAt, columnNumberAt } from '../../../../preview-template/src/plugins/sq-source-transforms.js';
+import { unusedDefaultImports, findFrontmatterFences, resolveElementSpan, widenToExpression, scanTopLevelElements, lineNumberAt, columnNumberAt } from '../../../../preview-template/src/plugins/sq-source-transforms.js';
 import { getActiveSaveProjectId } from '@/services/pendingProjectMutations';
 import { setLocalPendingSelection, getSelectionEpoch } from '@/utils/localPendingSelection';
 import { isContainerNode, type DropPosition } from '@/store/planLayersDrop';
@@ -484,11 +484,14 @@ function planLocalWrap(keys: string[], scannedByKey: ReadonlyMap<string, WrapNod
 
 /** DOM siblings are not always source siblings: between two wrapped layers the
  *  file may hold only whitespace, `<!-- -->` and whole elements (a guarded
- *  `{cond && <el/>}` counts as one). Text, an `{expression}`, the `)}` of a
- *  loop body or a ternary `:` would be split across the container. */
+ *  `{cond && <el/>}` or a whole `.map()` body counts as one). Text, an `{expression}`,
+ *  the `)}` of a loop body or a ternary `:` would be split across the container. */
 function onlySiblingsBetween(between: string): boolean {
-  const roots = (scanTopLevelElements(between) as Array<{ start: number; end: number; unclosed?: boolean }>)
-    .map(r => widenToGuardExpression(between, r) as { start: number; end: number; unclosed?: boolean });
+  let roots: Array<{ start: number; end: number; unclosed?: boolean }>;
+  try {
+    roots = (scanTopLevelElements(between) as Array<{ start: number; end: number; unclosed?: boolean }>)
+      .map(r => widenToExpression(between, r) as { start: number; end: number; unclosed?: boolean });
+  } catch { return false; } // an element that shares its {…} (a ternary branch) cannot move as a sibling
   if (roots.some(r => r.unclosed)) return false;
   let rest = '', pos = 0;
   for (const r of roots) { rest += between.slice(pos, r.start); pos = r.end; }
@@ -564,7 +567,7 @@ export const wrapLocalElements = (args: LocalWrapArgs) => regroupLocal(args, 'wr
   resolved.sort((a, b) => a.loc.line - b.loc.line || a.loc.column - b.loc.column);
   const file = resolved[0].loc.file;
   const source = () => gestureSource(gesture, file);
-  const spans = resolved.map(({ loc }) => widenToGuardExpression(source(), resolveElementSpan(source(), loc)) as { start: number; end: number });
+  const spans = resolved.map(({ loc }) => widenToExpression(source(), resolveElementSpan(source(), loc)) as { start: number; end: number });
   const gaps = spans.slice(1).map((s, i) => source().slice(spans[i].end, s.start));
   if (spans.slice(1).some((s, i) => s.start < spans[i].end) || !gaps.every(onlySiblingsBetween)) throw new Refusal(WRAP_NOT_SIBLINGS);
 
@@ -612,7 +615,7 @@ export const unwrapLocalElement = (args: LocalWrapArgs) => regroupLocal({ ...arg
   const count = (scanTopLevelElements(inner) as unknown[]).length;
   if (!count) throw new Refusal(UNWRAP_EMPTY);
   // Moved out of a `{cond && …}` the children would stop being conditional.
-  if (!onlySiblingsBetween(inner) || widenToGuardExpression(source(), own).start !== own.start) throw new Refusal(UNWRAP_TEXT_OR_CODE);
+  if (!onlySiblingsBetween(inner) || widenToExpression(source(), own).start !== own.start) throw new Refusal(UNWRAP_TEXT_OR_CODE);
 
   let first!: SourceLocation;
   for (let i = 0; i < count; i++) {

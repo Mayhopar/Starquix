@@ -98,6 +98,18 @@ describe('ui/Popover', () => {
     expect(screen.queryByRole('button', { name: 'inner' })).toBeNull();
   });
 
+  // Finding #36: a click on the canvas never reaches this document's mousedown — it moves focus into the iframe.
+  it('a click into an iframe (the canvas) closes it; the window losing focus to another app does not', async () => {
+    const onClose = vi.fn();
+    render(<><ControlledHost open onClose={onClose} /><iframe title="canvas" /></>);
+    const blurWindow = async () => { window.dispatchEvent(new Event('blur')); await new Promise((r) => setTimeout(r, 0)); };
+    await blurWindow();
+    expect(onClose).not.toHaveBeenCalled();
+    screen.getByTitle('canvas').focus();
+    await blurWindow();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('uncontrolled: trigger click toggles', () => {
     render(
       <Popover trigger={<button>open me</button>}>
@@ -170,7 +182,7 @@ describe('ui/Modal', () => {
   it('renders when open with modal tokens; Escape closes', () => {
     const onClose = vi.fn();
     const { container, rerender } = render(
-      <Modal isOpen onClose={onClose} size="md">
+      <Modal isOpen onClose={onClose} aria-label="Test" size="md">
         <div>modal body</div>
       </Modal>,
     );
@@ -181,11 +193,70 @@ describe('ui/Modal', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
     rerender(
-      <Modal isOpen={false} onClose={onClose}>
+      <Modal isOpen={false} onClose={onClose} aria-label="Test">
         <div>modal body</div>
       </Modal>,
     );
     expect(screen.queryByText('modal body')).toBeNull();
+  });
+
+  function WindowHost({ children }: { children?: React.ReactNode }) {
+    const [open, setOpen] = React.useState(false);
+    return (
+      <>
+        <button onClick={() => setOpen(true)}>open</button>
+        <Modal isOpen={open} onClose={() => setOpen(false)} aria-label="Publish">
+          {children ?? <><button>first</button><button>last</button></>}
+        </Modal>
+      </>
+    );
+  }
+  const openWindow = (children?: React.ReactNode) => {
+    render(<WindowHost>{children}</WindowHost>);
+    const opener = screen.getByText('open');
+    opener.focus();
+    fireEvent.click(opener);
+    return opener;
+  };
+
+  it('is a named dialog that takes the focus on open and hands it back on close (#4)', () => {
+    const opener = openWindow();
+    const dialog = screen.getByRole('dialog', { name: 'Publish' });
+    expect(dialog).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
+  it('leaves the focus on a field that took it (autoFocus)', () => {
+    openWindow(<input aria-label="Search" autoFocus />);
+    expect(screen.getByLabelText('Search')).toHaveFocus();
+  });
+
+  it('Tab and Shift+Tab cycle inside the window, never to the page behind it', () => {
+    openWindow();
+    const [first, last] = [screen.getByText('first'), screen.getByText('last')];
+    last.focus();
+    expect(fireEvent.keyDown(last, { key: 'Tab' })).toBe(false); // handled: wrapped
+    expect(first).toHaveFocus();
+    expect(fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(last).toHaveFocus();
+    screen.getByRole('dialog').focus();
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    first.focus();
+    expect(fireEvent.keyDown(first, { key: 'Tab' })).toBe(true); // inside: the browser moves on
+  });
+
+  it('Escape is the window\'s alone — it never reaches the editor behind (window listeners)', () => {
+    const behind = vi.fn();
+    window.addEventListener('keydown', behind);
+    openWindow();
+    const escape = fireEvent.keyDown(screen.getByText('first'), { key: 'Escape' });
+    window.removeEventListener('keydown', behind);
+    expect(escape).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(behind).not.toHaveBeenCalled();
   });
 });
 
@@ -193,7 +264,7 @@ function MenuInModal({ onClose, onSelect }: { onClose: () => void; onSelect: () 
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = React.useState(true);
   return (
-    <Modal isOpen onClose={onClose} size="md">
+    <Modal isOpen onClose={onClose} aria-label="Versions" size="md">
       <button ref={ref}>more</button>
       <Menu isOpen={open} onClose={() => setOpen(false)} triggerRef={ref}>
         <MenuItem label="Sign out" onSelect={onSelect} />

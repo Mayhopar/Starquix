@@ -328,7 +328,9 @@ it.each(['button', 'input', 'body'] as const)('image popover owns Escape from %s
   expect(result.current.selectedTagName).toBe('div');
   expect(result.current.selectedSourceLocation).toEqual(location);
   expect(result.current.contextKey).toBe(parent);
-  // A second, document-bubbling Escape matches the iframe keyboard relay.
+  // The next Escape is the canvas's once the keyboard is back on it (focus left the design-bar trigger); a
+  // document-bubbling Escape matches the iframe keyboard relay.
+  trigger.blur();
   fireEvent.keyDown(document, { key: 'Escape', bubbles: true, cancelable: true });
   expect(result.current.selectedKey).toBe(parent);
   expect(result.current.contextKey).toBeNull();

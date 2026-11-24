@@ -64,7 +64,8 @@ export function structuralIdentityMap(before: string, after: string, op: Structu
     const taken = old.filter(node => node.start >= span.start && node.start < span.end);
     survivors = old.filter(node => !taken.includes(node));
     if (op.kind === 'move') {
-      const landed = next.findIndex(node => node.line === result.insertedLine);
+      // `>=`: a moved `{cond && (` expression opens on a line with no element.
+      const landed = next.findIndex(node => node.line >= (result.insertedLine as number));
       if (landed < 0) throw new Error('Moved source identity has no landing region');
       const moved = next.slice(landed, landed + taken.length);
       taken.forEach((node, i) => pairs.set(node, moved[i]));

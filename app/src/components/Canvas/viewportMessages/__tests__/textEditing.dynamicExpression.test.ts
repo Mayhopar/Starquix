@@ -10,7 +10,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as Y from 'yjs';
 import toast from 'react-hot-toast';
-import { handleEditModeExited } from '../textEditing';
+import { handleEditModeExited, handleMarkupChanged } from '../textEditing';
+import { markFilesTruth, unmarkFilesTruth } from '@/utils/localMode';
 import { makeFakeCtx, makeFakeIframe } from './fakeContext';
 import { applyCommand } from '@/store/commands';
 import { viteTextWriter } from '@/services/ViteTextWriter';
@@ -18,6 +19,8 @@ import { viteTextWriter } from '@/services/ViteTextWriter';
 vi.mock('@/services/ViteTextWriter', () => ({
   viteTextWriter: { writeTextUpdate: vi.fn(), isAvailable: vi.fn(() => true) },
 }));
+const { mockAccept } = vi.hoisted(() => ({ mockAccept: vi.fn() }));
+vi.mock('@/store/commandGesture', async (orig) => ({ ...(await orig<typeof import('@/store/commandGesture')>()), acceptEditorCommands: mockAccept }));
 vi.mock('react-hot-toast', () => {
   const t = Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() });
   return { default: t };
@@ -35,11 +38,11 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-function setup() {
+function setup(projectId = 'browser_lf_dyn') {
   const doc = new Y.Doc();
   const { iframe, postMessage } = makeFakeIframe();
   const ctx = makeFakeCtx({
-    env: { doc, projectId: 'browser_lf_dyn' },
+    env: { doc, projectId },
     refs: { iframe, scannedElements: { current: [{ key: KEY, parentKey: null, tagName: 'p', classes: '', rect: { top: 0, left: 0, width: 1, height: 1 }, sourceLocation: LOC }] } as never },
     actions: { dispatch: vi.fn((cmd) => applyCommand(doc, cmd as never)) },
   });
@@ -66,5 +69,21 @@ describe('EDIT_MODE_EXITED on a dynamic-expression element', () => {
     expect(toast.error).not.toHaveBeenCalled();
     expect(doc.getMap('sourceText').has(KEY)).toBe(true);
     expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'RESTORE_ORIGINAL_TEXT' }), '*');
+  });
+});
+
+describe('MARKUP_CHANGED refused by the source guard (local project)', () => {
+  it('toasts the reason and restores the frame, like a dynamic expression', async () => {
+    const reason = 'text includes <svg> output that cannot be written back — edit it in the Source tab';
+    mockAccept.mockRejectedValueOnce(new Error(reason));
+    markFilesTruth('browser_lf_guard');
+    try {
+      const { ctx, postMessage } = setup('browser_lf_guard');
+      await handleMarkupChanged(ctx, { key: KEY, innerHTML: 'Save <svg></svg>' });
+      expect(toast.error).toHaveBeenCalledWith(reason);
+      expect(postMessage).toHaveBeenCalledWith({ type: 'RESTORE_ORIGINAL_TEXT', payload: { key: KEY } }, '*');
+    } finally {
+      unmarkFilesTruth('browser_lf_guard');
+    }
   });
 });

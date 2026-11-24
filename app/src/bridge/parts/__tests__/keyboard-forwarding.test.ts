@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mountBridgeForTest, resetHarnessDom, type HarnessBridge } from './harness';
-import { BARE_SHORTCUT_KEYS, TOOL_SHORTCUTS, BREAKPOINT_SHORTCUT_KEYS } from '../../globalShortcuts';
+import { BARE_SHORTCUT_KEYS, TOOL_SHORTCUTS, BREAKPOINT_SHORTCUT_KEYS, COMBO_SHORTCUT_KEYS } from '../../globalShortcuts';
 
 function mount(): HarnessBridge {
   const bridge = mountBridgeForTest();
@@ -123,5 +123,45 @@ describe('text entry inside the preview keeps its keystrokes', () => {
     for (const key of BARE_SHORTCUT_KEYS) {
       expect(forwarded(bridge, { key, target })).toEqual([]);
     }
+  });
+});
+
+describe('the frame reads keys as the editor does (#24) and leaves the app menu its own shortcuts (#42)', () => {
+  beforeEach(() => resetHarnessDom());
+
+  function keydown(init: KeyboardEventInit) {
+    const bridge = mount();
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+    Object.defineProperty(event, 'target', { value: document.body });
+    bridge.handleKeyDown(event);
+    const sent = (bridge.sendToParent as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0].type === 'KEYBOARD_EVENT');
+    return { prevented: event.defaultPrevented, forwarded: sent.length };
+  }
+  const codeOf = (key: string) => (/^[a-z]$/.test(key) ? `Key${key.toUpperCase()}` : /^\d$/.test(key) ? `Digit${key}` : '');
+
+  it.each([['м', 'KeyV'], ['к', 'KeyR'], ['ρ', 'KeyR'], ['&', 'Digit1'], ['é', 'Digit2']])(
+    'forwards %s (%s): a tool or breakpoint key on a Cyrillic, Greek or AZERTY layout', (key, code) => {
+      expect(keydown({ key, code }).forwarded).toBe(1);
+    });
+
+  it.each([['w', 'KeyW'], ['q', 'KeyQ'], ['m', 'KeyM'], ['h', 'KeyH'], [',', 'Comma'], ['r', 'KeyR'], ['w', 'KeyZ']])(
+    'leaves ⌘%s (%s) to the app menu', (key, code) => {
+      expect(keydown({ key, code, metaKey: true }).prevented).toBe(false);
+    });
+
+  it('leaves Ctrl+W, Ctrl+R and Ctrl+Shift+I to the app menu (Windows/Linux)', () => {
+    expect(keydown({ key: 'w', code: 'KeyW', ctrlKey: true }).prevented).toBe(false);
+    expect(keydown({ key: 'r', code: 'KeyR', ctrlKey: true }).prevented).toBe(false);
+    expect(keydown({ key: 'I', code: 'KeyI', ctrlKey: true, shiftKey: true }).prevented).toBe(false);
+  });
+
+  it.each(COMBO_SHORTCUT_KEYS)('takes ⌘%s, a combo the editor handles', (key) => {
+    expect(keydown({ key, code: codeOf(key), metaKey: true })).toEqual({ prevented: true, forwarded: 1 });
+  });
+
+  it('takes the handled combos on other layouts: Ctrl+я (Russian ⌃Z), AZERTY ⌘Z (code KeyW), Caps Lock ⌘Z', () => {
+    expect(keydown({ key: 'я', code: 'KeyZ', ctrlKey: true }).prevented).toBe(true);
+    expect(keydown({ key: 'z', code: 'KeyW', metaKey: true }).prevented).toBe(true);
+    expect(keydown({ key: 'Z', code: 'KeyZ', metaKey: true }).prevented).toBe(true);
   });
 });

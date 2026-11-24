@@ -807,6 +807,10 @@ export function Canvas({ activeDragId, isReorderPending, localInstance, runtimeF
         ref={setCombinedRef}
         className="flex-1 overflow-hidden transition-colors relative"
         data-scroll-container
+        data-canvas-keys
+        // Draw/pen/handle gestures preventDefault their mousedown, which also keeps focus on the toolbar control that
+        // had it; give the keyboard to the canvas the way a plain click on it would.
+        onMouseDownCapture={(e) => { if (!e.currentTarget.contains(document.activeElement)) (document.activeElement as HTMLElement | null)?.blur(); }}
         onClick={handleBackgroundClick}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}

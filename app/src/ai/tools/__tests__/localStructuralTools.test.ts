@@ -602,7 +602,7 @@ describe('add_page (local)', () => {
       page: { id: 'page-123', name: 'About' }, __scanTimeoutMs: 10,
     });
     expect(result.success).toBe(true);
-    expect(mockCreateLocalDocPage).toHaveBeenCalledWith(ctx.doc, LOCAL_PATH, 'About');
+    expect(mockCreateLocalDocPage).toHaveBeenCalledWith(ctx.doc, LOCAL_PATH, 'About', ctx.pushStructuralUndo);
     // No doc-only ADD_PAGE dispatch — createLocalDocPage owns file+doc.
     expect(ctx.dispatch).not.toHaveBeenCalled();
     // Static scan in this ctx → awaitScanChange times out → switchedToPage

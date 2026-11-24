@@ -85,12 +85,12 @@ it('markup acceptance maps same-line descendants and a following original-key de
   const original = '<main><p><b>Old</b></p><p>Tail</p></main>\n'; source(original);
   await acceptEditorCommands(h.doc, [
     { type: 'REGISTER_SOURCE_ELEMENT', sourceKey: `${file}:1:7`, classes: '', sourceLocation: { file, line: 1, column: 7, sourceVersion: sourceVersion(original) } },
-    { type: 'UPDATE_SOURCE_MARKUP', sourceKey: `${file}:1:7`, markup: '<i>New</i>\n<strong>More</strong>' },
+    { type: 'UPDATE_SOURCE_MARKUP', sourceKey: `${file}:1:7`, markup: '<b>New</b>\nMore' },
   ]);
   db.close(); await db.open(); runtime!.restart();
   expect(await deleteLocalElement({ key: `${file}:1:24`, clearSelection() {} })).toBe(true);
   release!(); await flushDurableSourceWritesThrough(projectId, 2);
-  expect(runtime!.read(file)).toBe('<main><p><i>New</i>\n<strong>More</strong></p></main>\n');
+  expect(runtime!.read(file)).toBe('<main><p><b>New</b>\nMore</p></main>\n');
 });
 
 it.each(['text', 'markup'] as const)('viewport %s acceptance persists the original target without a live iframe writer', async kind => {
@@ -101,11 +101,11 @@ it.each(['text', 'markup'] as const)('viewport %s acceptance persists the origin
     file, line: 3, column: 3, sourceVersion: sourceVersion(original), sourceRevision: 0,
   } }] as typeof ctx.refs.scannedElements.current;
   if (kind === 'text') await handleEditModeExited(ctx, { key: `${file}:3:3`, originalText: 'Two', textContent: 'New Two' });
-  else await handleMarkupChanged(ctx, { key: `${file}:3:3`, innerHTML: '<b>New Two</b>' });
+  else await handleMarkupChanged(ctx, { key: `${file}:3:3`, innerHTML: 'New<br>Two' });
   expect(await getDurableProjectState(projectId)).toMatchObject({ acceptedRevision: 2, materializedRevision: 0 });
   release!(); await flushDurableSourceWritesThrough(projectId, 2);
   expect(runtime!.read(file)).toBe(kind === 'text' ? '<main>\n  <p>New Two</p>\n  <p>One</p>\n</main>\n'
-    : '<main>\n  <p><b>New Two</b></p>\n  <p>One</p>\n</main>\n');
+    : '<main>\n  <p>New<br>Two</p>\n  <p>One</p>\n</main>\n');
 });
 
 it('direct source text writer accepts an owned old key while ACK and iframe are unavailable', async () => {
@@ -200,7 +200,7 @@ it('accepted source text and markup carriers remain inert to scan/export through
   await act(async () => {
     result.current.takeSnapshot();
     await acceptEditorCommands(h.doc, [
-      { type: 'UPDATE_SOURCE_MARKUP', sourceKey: `${file}:1:7`, markup: '<b>New</b>' },
+      { type: 'UPDATE_SOURCE_MARKUP', sourceKey: `${file}:1:7`, markup: 'New<br>' },
       { type: 'UPDATE_SOURCE_TEXT', sourceKey: `${file}:1:7`, textContent: 'New' },
     ], result.current.claimSnapshot());
   });

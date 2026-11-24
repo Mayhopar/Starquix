@@ -171,7 +171,7 @@ export const StylePickerModal: React.FC<Props> = ({ isOpen, onClose, projectId, 
 
   return (
     // Same shell as ComponentPickerModal (⌘K)
-    <Modal isOpen={isOpen} onClose={onClose} size="picker">
+    <Modal isOpen={isOpen} onClose={onClose} aria-label="Style" size="picker">
       {mode === 'list' ? (
         <>
           {/* Search header — mirrors ⌘K */}

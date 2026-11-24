@@ -32,7 +32,8 @@ import type * as Y from 'yjs';
 import { db } from '@/db';
 import { applyCommand } from '@/store/commands';
 import { selectCurrentPageId } from '@/store/selectors';
-import { announceLocalPage } from '@/store/localPages';
+import { announceLocalPage, pageFileUndo } from '@/store/localPages';
+import type { PushStructuralUndo } from '@/store/structuralUndo';
 import { localPageId } from './localMode';
 import { acceptFileChanges, finishAcceptedFiles, preparePageFilePlan, projectIdForFolder, type PageFilePlan } from '@/services/durableEdits/fileAcceptance';
 import { localFetch } from './sqLocalBase';
@@ -520,7 +521,7 @@ export function _resetLocalPageSyncForTests(): void {
  *  honestly instead, so the Home badge never moves. ONE message for the UI
  *  toast and the AI tool refusal. */
 export const LOCAL_HOME_IS_INDEX =
-  'In local projects the home page is your index.astro — rename page files in your editor to change it.';
+  'The home page is your index.astro — rename page files in your editor to change it.';
 
 /** Gap 26: page order in local mode. src/pages has no order, so the editor
  *  keeps the root order (as routes) on the project row and the open-time
@@ -559,6 +560,7 @@ export async function renameLocalDocPage(
   projectPath: string,
   pageId: string,
   name: string,
+  pushUndo?: PushStructuralUndo,
 ): Promise<string> {
   projectIdForFolder(projectPath, doc);
   let body!: PageFilePlan;
@@ -572,6 +574,7 @@ export async function renameLocalDocPage(
   });
   void finishAcceptedFiles(accepted);
   if (body.route === body.oldRoute) return pageId;
+  pushUndo?.(pageFileUndo(projectPath, body, pageId));
   const newId = localPageId(body.route);
   announceLocalPage('created', body.route, body.file);
   announceLocalPage('deleted', body.oldRoute!, body.oldFile!);

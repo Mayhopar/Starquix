@@ -167,7 +167,7 @@ describe('wrapLocalElements — refusals change nothing', () => {
   it.each([
     ['text', '<main>\n  <p>a</p>\n  some text\n  <p>b</p>\n</main>\n', 2, 4],
     ['an expression', '<main>\n  <p>a</p>\n  {count}\n  <p>b</p>\n</main>\n', 2, 4],
-    ['the end of a loop body', '<ul>\n  {items.map((i) => (\n    <li>{i}</li>\n  ))}\n  <li>x</li>\n</ul>\n', 3, 5],
+    ['a ternary branch', '<main>\n  <p>a</p>\n  {on ? <i>x</i> : <b>y</b>}\n  <p>b</p>\n</main>\n', 2, 4],
   ])('%s between the layers in the source', async (_what, src, a, b) => {
     await stopLocalDeleteRuntime(runtime, projectId);
     await start({ [PAGE_FILE]: src });
@@ -177,6 +177,17 @@ describe('wrapLocalElements — refusals change nothing', () => {
     expect(await wrap([A, B], scan)).toBe(false);
     expect(toast).toHaveBeenCalledWith(WRAP_NOT_SIBLINGS);
     await expectRefused(false, src);
+  });
+
+  // A .map() body is one unit with its {…} (structural ops move it whole), so it wraps with its loop.
+  it('a loop body wraps together with its whole {items.map(…)}', async () => {
+    const src = '<main>\n  {items.map((i) => (\n    <li>{i}</li>\n  ))}\n  <p>x</p>\n</main>\n';
+    await stopLocalDeleteRuntime(runtime, projectId);
+    await start({ [PAGE_FILE]: src });
+    const A = k(3, 5), B = k(5, 3);
+    const scan = new Map<string, Node>([[A, { parentKey: 'P', tagName: 'li' }], [B, { parentKey: 'P', tagName: 'p' }], ['P', { parentKey: null, tagName: 'main' }]]);
+    expect(await wrap([A, B], scan)).toBe(true);
+    expect(await disk()).toBe('<main>\n  <div>\n    {items.map((i) => (\n      <li>{i}</li>\n    ))}\n    <p>x</p>\n  </div>\n</main>\n');
   });
 
   it('a loop copy, alone or among others', async () => {

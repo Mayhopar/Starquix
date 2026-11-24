@@ -259,7 +259,6 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
     }
   }, [gutterRootElements]);
 
-  useKeyboardShortcuts();
   // Selecting a static svg silently converts it into an editable pen shape.
   useAutoConvertSvgSelection();
   const filesTruth = useFilesTruthMirror(projectId);
@@ -315,6 +314,7 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
   // the Content tab, not an empty Assets tab. Design props and
   // design tools exist only here.
   const designSurface = !activeCollectionId && !editingPost && activeTopTab !== 'content' && !componentsTabEmpty;
+  useKeyboardShortcuts(designSurface);
   useEffect(() => {
     const h = (e: Event) => {
       const file = ((e as CustomEvent).detail?.file ?? null) as string | null;

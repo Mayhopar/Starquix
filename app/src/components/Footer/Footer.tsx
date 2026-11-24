@@ -23,7 +23,6 @@ import {
   CursorIcon,
   DownloadIcon,
   FrameIcon,
-  SlotIcon,
   GearIcon,
   MoonIcon,
   PlusLargeIcon,
@@ -119,7 +118,7 @@ function FooterButton({ onClick, title, icon, active, disabled, testId, compact 
   );
 }
 
-/** One toolbar button for a family of tools (Frame/Slot, Shapes): it shows the
+/** One toolbar button for a family of tools (Shapes): it shows the
  *  active member (else the last pick) and opens a flyout with all of them. */
 function ToolGroup<K extends string>({ tools, activeTool, onPick, title, testId }: {
   tools: Array<{ kind: K; title: string; icon: React.ReactElement }>;
@@ -158,12 +157,6 @@ function ToolGroup<K extends string>({ tools, activeTool, onPick, title, testId 
     </div>
   );
 }
-
-// Frame + Slot: one button, both draw a box (a slot is a component placeholder).
-const FRAME_TOOLS: Array<{ kind: 'frame' | 'slot'; title: string; icon: React.ReactElement }> = [
-  { kind: 'frame', title: 'Frame (A)', icon: <FrameIcon className="w-6 h-6" /> },
-  { kind: 'slot', title: 'Slot', icon: <SlotIcon className="w-6 h-6" /> },
-];
 
 // Metaphors: Manual = design tools (shapes), AI = sparkles, Settings = gear
 
@@ -963,7 +956,13 @@ export function Footer({ projectId, onOpenModal, addOpen = false, onCloseAdd, on
                   title="Select (V)"
                   icon={<CursorIcon className="w-6 h-6" />}
                 />
-                <ToolGroup tools={FRAME_TOOLS} activeTool={activeTool} onPick={setActiveTool} title="Frame / Slot" testId="frames" />
+                {/* No Slot tool: a slot draw is always refused in a project's own pages (#35). */}
+                <FooterButton
+                  onClick={() => setActiveTool('frame')}
+                  active={activeTool === 'frame'}
+                  title="Frame (A)"
+                  icon={<FrameIcon className="w-6 h-6" />}
+                />
                 <ToolGroup tools={SHAPE_TOOLS} activeTool={activeTool} onPick={setActiveTool} title="Shapes" testId="shapes" />
                 <FooterButton
                   onClick={() => setActiveTool('pen')}

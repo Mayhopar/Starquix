@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { handleElementClick, handleElementClicked, handleSlotPlaceholderClick, TEXT_EDITABLE_TAGS } from '../selection';
+import { handleElementClick, handleElementClicked, handleSlotPlaceholderClick } from '../selection';
 import { makeFakeCtx, makeFakeIframe } from './fakeContext';
 import { layerMenu } from '@/components/Editor/layerMenuStore';
 
@@ -58,8 +58,14 @@ describe('ELEMENT_CLICK', () => {
     });
     expect(ctx.actions.sendEnterEditMode).toHaveBeenCalledWith('k1');
     expect(ctx.actions.dispatch).not.toHaveBeenCalled();
-    expect(TEXT_EDITABLE_TAGS.has('p')).toBe(true);
   });
+
+  it.each(['div', 'section', 'header', 'footer', 'nav', 'article', 'summary'])(
+    'double-click edits a selected childless <%s> as Enter does (audit #41)', (tagName) => {
+      const ctx = makeFakeCtx({ refs: { selectedKey: { current: 'k1' } } });
+      handleElementClick(ctx, { ...basePayload, key: 'k1', tagName, isDoubleClick: true, hasChildren: false });
+      expect(ctx.actions.sendEnterEditMode).toHaveBeenCalledWith('k1');
+    });
 
   it('double-click with children enters context (drill down)', () => {
     const ctx = makeFakeCtx();

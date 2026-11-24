@@ -576,7 +576,7 @@ export function ComponentPickerModal({
   ]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="picker">
+    <Modal isOpen={isOpen} onClose={onClose} aria-label="Add component" size="picker">
       {selectionIssue && <div role="alert" className="px-4 py-2 text-sm text-text">{selectionIssue}</div>}
       {/* Tabs header; the project's section theme on the right (Components only) */}
       <div className="px-4 border-b border-stroke flex items-center gap-2">

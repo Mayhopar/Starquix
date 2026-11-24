@@ -27,3 +27,30 @@ describe('text writers — typed braces are text', () => {
     expect(await updateTextContent(value, FILE, LOC, 'a {z}')).toBe(page('{Astro.props.pText ?? "a {z}"}'));
   });
 });
+
+describe('instance writer — a markup commit never writes HTML its source lacks (audit #3 follow-up)', () => {
+  const REFUSAL = /edit it in the Source tab/;
+
+  it("refuses a component's rendered output (<Icon/> became <svg>)", async () => {
+    await expect(instanceUpdateTextContent(page('Save <Icon name="check" />'), LOC,
+      'Save now <svg viewBox="0 0 24 24"><path d="M5 12l5 5"></path></svg>')).rejects.toThrow(REFUSAL);
+  });
+
+  it('refuses markup a script swapped in (<i class="fa"> replaced by <svg>)', async () => {
+    await expect(instanceUpdateTextContent(page('Done <i class="fa fa-check"></i>'), LOC,
+      'Done! <svg class="svg-inline--fa"></svg>')).rejects.toThrow(REFUSAL);
+  });
+
+  it("refuses a link component: its rendered <a> must not replace the call", async () => {
+    await expect(instanceUpdateTextContent(page('Read <Link href="/docs">docs</Link>'), LOC,
+      'Read the <a href="/en/docs">docs</a>')).rejects.toThrow(REFUSAL);
+  });
+
+  it("writes text edits of the element's own markup, typed line breaks and the link tool's <a>", async () => {
+    const span = 'Build <span class="text-indigo-600">faster</span> sites';
+    expect(await instanceUpdateTextContent(page(span), LOC, `${span} today`)).toBe(page(`${span} today`));
+    expect(await instanceUpdateTextContent(page('Two lines'), LOC, 'Two<br>lines')).toBe(page('Two<br>lines'));
+    expect(await instanceUpdateTextContent(page('Read the docs'), LOC, 'Read the <a href="/docs">docs</a>'))
+      .toBe(page('Read the <a href="/docs">docs</a>'));
+  });
+});

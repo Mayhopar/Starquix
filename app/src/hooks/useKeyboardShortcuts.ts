@@ -56,6 +56,7 @@ import { applyCommand } from '@/store/commands';
 import { planEntryDeletion, publishEntryDeletions, type EntryDeletion } from './keyboardShortcutsHelpers';
 import { markLocalScanStaleAfterWrite } from '@/utils/localPageSync';
 import { TOOL_SHORTCUTS, BREAKPOINT_SHORTCUT_KEYS } from '@/bridge/globalShortcuts';
+import { shortcutKey } from '@/bridge/shortcutKey';
 
 /**
  * Decide what the Delete/Backspace key should do when the page's Layout root is
@@ -267,7 +268,8 @@ export async function deleteLocalElementGroup(
   } finally { releaseStructuralWrite(); }
 }
 
-export function useKeyboardShortcuts(): void {
+/** `designSurface`: the page canvas is what's on screen (Editor's own flag) — not the Content/Assets/variables views. */
+export function useKeyboardShortcuts(designSurface = true): void {
   const dispatch = useDispatch();
   const doc = useEditorDoc();
   const { undo, redo, takeSnapshot, claimSnapshot, pushStructuralUndo } = useUndoContext();
@@ -290,8 +292,8 @@ export function useKeyboardShortcuts(): void {
   const { scannedElementsRef, scannedByKeyRef, treeNodesRef } = useScannedElementsRef();
 
   // Consolidated ref for event handler access (avoid stale closures)
-  const stateRef = useRef({ selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview });
-  stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview };
+  const stateRef = useRef({ selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview, designSurface });
+  stateRef.current = { selectedKey, selectedSourceLocation, contextKey, activeTool, additionalSelections, isPreview, designSurface };
 
   const wrapSelection = useWrapSelection();
   const unwrapSelection = useWrapSelection(unwrapLocalElement);
@@ -307,10 +309,11 @@ export function useKeyboardShortcuts(): void {
   const handleKeyDown = useCallback(
     async (e: KeyboardEvent) => {
       const cmdOrCtrl = getModifierKey(e);
+      const key = shortcutKey(e); // the same key on every layout, Shift and Caps Lock
 
       // Save is global even while a property/source field has focus. Let
       // composition and a field's own handled shortcut keep their ownership.
-      if (cmdOrCtrl && e.key === 's') {
+      if (cmdOrCtrl && key === 's') {
         if (e.defaultPrevented || e.isComposing || e.keyCode === 229 || stateRef.current.isPreview) return;
         e.preventDefault();
         const projectId = selectProjectId(doc);
@@ -371,7 +374,7 @@ export function useKeyboardShortcuts(): void {
         dispatchZoomCommand(action);
       };
       if (cmdOrCtrl && !e.altKey) {
-        if (e.key === '0' && !e.shiftKey) { zoom('reset'); return; }
+        if (key === '0' && !e.shiftKey) { zoom('reset'); return; } // AZERTY's 0 key types 'à'; symbols below as typed
         if (e.key === '=' || e.key === '+') { zoom('in'); return; }
         if (e.key === '-' || e.key === '_') { zoom('out'); return; }
       }
@@ -383,16 +386,23 @@ export function useKeyboardShortcuts(): void {
       // Alignment grid on/off: Ctrl+G on every platform (⌃G on a Mac, as in Figma's
       // layout grids — so ⌘G stays free). Modifier combos are forwarded out of the
       // iframe by rule (bridge/parts/events.ts), so this works with focus in the page.
-      if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'g') {
+      if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && key === 'g') {
         e.preventDefault();
         toggleGrid(selectProjectId(doc));
         return;
       }
 
+      // Every key from here on acts on the canvas (only ⌘Z/⌘Y/⌘J are app commands), so only while the keyboard is on
+      // the canvas: nothing focused, or focus in [data-canvas-keys] (the canvas with its iframe, the Layers tree) — on
+      // the Design view, with no window open. A focused control keeps its own keys (Enter clicks, Tab moves on).
+      const focus = document.activeElement;
+      const canvasKeys = stateRef.current.designSurface && !document.querySelector('[aria-modal="true"]') &&
+        (!focus || focus === document.body || !!focus.closest('[data-canvas-keys]'));
+
       // Create / Remove container: ⌘G / ⇧⌘G on a Mac; Ctrl+Alt+G / Ctrl+Shift+G
       // elsewhere (Ctrl+G is the grid there). `code`, not `key`: ⌥ and AltGr change the letter.
       const groupCombo = isMac() ? e.metaKey && !e.ctrlKey && !e.altKey : e.ctrlKey && !e.metaKey && e.altKey !== e.shiftKey;
-      if (groupCombo && e.code === 'KeyG') {
+      if (canvasKeys && groupCombo && e.code === 'KeyG') {
         e.preventDefault();
         if (!e.repeat) (e.shiftKey ? unwrapSelection : wrapSelection)();
         return;
@@ -401,16 +411,16 @@ export function useKeyboardShortcuts(): void {
       // Bare-key shortcuts (no modifiers). Both the keys handled here and the
       // set the bridge forwards out of the preview iframe come from ONE list:
       // bridge/globalShortcuts.ts. Add a bare-key shortcut there, never here.
-      if (!cmdOrCtrl && !e.shiftKey && !e.altKey) {
+      if (canvasKeys && !cmdOrCtrl && !e.shiftKey && !e.altKey) {
         // Breakpoint shortcuts: 1–6 → xs…2xl (input guard above keeps typing safe)
-        const bpIndex = BREAKPOINT_SHORTCUT_KEYS.indexOf(e.key);
+        const bpIndex = BREAKPOINT_SHORTCUT_KEYS.indexOf(key);
         if (bpIndex !== -1) {
           dispatch({ type: 'SET_BREAKPOINT', breakpoint: BREAKPOINT_ORDER[bpIndex] });
           return;
         }
         // Tools: select/frame/text/slot/blog + vector shapes (task-106) and the
         // bezier pen (task-107). Arrow/Polygon have no key — footer flyout only.
-        const tool = TOOL_SHORTCUTS[e.key.toLowerCase()];
+        const tool = TOOL_SHORTCUTS[key];
         if (tool) {
           e.preventDefault();
           setActiveTool(tool);
@@ -419,29 +429,31 @@ export function useKeyboardShortcuts(): void {
       }
 
       // Undo: Cmd/Ctrl + Z
-      if (cmdOrCtrl && e.key === 'z' && !e.shiftKey) {
+      if (cmdOrCtrl && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
         return;
       }
 
       // Redo: Cmd/Ctrl + Shift + Z or Cmd/Ctrl + Y
-      if (cmdOrCtrl && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
+      if (cmdOrCtrl && ((key === 'z' && e.shiftKey) || key === 'y')) {
         e.preventDefault();
         redo();
         return;
       }
 
       // AI mode: Cmd/Ctrl + J — toggle activeTool to/from 'ai'
-      if (cmdOrCtrl && e.key === 'j') {
+      if (cmdOrCtrl && key === 'j') {
         e.preventDefault();
         const next = currentActiveTool === 'ai' ? 'select' : 'ai';
         setActiveTool(next); // Footer's effect is the sole sq:ai-context-mode emitter
         return;
       }
 
+      if (!canvasKeys) return;
+
       // ⌘C copy / ⌘X cut / ⌘V paste / ⌘D duplicate — element clipboard
-      if (cmdOrCtrl && (e.key === 'c' || e.key === 'x' || e.key === 'v' || e.key === 'd') && !e.shiftKey && !e.altKey) {
+      if (cmdOrCtrl && (key === 'c' || key === 'x' || key === 'v' || key === 'd') && !e.shiftKey && !e.altKey) {
         const buildClipboardDeps = (entries: MultiSelectionEntry[]): ClipboardActionDeps => ({
           doc,
           entries,
@@ -470,15 +482,15 @@ export function useKeyboardShortcuts(): void {
           ? [{ key: currentSelectedKey, elementId: selectedElementId ?? null }]
           : [];
         const entries = [...primary, ...currentAdditionalSelections];
-        if (e.key === 'v') {
+        if (key === 'v') {
           e.preventDefault();
           void pasteClipboard(buildClipboardDeps(entries));
           return;
         }
         if (entries.length === 0) return;          // no selection: let native copy happen
         e.preventDefault();
-        if (e.key === 'c') { void copySelection(buildClipboardDeps(entries)); return; }
-        if (e.key === 'x') { void cutSelection(buildClipboardDeps(entries)); return; }
+        if (key === 'c') { void copySelection(buildClipboardDeps(entries)); return; }
+        if (key === 'x') { void cutSelection(buildClipboardDeps(entries)); return; }
         void duplicateSelection(buildClipboardDeps(entries));
         return;
       }

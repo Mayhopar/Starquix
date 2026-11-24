@@ -21,7 +21,7 @@ test('Electron edits real source, survives child crash, quit and reopen', async 
     await expect(heading).toBeVisible({ timeout: BOOT }); await select(page, heading);
     await expect(page.getByTestId('design-bar').getByText('H1', { exact: true })).toBeVisible();
     await page.keyboard.press('Enter');
-    await preview(page).locator('[contenteditable="true"]').fill('Desktop durable source');
+    await preview(page).locator('[contenteditable="plaintext-only"]').fill('Desktop durable source');
     await page.keyboard.press('Escape');
     await page.getByTitle('Align center', { exact: true }).click();
     const edited = preview(page).getByRole('heading', { name: 'Desktop durable source' });

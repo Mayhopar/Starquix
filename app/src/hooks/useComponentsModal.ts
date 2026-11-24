@@ -1,6 +1,7 @@
 // src/hooks/useComponentsModal.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getModifierKey } from '@/utils/platform';
+import { shortcutKey } from '@/bridge/shortcutKey';
 
 /**
  * Hook to manage the component picker modal.
@@ -26,7 +27,7 @@ export function useComponentsModal() {
         return;
       }
 
-      if (getModifierKey(e) && e.key === 'k') {
+      if (getModifierKey(e) && shortcutKey(e) === 'k') {
         e.preventDefault();
         handleOpenModal();
       }

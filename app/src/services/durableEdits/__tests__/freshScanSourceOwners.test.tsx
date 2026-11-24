@@ -86,7 +86,7 @@ it.each(['AI text', 'AI classes', 'AI compound', 'viewport text', 'viewport mark
       else if (owner === 'viewport text') {
         result.current.undo.takeSnapshot();
         await handleEditModeExited(ctx, { key, originalText: 'Two', textContent: 'Updated Two' });
-      } else if (owner === 'viewport markup') await handleMarkupChanged(ctx, { key, innerHTML: '<b>Updated Two</b>' });
+      } else if (owner === 'viewport markup') await handleMarkupChanged(ctx, { key, innerHTML: 'Updated<br>Two' });
       else if (owner === 'source-key command') {
         result.current.undo.takeSnapshot();
         await acceptEditorCommands(h.doc, [{ type: 'UPDATE_SOURCE_TEXT', sourceKey: key, originalText: 'Two', textContent: 'Updated Two' }], result.current.undo.claimSnapshot());
@@ -94,7 +94,7 @@ it.each(['AI text', 'AI classes', 'AI compound', 'viewport text', 'viewport mark
       else if (owner.startsWith('dispatch ')) {
         result.current.undo.takeSnapshot();
         await result.current.dispatch(owner === 'dispatch classes' ? { type: 'UPDATE_SOURCE_CLASSES', sourceKey: key, classes: 'chosen' }
-          : owner === 'dispatch markup' ? { type: 'UPDATE_SOURCE_MARKUP', sourceKey: key, markup: '<b>Updated Two</b>' }
+          : owner === 'dispatch markup' ? { type: 'UPDATE_SOURCE_MARKUP', sourceKey: key, markup: 'Updated<br>Two' }
           : { type: 'UPDATE_SOURCE_TEXT', sourceKey: key, originalText: 'Two', textContent: 'Updated Two' });
       }
       else if (owner.startsWith('grid ')) {
@@ -114,7 +114,7 @@ it.each(['AI text', 'AI classes', 'AI compound', 'viewport text', 'viewport mark
     const changedTwo = owner.startsWith('grid ') ? '<p class="col-span-2">Two</p>'
       : owner === 'AI classes' || owner === 'dispatch classes' || classStoreOwner ? '<p class="chosen">Two</p>'
       : owner === 'AI compound' ? '<p class="chosen">Updated Two</p>'
-      : owner === 'viewport markup' || owner === 'dispatch markup' ? '<p><b>Updated Two</b></p>' : '<p>Updated Two</p>';
+      : owner === 'viewport markup' || owner === 'dispatch markup' ? '<p>Updated<br>Two</p>' : '<p>Updated Two</p>';
     expect(runtime.read(file)).toBe(`<main>\n  ${changedTwo}\n  <p>Changed One</p>\n</main>\n`);
     await act(async () => { await result.current.undo.undo(); });
     await act(async () => { await flushDurableSourceWritesThrough(projectId, 4); });

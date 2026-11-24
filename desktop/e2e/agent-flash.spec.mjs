@@ -42,7 +42,7 @@ test('agent edits ring on the canvas; the user\'s own edits and CSS do not', asy
     await select(page, second);
     await expect(page.getByTestId('design-bar').getByText('P', { exact: true })).toBeVisible();
     await page.keyboard.press('Enter');
-    await expect(frame.locator('[contenteditable="true"]')).toBeVisible();
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toBeVisible();
     await page.keyboard.press('ArrowRight');
     await page.keyboard.type(' typed');
     await page.keyboard.press('Escape');

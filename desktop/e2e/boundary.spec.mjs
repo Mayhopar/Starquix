@@ -105,7 +105,7 @@ test('A4-draft: text typed when the instance dies is restored in the new documen
     await select(page, para);
     await expect(page.getByTestId('design-bar').getByText('P', { exact: true })).toBeVisible();
     await page.keyboard.press('Enter');
-    await expect(frame.locator('[contenteditable="true"]')).toBeVisible();
+    await expect(frame.locator('[contenteditable="plaintext-only"]')).toBeVisible();
     await page.keyboard.press('ArrowRight');
     await page.keyboard.type(' before the crash');
     await frame.locator('body').evaluate(() => { window.__sqMarker = 1; });
@@ -113,7 +113,7 @@ test('A4-draft: text typed when the instance dies is restored in the new documen
     // The new instance's document replaced the old one (marker gone)…
     await expect.poll(() => preview(page).locator('body').evaluate(() => window.__sqMarker !== 1).catch(() => false), { timeout: BOOT }).toBe(true);
     // …and re-entered the edit with the typed text.
-    await expect(preview(page).locator('[contenteditable="true"]')).toHaveText('Second editable paragraph before the crash', { timeout: 15_000 });
+    await expect(preview(page).locator('[contenteditable="plaintext-only"]')).toHaveText('Second editable paragraph before the crash', { timeout: 15_000 });
   } catch (error) { await fail(app, temp, info, error); }
   finally { await app?.close(); await fs.rm(temp, { recursive: true, force: true, maxRetries: 10 }); }
 });

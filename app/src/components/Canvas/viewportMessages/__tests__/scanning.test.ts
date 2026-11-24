@@ -78,12 +78,22 @@ describe('ELEMENTS_SCANNED', () => {
     expect(selectRootElementIds(doc, 'page-1')).toEqual(['el-1']);
   });
 
-  it('refreshes the selected rect from the new scan, clearing when gone', () => {
+  it('refreshes the selected rect from the new scan', () => {
     const ctx = makeFakeCtx({ refs: { selectedKey: { current: 'k1' } } });
     handleElementsScanned(ctx, { elements: [el('k1')] });
     expect(ctx.actions.updateSelectionRect).toHaveBeenCalledWith(el('k1').rect);
-    handleElementsScanned(ctx, { elements: [el('other')] });
+    expect(ctx.actions.clearSelection).not.toHaveBeenCalled();
+  });
+
+  // #18: ⌘D then ⌘Z — the copy is gone, but the panel kept it and every edit failed
+  // ('Could not parse element tag'). A predicted scan still carries pre-write keys: it only drops the box.
+  it('a settled scan without the selected element clears the selection', () => {
+    const ctx = makeFakeCtx({ refs: { selectedKey: { current: 'k1' } } });
+    handleElementsScanned(ctx, { elements: [el('other')], predicted: true });
     expect(ctx.actions.updateSelectionRect).toHaveBeenLastCalledWith(null);
+    expect(ctx.actions.clearSelection).not.toHaveBeenCalled();
+    handleElementsScanned(ctx, { elements: [el('other')] });
+    expect(ctx.actions.clearSelection).toHaveBeenCalledTimes(1);
   });
 
   it('auto-selects the pending element after replace', () => {
@@ -453,6 +463,28 @@ describe('local pending selection (task-133)', () => {
       await new Promise(r => setTimeout(r, 0));
       expect(isSelectionResolving()).toBe(false);
       expect(ctx.refs.selectInContext.current).toHaveBeenCalledWith(`${FILE}:12:5`, expect.anything());
+    } finally { setActiveSaveProjectId(null); }
+  });
+
+  // #18 (address reuse): after ⌘D then ⌘Z the selected copy's address names the next element (a section).
+  // The replay's restore selects exactly the key the step started with — or nothing.
+  it('an undo/redo restore selects exactly its key, or clears, never the element now at the old address', async () => {
+    const { setActiveSaveProjectId } = await import('@/services/pendingProjectMutations');
+    const { setLocalPendingRestore, getSelectionEpoch } = await import('@/utils/localPendingSelection');
+    setActiveSaveProjectId('browser_restore');
+    try {
+      const doc = new Y.Doc(); doc.getMap('meta').set('projectId', 'browser_restore');
+      const li = el(`${FILE}:6:17`, null, { tagName: 'li' }), section = el(`${FILE}:7:5`, null, { tagName: 'section' });
+      const ctx = makeFakeCtx({ refs: { selectedKey: { current: section.key }, patchSelection: { current: vi.fn() } }, env: { doc } });
+      setLocalPendingRestore(FILE, li.key, getSelectionEpoch());
+      handleElementsScanned(ctx, { elements: [li, section] });
+      await new Promise(r => setTimeout(r, 0));
+      expect(ctx.refs.selectInContext.current).toHaveBeenCalledWith(li.key, expect.anything());
+      expect(ctx.refs.patchSelection?.current).not.toHaveBeenCalled();
+      setLocalPendingRestore(FILE, null, getSelectionEpoch());
+      handleElementsScanned(ctx, { elements: [li, section] });
+      await new Promise(r => setTimeout(r, 0));
+      expect(ctx.actions.clearSelection).toHaveBeenCalledTimes(1);
     } finally { setActiveSaveProjectId(null); }
   });
 

@@ -167,12 +167,14 @@ describe('Pages panel rename gesture ownership', () => {
   });
 });
 
-// ⌘\ hides the sidebars and dispatches `resize`: a menu pinned at the cursor would float over the canvas.
+// ⌘\ hides the sidebars and dispatches `resize`: the row menu (kit Menu) closes once its row leaves the layout.
 describe('Pages panel row menu', () => {
-  it('closes when the layout resizes', () => {
+  it('closes when its row leaves the layout', () => {
     renderNode(page({ id: 'p2', name: 'Page 2' }));
-    fireEvent.contextMenu(screen.getByTestId('page-item'));
+    const row = screen.getByTestId('page-item');
+    fireEvent.contextMenu(row);
     expect(screen.getByText('Delete')).toBeTruthy();
+    row.parentElement!.checkVisibility = () => false; // the menu's trigger, Row's outer element, under display: none
     fireEvent(window, new Event('resize'));
     expect(screen.queryByText('Delete')).toBeNull();
   });

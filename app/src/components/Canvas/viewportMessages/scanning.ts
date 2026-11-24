@@ -249,7 +249,9 @@ export function handleElementsScanned(ctx: ViewportMessageContext, payload: unkn
   }
 
   // Refresh selectedRect from new scan so overlays track element movement.
-  // If the selected element is gone (deleted), clear the rect to remove ghost overlay.
+  // The selected element is gone from a settled scan (deleted, an undone insert or
+  // duplicate): clear the selection, or the panel keeps editing a ghost (#18). A
+  // predicted scan still carries pre-write keys — it only drops the box.
   // Not while a structural edit's own selection resolves on this scan: keys are
   // positional, so the selected (pre-write) key may now name a neighbour — the box
   // flashed onto it for ~50 ms (filmstrip 2026-11-08). The pending re-selects.
@@ -264,7 +266,8 @@ export function handleElementsScanned(ctx: ViewportMessageContext, payload: unkn
       const el = p.elements.find(e => e.key === ctx.refs.selectedKey.current);
       const moved = linkElementAfterScan(ctx.refs.selectedKey.current, p.elements);
       if (moved) ctx.refs.selectInContext.current(moved.key, selectOptionsFor(moved));
-      else ctx.actions.updateSelectionRect(el?.rect ?? null);
+      else if (el || p.predicted) ctx.actions.updateSelectionRect(el?.rect ?? null);
+      else ctx.actions.clearSelection();
       // The selection's facts are post-scan truth too: after a write that
       // changed the tag / src the panel must not wait for a re-click.
       if (el && !moved) ctx.refs.patchSelection?.current?.(el.key, { tagName: el.tagName, classes: el.classes, imageSrc: el.imageSrc ?? null, imageAlt: el.imageAlt ?? null });
@@ -300,6 +303,8 @@ export function handleElementsScanned(ctx: ViewportMessageContext, payload: unkn
       if (consumed) clearLocalPendingSelection();
       const match = key ? p.elements.find(el => el.key === key) : undefined;
       if (match) ctx.refs.selectInContext.current(match.key, selectOptionsFor(match));
+      // An undo / redo restore found nothing to select: its old key may name another element now (#18).
+      else if (localPending.exact !== undefined) ctx.actions.clearSelection();
       // No match: the selection keeps its key; give the box that key's rect now.
       else if (ctx.refs.selectedKey.current) ctx.actions.updateSelectionRect(p.elements.find(e => e.key === ctx.refs.selectedKey.current)?.rect ?? null);
     }, () => { if (resolvingSelection === localPending) resolvingSelection = null; });

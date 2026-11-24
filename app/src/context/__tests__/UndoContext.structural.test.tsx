@@ -44,6 +44,7 @@ import {
   _resetStructuralWriteInFlightForTests,
 } from '@/components/Editor/localStructuralOps';
 import type { StructuralUndoRecord } from '@/store/structuralUndo';
+import { clearLocalPendingSelection, peekLocalPendingSelection, registerSelectedKeyReader } from '@/utils/localPendingSelection';
 import { applyCommand } from '@/store/commands';
 
 const PAGE = 'src/pages/index.astro';
@@ -525,5 +526,63 @@ describe('UndoContext page delete/restore entries (task-148)', () => {
     expect(result.current.canUndo).toBe(true);
     expect(result.current.canRedo).toBe(false);
     expect(result.current.doc.getMap('pages').has('about')).toBe(false);
+  });
+});
+
+// #20: an outside edit (the AI, a terminal) changed the step's file, so the step can never replay.
+// It leaves the stack with a toast that says so, and the next ⌘Z reaches the step before it.
+describe('a step whose file changed since', () => {
+  beforeEach(() => { vi.clearAllMocks(); _resetStructuralWriteInFlightForTests(); });
+  afterEach(teardown);
+  const OUTSIDE = '<main>edited outside</main>\n';
+  const change = { file: PAGE, beforeSource: ORIGINAL, afterSource: DELETED };
+
+  async function pressTwice(push: (result: ReturnType<typeof mount>['result']) => void) {
+    await boot({ [PAGE]: OUTSIDE });
+    const { result } = mount();
+    act(() => result.current.takeSnapshot());
+    act(() => { h.doc.transact(() => h.doc.getMap('sourceText').set('k', new Y.Map()), 'user'); });
+    act(() => push(result));
+    await act(async () => { await result.current.undo(); });
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('step was removed'));
+    expect(await disk()).toBe(OUTSIDE);
+    expect(result.current.canRedo).toBe(false);
+    await act(async () => { await result.current.undo(); });
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(h.doc.getMap('sourceText').has('k')).toBe(false); // the step before it was undone
+    expect(result.current.canUndo).toBe(false);
+  }
+
+  it('a structural step is dropped', () => pressTwice(result =>
+    result.current.pushStructuralUndo({ structuralOp: { ...deleteRecord().structuralOp, sourceFiles: [change] } })));
+
+  it('a snapshot step is dropped', () => pressTwice(result => {
+    result.current.takeSnapshot();
+    const claim = result.current.claimSnapshot()!;
+    claim.attachFiles([change]);
+    claim.commit();
+  }));
+});
+
+// #18 (address reuse): ⌘D then ⌘Z handed the copy's address to the next element, which stayed selected
+// — Backspace then deleted it. A replay restores the selection its step started with, by its exact key.
+describe('a replay restores the selection its step started with', () => {
+  beforeEach(() => { vi.clearAllMocks(); _resetStructuralWriteInFlightForTests(); });
+  afterEach(() => { teardown(); registerSelectedKeyReader(() => null); clearLocalPendingSelection(); });
+
+  it('⌘Z restores the selection from before the step, ⌘⇧Z the one ⌘Z was pressed on', async () => {
+    await boot({ [PAGE]: DELETED });
+    let selected: string | null = `${PAGE}:6:17`;
+    registerSelectedKeyReader(() => selected);
+    const { result } = mount();
+    act(() => result.current.pushStructuralUndo(deleteRecord()));
+    selected = `${PAGE}:7:5`; // the step's own result got selected (the ⌘D copy)
+    await act(async () => { await result.current.undo(); });
+    expect(peekLocalPendingSelection()).toMatchObject({ file: PAGE, exact: `${PAGE}:6:17` });
+    clearLocalPendingSelection();
+    selected = null;
+    await act(async () => { await result.current.redo(); });
+    expect(peekLocalPendingSelection()).toMatchObject({ file: PAGE, exact: `${PAGE}:7:5` });
   });
 });

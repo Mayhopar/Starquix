@@ -1171,7 +1171,7 @@ export function ElementsTree({ baseDepth = 0, viewedComponentFile = null, dynami
   );
 
   return (
-    <div data-testid="layers-panel" className="text-sm select-none outline-none relative" tabIndex={0}>
+    <div data-testid="layers-panel" data-canvas-keys className="text-sm select-none outline-none relative" tabIndex={0}>
       {reparentDragKey && (
         <ReparentDropZone
           nodes={baseNodes}

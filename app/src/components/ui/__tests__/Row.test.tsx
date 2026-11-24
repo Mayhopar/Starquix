@@ -171,6 +171,14 @@ describe('ui/Row', () => {
     expect(container.innerHTML).toContain('group-hover/row:');
   });
 
+  // Finding #39: visibility:hidden took the action out of the Tab order, so the keyboard could never reach it.
+  it('showOnHover actions stay in the Tab order and show while focus is in them', () => {
+    render(<Row title="Asset" right={[{ type: 'custom', node: <button aria-label="Delete" />, showOnHover: true }]} />);
+    const reveal = screen.getByRole('button', { name: 'Delete' }).closest('span.contents')!;
+    expect(reveal.className).not.toMatch(/\binvisible\b/);
+    expect(reveal.className).toContain('focus-within:[&>*]:opacity-100');
+  });
+
   it('legacy leftIcons/rightIcons ReactNodes render as-is and stop propagation', () => {
     const onRowClick = vi.fn();
     const onAction = vi.fn();

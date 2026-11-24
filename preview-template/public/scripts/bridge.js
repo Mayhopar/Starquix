@@ -4748,8 +4748,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     if (!key) return;
     var element = this.findElementByKey(key);
     if (!element) return;
-    // An element whose text is split by line breaks restores its markup, so
-    // the <br> comes back with the text (flat textContent would drop it).
+    // An element whose text holds inline markup restores that markup, so the
+    // <br>/<span> comes back with the text (flat textContent would drop it).
     if (this.originalMarkupByKey && this.originalMarkupByKey[key] !== undefined) {
       element.innerHTML = this.originalMarkupByKey[key];
     } else if (this.originalTextByKey[key] !== undefined) {
@@ -4774,9 +4774,9 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     this.savedSelectionRange = null;
     this.editingElement = element;
     this.originalTextContent = element.textContent;
-    if (key && this.hasLineBreakText(element)) {
-      // Line-break text commits as markup (see exitEditModeCleanup); keep the
-      // first-seen inner markup so an undo can put the <br> back on screen.
+    if (key && this.hasInlineMarkup(element)) {
+      // Such text commits as markup (see exitEditModeCleanup); keep the
+      // first-seen inner markup so an undo can put it back on screen.
       this.originalMarkupByKey = this.originalMarkupByKey || {};
       if (this.originalMarkupByKey[key] === undefined) this.originalMarkupByKey[key] = element.innerHTML;
     }
@@ -4792,7 +4792,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
         this.originalTextByKey[key] = element.textContent;
       }
     }
-    element.contentEditable = 'true';
+    // Text, never structure: no ⌘B/⌘I/paste formatting the commit would drop (audit #38).
+    element.contentEditable = 'plaintext-only';
     // Seamless canvas Task 1.7: a restored draft (typed before a crash or a
     // document replacement). The baselines above stay the FILE text, so exit
     // reports the change and commits it.
@@ -4902,7 +4903,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   
   /**
    * Sanitize innerHTML by removing dangerous attributes from all elements.
-   * Removes: event handlers (onclick, onload, etc.), javascript: URLs, class attributes from links.
+   * Removes: event handlers (onclick, onload, etc.), javascript: URLs. A link's
+   * class stays: an edit keeps every link exactly as the source has it.
    * Returns sanitized HTML string.
    */
   IFrameBridge.prototype.sanitizeLinkHtml = function(innerHTML) {
@@ -4936,9 +4938,6 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
 
     // Sanitize <a> tags specifically
     tempDiv.querySelectorAll('a').forEach(function(a) {
-      // Remove class attribute
-      a.removeAttribute('class');
-
       // Sanitize href - remove javascript: URLs
       var href = a.getAttribute('href');
       if (href) {
@@ -5021,7 +5020,7 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     }
 
     // Temporarily make element contentEditable if using saved range
-    var wasContentEditable = element.contentEditable === 'true';
+    var wasContentEditable = element.isContentEditable;
     if (!wasContentEditable) {
       element.contentEditable = 'true';
     }
@@ -5226,8 +5225,18 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   
   // Interpolated from bridge/globalShortcuts.ts — THE one list of bare-key
   // editor shortcuts. Never hardcode keys here; add them there.
-  var SQ_BARE_SHORTCUT_KEYS = ["v","a","t","s","b","r","o","l","p","1","2","3","4","5","6"];
+  var SQ_BARE_SHORTCUT_KEYS = ["v","a","t","r","o","l","p","1","2","3","4","5","6"];
   var SQ_SHIFTED_SHORTCUT_CODE = "Digit1";
+  var SQ_COMBO_SHORTCUT_KEYS = ["s","k","g","z","y","j","c","x","v","d","0","=","+","-","_"];
+  // bridge/shortcutKey.js verbatim: the frame reads a key exactly as the editor does.
+  var sqShortcutKey = function shortcutKey(e) {
+  var key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (key.length !== 1 || /[a-z0-9]/.test(key) || e.altKey) return key;
+  var digit = /^Digit(\d)$/.exec(e.code);
+  if (digit) return digit[1];
+  var letter = /^Key([A-Z])$/.exec(e.code);
+  return letter && key.charCodeAt(0) > 127 ? letter[1].toLowerCase() : key;
+};
 
   IFrameBridge.prototype.setupEventListeners = function() {
     this.boundHandlers = {
@@ -5270,7 +5279,7 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     var hasModifier = event.metaKey || event.ctrlKey;
     var isForwardableKey = ['Tab', 'Enter', 'Escape', 'Backspace', 'Delete'].indexOf(event.key) !== -1;
     var isBareShortcut = !hasModifier && !event.shiftKey && !event.altKey &&
-      SQ_BARE_SHORTCUT_KEYS.indexOf(String(event.key).toLowerCase()) !== -1;
+      SQ_BARE_SHORTCUT_KEYS.indexOf(sqShortcutKey(event)) !== -1;
     // Shift+1 (zoom to fit) is the one SHIFTED bare shortcut; shifted Digit1
     // reports key '!' so it has to be matched on event.code.
     var isShiftedShortcut = !hasModifier && event.shiftKey && !event.altKey &&
@@ -5300,8 +5309,9 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
       }
     });
 
-    // Prevent default for forwardable keys and modifier combos
-    if (isForwardableKey || hasModifier) {
+    // Prevent default for forwardable keys and the combos the editor handles;
+    // any other combo (⌘W, ⌘Q, ⌘M, ⌘,) still reaches the app menu.
+    if (isForwardableKey || (hasModifier && SQ_COMBO_SHORTCUT_KEYS.indexOf(sqShortcutKey(event)) !== -1)) {
       event.preventDefault();
     }
   };
@@ -5460,6 +5470,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   };
 
   IFrameBridge.prototype.handleMouseDown = function(event) {
+    // Outside text editing a double-click selects or edits elements, never words (audit #40).
+    if (event.detail > 1 && !this.editingElement) event.preventDefault();
     this.mouseDownTarget = event.target;
     this.mouseDownPos = { x: event.clientX, y: event.clientY };
     this.isDragging = false;
@@ -6416,16 +6428,19 @@ IFrameBridge.prototype.handlePickElementAtPoint = function(payload) {
   
 
 
-/** Text split by line breaks commits as markup (flat textContent would drop
- *  every <br>) — unless a link carrier already owns this element's markup. */
-IFrameBridge.prototype.hasLineBreakText = function(element) {
-    return !!element.querySelector('br, wbr') && !element.querySelector('a');
+/** Text holding elements (<br>, <span>, <a>…) commits as markup — flat
+ *  textContent would drop them (audit #3); the writer refuses any it cannot
+ *  write back. Editing is plaintext-only, so they are the ones that were there.
+ *  Outside local projects (WC) links keep their link carrier: an instance's
+ *  markup commit wipes its link overrides (cleanOrphanedLinkOverrides). */
+IFrameBridge.prototype.hasInlineMarkup = function(element) {
+    return element.children.length > 0 && (!!window.__SQ_LOCAL_MODE__ || !element.querySelector('a'));
 };
 
-/** Inner markup to commit for line-break text, bookkeeping attributes stripped;
+/** Inner markup to commit for such text, bookkeeping attributes stripped;
  *  null = plain text is exact. Rides the same markup channel links use. */
 IFrameBridge.prototype.editedInlineMarkup = function(element) {
-    return this.hasLineBreakText(element) ? this.sanitizeLinkHtml(this.cleanClone(element).innerHTML) : null;
+    return this.hasInlineMarkup(element) ? this.sanitizeLinkHtml(this.cleanClone(element).innerHTML) : null;
 };
 
 IFrameBridge.prototype.exitEditModeCleanup = function() {
