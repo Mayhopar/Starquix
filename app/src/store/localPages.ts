@@ -9,11 +9,11 @@ import type * as Y from 'yjs';
 import { applyCommand } from './commands';
 import { localPageId, localPostTargetFor, discoverPagesFromPaths, type LocalPageRef } from '@/utils/localMode';
 import { contentOps } from '@/core/collections/content-ops';
-import type { PushStructuralUndo } from './structuralUndo';
+import type { PushStructuralUndo, StructuralOp, StructuralUndoRecord } from './structuralUndo';
 import type { MutationSnapshot } from './documentMutation';
 import { acceptFileChanges, finishAcceptedFiles, preparePageFilePlan, projectIdForFolder, type PageFilePlan } from '@/services/durableEdits/fileAcceptance';
 
-export async function createLocalDocPage(doc: Y.Doc, projectPath: string, name: string): Promise<string> {
+export async function createLocalDocPage(doc: Y.Doc, projectPath: string, name: string, pushUndo?: PushStructuralUndo): Promise<string> {
   projectIdForFolder(projectPath, doc);
   let body!: PageFilePlan;
   const accepted = await acceptFileChanges(projectPath, async () => {
@@ -24,6 +24,7 @@ export async function createLocalDocPage(doc: Y.Doc, projectPath: string, name: 
     page: { id: localPageId(body.route), name: body.route, rootElementIds: [], children: [] },
     })) throw new Error('Page creation refused');
   });
+  pushUndo?.(pageFileUndo(projectPath, body));
   void finishAcceptedFiles(accepted);
   // task-133 Task 9 review: the session pages list (/__sq/local/pages) is
   // fetched ONCE at instance boot — announce the new page so useLocalInstance
@@ -37,6 +38,24 @@ export async function createLocalDocPage(doc: Y.Doc, projectPath: string, name: 
     }));
   }
   return localPageId(body.route);
+}
+
+/** Add page and Rename are undo steps of their own, like Delete page: an
+ *  earlier step's snapshot restore dropped the new row (or brought the old
+ *  one back) while the file stayed — a live route nobody sees (#17). Replays
+ *  the plan's exact bytes — refused when the file changed since — and the
+ *  rows and the route→file map follow. `oldPageId`: the renamed row. */
+export function pageFileUndo(folder: string, plan: PageFilePlan, oldPageId?: string): StructuralUndoRecord {
+  const page = { folder, pageId: localPageId(plan.route), route: plan.route, file: plan.file };
+  const content = plan.files.find(file => file.file === plan.file)?.afterSource ?? '';
+  const forward: StructuralOp[] = [{ kind: 'page-restore', ...page, content }];
+  const inverse: StructuralOp[] = [{ kind: 'page-delete', ...page }];
+  if (oldPageId) { // rename: a row is added before one is dropped (DELETE_PAGE keeps the last page)
+    const old = { folder, pageId: oldPageId, route: plan.oldRoute!, file: plan.oldFile! };
+    forward.push({ kind: 'page-delete', ...old });
+    inverse.unshift({ kind: 'page-restore', ...old, content });
+  }
+  return { structuralOp: { forward, inverse, sourceSteps: [{ forward, inverse, sourceFiles: plan.files }] } };
 }
 
 // ── task-148: page delete/restore ───────────────────────────────────────────

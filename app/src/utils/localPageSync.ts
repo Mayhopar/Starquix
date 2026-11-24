@@ -32,7 +32,8 @@ import type * as Y from 'yjs';
 import { db } from '@/db';
 import { applyCommand } from '@/store/commands';
 import { selectCurrentPageId } from '@/store/selectors';
-import { announceLocalPage } from '@/store/localPages';
+import { announceLocalPage, pageFileUndo } from '@/store/localPages';
+import type { PushStructuralUndo } from '@/store/structuralUndo';
 import { localPageId } from './localMode';
 import { acceptFileChanges, finishAcceptedFiles, preparePageFilePlan, projectIdForFolder, type PageFilePlan } from '@/services/durableEdits/fileAcceptance';
 import { localFetch } from './sqLocalBase';
@@ -559,6 +560,7 @@ export async function renameLocalDocPage(
   projectPath: string,
   pageId: string,
   name: string,
+  pushUndo?: PushStructuralUndo,
 ): Promise<string> {
   projectIdForFolder(projectPath, doc);
   let body!: PageFilePlan;
@@ -572,6 +574,7 @@ export async function renameLocalDocPage(
   });
   void finishAcceptedFiles(accepted);
   if (body.route === body.oldRoute) return pageId;
+  pushUndo?.(pageFileUndo(projectPath, body, pageId));
   const newId = localPageId(body.route);
   announceLocalPage('created', body.route, body.file);
   announceLocalPage('deleted', body.oldRoute!, body.oldFile!);

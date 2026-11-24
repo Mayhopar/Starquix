@@ -228,6 +228,41 @@ describe('PagesContext deletePage — local mode (task-148)', () => {
     } finally { runtime.close(); unmarkFilesTruth(localId); }
   });
 
+  // #17: an edit, then Add page / Rename, then ⌘Z — the earlier edit's snapshot dropped the new row
+  // (or brought the old one back) while the files stayed: a live route nobody sees. Rows and files move together.
+  const pageUndoCase = async (gesture: (result: Awaited<ReturnType<typeof setup>>) => Promise<void>, files: (onDisk: (file: string) => boolean) => void) => {
+    const localId = `browser_site_${crypto.randomUUID()}`;
+    markFilesTruth(localId);
+    const runtime = projectFsRuntime(localId, { 'src/pages/index.astro': '<html>home</html>', 'src/pages/about.astro': '<html>about</html>' });
+    const onDisk = (file: string) => { try { runtime.read(file); return true; } catch { return false; } };
+    try {
+      const result = await setup(localId);
+      act(() => result.current.undo.takeSnapshot()); // the earlier edit: a full snapshot (ViewportFrame's text edit)
+      act(() => { result.current.doc.transact(() => result.current.doc.getMap('meta').set('edited', true), 'user'); });
+      await act(async () => { await gesture(result); });
+      await flushDurableSourceWrites(localId);
+      await act(async () => { await result.current.undo.undo(); });
+      await flushDurableSourceWrites(localId);
+      files(onDisk);
+      for (const page of ['index', 'about', 'new-page', 'team']) {
+        expect(result.current.pages.pages.some(p => p.id === page), page).toBe(onDisk(`src/pages/${page}.astro`));
+      }
+      await act(async () => { await result.current.undo.redo(); });
+      await flushDurableSourceWrites(localId);
+      for (const page of ['index', 'about', 'new-page', 'team']) {
+        expect(result.current.pages.pages.some(p => p.id === page), `${page} after redo`).toBe(onDisk(`src/pages/${page}.astro`));
+      }
+    } finally { runtime.close(); unmarkFilesTruth(localId); }
+  };
+
+  it('Add page is its own undo step: ⌘Z takes the new page with its file, ⌘⇧Z brings both back', () => pageUndoCase(
+    async result => { await result.current.pages.createPage('New Page'); },
+    onDisk => expect(onDisk('src/pages/new-page.astro')).toBe(false)));
+
+  it('Rename is its own undo step: ⌘Z moves the file back under its old row', () => pageUndoCase(
+    async result => { await result.current.pages.renamePage('about', 'Team'); },
+    onDisk => expect([onDisk('src/pages/about.astro'), onDisk('src/pages/team.astro')]).toEqual([true, false])));
+
   it('endpoint refusal leaves the page row in place (no ghost delete)', async () => {
     const result = await setup();
     const pageId = 'about';

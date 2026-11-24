@@ -101,7 +101,7 @@ describe('update_page (local)', () => {
     const tools = generateCommandTools(ctx);
     const result = await (tools.update_page as ExecTool).execute({ pageId: 'about', name: 'Team' });
     expect(result.success).toBe(true);
-    expect(mockRename).toHaveBeenCalledWith(ctx.doc, LOCAL_PATH, 'about', 'Team');
+    expect(mockRename).toHaveBeenCalledWith(ctx.doc, LOCAL_PATH, 'about', 'Team', ctx.pushStructuralUndo);
     expect(result.data).toMatchObject({ pageId: 'team' });
     expect(ctx.dispatch).not.toHaveBeenCalled();
   });

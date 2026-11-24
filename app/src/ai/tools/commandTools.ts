@@ -1284,8 +1284,8 @@ async function executeCommand(
     // (task-145 data-loss class). REUSE the task-145 path: createLocalDocPage
     // writes the real src/pages file FIRST (POST /__sq/local/page); the doc
     // page follows only on success — a failed write adds NOTHING, and this
-    // tool reports success ONLY when the endpoint succeeded. No takeSnapshot:
-    // ⌘Z can't unwrite a file (PagesContext precedent).
+    // tool reports success ONLY when the endpoint succeeded. ⌘Z is its own
+    // structural step (PagesContext precedent, #17).
     if (commandType === 'add_page' && isLocalProjectId(selectProjectId(ctx.doc) ?? '')) {
       const projectId = selectProjectId(ctx.doc) ?? '';
       const requestedName =
@@ -1298,7 +1298,7 @@ async function executeCommand(
         return { success: false, message: 'add_page failed: this local project is not in the recents list — reopen it from the Projects page.' };
       }
       try {
-        const newPageId = await createLocalDocPage(ctx.doc, entry.path, requestedName);
+        const newPageId = await createLocalDocPage(ctx.doc, entry.path, requestedName, ctx.pushStructuralUndo);
         // The page FILE must be on disk before the switch: a canvas that asks
         // for the route first gets Astro's 404 and keeps it (task-271, e2e-
         // proven: the switch came 80-150 ms before the file). Page creation
@@ -1373,7 +1373,7 @@ async function executeCommand(
         return { success: false, message: 'update_page failed: this local project is not in the recents list — reopen it from the Projects page.' };
       }
       try {
-        const newId = await renameLocalDocPage(ctx.doc, entry.path, pageId, name);
+        const newId = await renameLocalDocPage(ctx.doc, entry.path, pageId, name, ctx.pushStructuralUndo);
         console.groupEnd();
         return {
           success: true,

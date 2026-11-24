@@ -161,8 +161,8 @@ export const PagesProvider: React.FC<PagesProviderProps> = ({ children }) => {
     // first; the doc page follows only on success. A doc-only page has no
     // route: it aliased the index in the iframe and edits there source-wrote
     // the real index file. (parentId nesting is a doc-tree concept the file
-    // system doesn't have — ignored here. No takeSnapshot: ⌘Z can't unwrite
-    // the file, so the page row is not an undoable doc step.)
+    // system doesn't have — ignored here. No takeSnapshot: its own structural
+    // undo step deletes the file and the row together, #17.)
     if (projectId && isLocalProjectId(projectId)) {
       const entry = findLocalProjectEntry(projectId);
       if (!entry) {
@@ -172,7 +172,7 @@ export const PagesProvider: React.FC<PagesProviderProps> = ({ children }) => {
       // 'New Page', not the caller's "Page ${count}" — the doc page count
       // includes nested dynamic instances (a 9-page site produced "Page 10"),
       // and the server suffixes to the first free slug anyway.
-      return await createLocalDocPage(doc, entry.path, 'New Page').catch((e) => {
+      return await createLocalDocPage(doc, entry.path, 'New Page', pushStructuralUndo).catch((e) => {
         showSourceFailure('create-page', e);
         return '';
       });
@@ -214,7 +214,7 @@ export const PagesProvider: React.FC<PagesProviderProps> = ({ children }) => {
     }
 
     return id;
-  }, [doc, projectId, takeSnapshot, claimSnapshot, showSourceFailure]);
+  }, [doc, projectId, takeSnapshot, claimSnapshot, pushStructuralUndo, showSourceFailure]);
 
   const deletePage = useCallback(async (pageId: string) => {
     // task-148 local mode: files are truth — the REAL src/pages file is
@@ -249,14 +249,14 @@ export const PagesProvider: React.FC<PagesProviderProps> = ({ children }) => {
     // Gap 23 local mode: files are truth — the REAL src/pages file is renamed
     // FIRST (host endpoint) and the doc row is rekeyed only on success. A
     // doc-only RENAME_PAGE displayed a route that didn't exist and evaporated
-    // on reopen. No takeSnapshot: ⌘Z can't unrename the file (createPage law).
+    // on reopen. Its own structural undo step moves the file back (createPage law).
     if (projectId && isLocalProjectId(projectId)) {
       const entry = findLocalProjectEntry(projectId);
       if (!entry) {
         toast.error(PROJECT_NOT_READY);
         return;
       }
-      await renameLocalDocPage(doc, entry.path, pageId, name).catch((e) => {
+      await renameLocalDocPage(doc, entry.path, pageId, name, pushStructuralUndo).catch((e) => {
         showSourceFailure('rename-page', e);
       });
       return;
@@ -264,7 +264,7 @@ export const PagesProvider: React.FC<PagesProviderProps> = ({ children }) => {
 
     takeSnapshot();
     await dispatch({ type: 'RENAME_PAGE', pageId, name }).catch(error => showSourceFailure('rename-page', error));
-  }, [doc, projectId, dispatch, takeSnapshot, showSourceFailure]);
+  }, [doc, projectId, dispatch, takeSnapshot, pushStructuralUndo, showSourceFailure]);
 
   const setHomePage = useCallback(async (pageId: string) => {
     // Gap 24 local mode: home is whatever src/pages/index.astro serves. The

@@ -90,7 +90,7 @@ describe('PagesContext.renamePage (local)', () => {
     await act(async () => {
       result.current.pages.renamePage(otherId, 'Team');
     });
-    expect(mockRename).toHaveBeenCalledWith(result.current.doc, LOCAL_PATH, otherId, 'Team');
+    expect(mockRename).toHaveBeenCalledWith(result.current.doc, LOCAL_PATH, otherId, 'Team', expect.any(Function));
     // The doc name is untouched by the context — the helper owns the rekey.
     expect((result.current.doc.getMap('pages').get(otherId) as Y.Map<unknown>).get('name')).toBe('About');
     expect(toast.error).not.toHaveBeenCalled();
