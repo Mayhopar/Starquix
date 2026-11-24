@@ -78,12 +78,22 @@ describe('ELEMENTS_SCANNED', () => {
     expect(selectRootElementIds(doc, 'page-1')).toEqual(['el-1']);
   });
 
-  it('refreshes the selected rect from the new scan, clearing when gone', () => {
+  it('refreshes the selected rect from the new scan', () => {
     const ctx = makeFakeCtx({ refs: { selectedKey: { current: 'k1' } } });
     handleElementsScanned(ctx, { elements: [el('k1')] });
     expect(ctx.actions.updateSelectionRect).toHaveBeenCalledWith(el('k1').rect);
-    handleElementsScanned(ctx, { elements: [el('other')] });
+    expect(ctx.actions.clearSelection).not.toHaveBeenCalled();
+  });
+
+  // #18: ⌘D then ⌘Z — the copy is gone, but the panel kept it and every edit failed
+  // ('Could not parse element tag'). A predicted scan still carries pre-write keys: it only drops the box.
+  it('a settled scan without the selected element clears the selection', () => {
+    const ctx = makeFakeCtx({ refs: { selectedKey: { current: 'k1' } } });
+    handleElementsScanned(ctx, { elements: [el('other')], predicted: true });
     expect(ctx.actions.updateSelectionRect).toHaveBeenLastCalledWith(null);
+    expect(ctx.actions.clearSelection).not.toHaveBeenCalled();
+    handleElementsScanned(ctx, { elements: [el('other')] });
+    expect(ctx.actions.clearSelection).toHaveBeenCalledTimes(1);
   });
 
   it('auto-selects the pending element after replace', () => {
