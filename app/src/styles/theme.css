@@ -23,8 +23,9 @@
   --color-bg-hover:                     light-dark(var(--color-stone-100), --alpha(var(--color-stone-700) / 30%));  /* Background/Hover */
   --color-bg-selected:                  light-dark(--alpha(var(--color-stone-200) / 60%), --alpha(var(--color-stone-700) / 60%));  /* Background/Selected */
   --color-bg-selected-hover:            light-dark(var(--color-stone-200), --alpha(var(--color-stone-700) / 80%));;
-  /* ::selection — distinct from bg-contrast (input bg) so highlights in inputs stay visible; off bg-selected so selected rows stay light */
-  --color-bg-text-selection:            light-dark(var(--color-stone-300), var(--color-bg-selected));
+  /* ::selection (ours) — the platform's accent tint, one recipe for both modes: it stands off every surface (a stone
+     highlight sank into the stone surfaces). Selected text is painted in --color-text (globals.css); the terminal reads the same pair. */
+  --color-bg-text-selection:            --alpha(var(--color-accent) / 45%);
   --color-bg-input-editing:             light-dark(var(--color-yellow-200), var(--color-yellow-950));
 
   /* === TEXT === */
