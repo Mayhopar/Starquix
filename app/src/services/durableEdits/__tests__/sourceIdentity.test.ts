@@ -54,3 +54,11 @@ it('projects import line shifts and whitespace-sensitive subtree moves', () => {
   expect(projectCoordinate(loc(2), [imported.map, moved.map])).toMatchObject(loc(6));
   expect(projectCoordinate(loc(5), [imported.map, moved.map])).toMatchObject(loc(5));
 });
+
+it('a moved `{cond && (…)}` lands with its identity though its first line holds no element (audit #8)', () => {
+  const source = '<main>\n  {big && (\n    <p>Guarded</p>\n  )}\n  <a>Tail</a>\n</main>\n';
+  const moved = step(source, { kind: 'move', from: loc(3, 5), to: loc(5), position: 'after' });
+  expect(moved.source).toBe('<main>\n  <a>Tail</a>\n  {big && (\n    <p>Guarded</p>\n  )}\n</main>\n');
+  expect(projectCoordinate(loc(3, 5), [moved.map])).toMatchObject(loc(4, 5));
+  expect(projectCoordinate(loc(5), [moved.map])).toMatchObject(loc(2));
+});

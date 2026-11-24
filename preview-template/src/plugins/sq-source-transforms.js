@@ -576,18 +576,25 @@ export function resolveElementSpan(content, location) {
 }
 
 /**
- * A conditionally-rendered element — `{cond && <el>…</el>}` (a card field's eye
- * `{show.f && …}`, a guarded field `{post.data.f && …}`) — is ONE unit for
+ * An element that IS the whole value of a `{…}` expression — a guard
+ * `{cond && <el/>}` (a card field's eye `{show.f && …}`) or a `.map()` body
+ * `{items.map((item) => <el/>)}`, either one `(…)`-wrapped — is ONE unit for
  * sibling splices: before/after inserts, removal and moves take the whole
- * expression, or they leave invalid code (`{cond && <p/>\n<p/>}`,
- * `{cond && }`). Only an element that IS the expression's whole body widens;
- * a child inside it does not. inside-end splices are unaffected.
+ * expression, or they leave invalid code (`{cond && }`, `{items.map((item) => )}`)
+ * or land in the callback, once per item (audit #8/#10). One that shares its
+ * expression (a ternary branch, a block-bodied callback) can't leave it alone:
+ * refused. A child inside the element never widens; inside-end is unaffected.
  */
-export function widenToGuardExpression(content, span) {
-  const head = content.slice(0, span.start).match(/\{[^{}<>]*&&\s*$/);
-  const tail = content.slice(span.end).match(/^\s*\}/);
-  if (!head || !tail) return span;
-  return { ...span, start: span.start - head[0].length, end: span.end + tail[0].length };
+const EXPRESSION_OPEN = /\{(?:[^{}<]|\{[^{}<]*\})*$/; // an unclosed `{`, no markup after it
+const EXPRESSION_CLOSE = /^(?:[^{}<]|\{[^{}<]*\})*\}/; // a `}` before any markup
+export function widenToExpression(content, span) {
+  const head = content.slice(templateStartOffset(content), span.start).match(EXPRESSION_OPEN);
+  const tail = content.slice(span.end).match(EXPRESSION_CLOSE);
+  if (!head && !tail) return span;
+  if (head && tail && /(?:&&|=>)[\s(]*$/.test(head[0]) && /^[\s)]*\}$/.test(tail[0])) {
+    return { ...span, start: span.start - head[0].length, end: span.end + tail[0].length };
+  }
+  throw new Error(`structural op: <${span.tag}> is one part of a {…} expression — edit this one in code`);
 }
 
 export function lineNumberAt(content, offset) {
@@ -911,7 +918,7 @@ export function insertMarkupAtLocation(content, location, markup, position) {
   const own = resolveElementSpan(normalized, location);
   assertInsideEndAllowed(own, position);
   assertTargetSpanSafe(normalized, own, position);
-  const span = position === 'inside-end' ? own : widenToGuardExpression(normalized, own);
+  const span = position === 'inside-end' ? own : widenToExpression(normalized, own);
   const offset = structuralSpliceOffset(span, position);
   const baseIndent = lineIndentAt(normalized, span.start);
   const indent = position === 'inside-end' ? baseIndent + '  ' : baseIndent;
@@ -1070,10 +1077,10 @@ export function removeElementAtLocation(content, location, options = {}) {
   const normalized = hasCRLF ? content.replace(/\r\n/g, '\n') : content;
   const own = resolveElementSpan(normalized, location);
   assertRootRemovalAllowed(normalized, own, location, options.allowRootRemoval);
-  const span = widenToGuardExpression(normalized, own);
+  if (!own.voidLike) assertSpanBalanced(normalized.slice(own.start, own.end), own.tag);
+  const span = widenToExpression(normalized, own);
   const region = computeRemovalRegion(normalized, span);
   const removedSource = normalized.slice(region.start, region.end);
-  if (!span.voidLike) assertSpanBalanced(removedSource, span.tag);
   const result = normalized.slice(0, region.start) + normalized.slice(region.end);
   return {
     content: hasCRLF ? result.replace(/\n/g, '\r\n') : result,
@@ -1100,8 +1107,8 @@ export function restoreSourceAtLocation(content, location, text) {
   const hasCRLF = content.includes('\r\n');
   const normalized = hasCRLF ? content.replace(/\r\n/g, '\n') : content;
   const normText = text.replace(/\r\n/g, '\n');
-  // A removed guarded element comes back whole: `{cond && <el>…</el>}` (widenToGuardExpression).
-  const tagMatch = normText.match(/^[ \t\n]*(?:\{[^{}<>]*&&\s*)?<([a-zA-Z][a-zA-Z0-9.-]*)/);
+  // A removed expression value comes back whole: `{cond && <el>…</el>}`, `{items.map((x) => <el>…</el>)}` (widenToExpression).
+  const tagMatch = normText.match(/^[ \t\n]*(?:\{[^<]*)?<([a-zA-Z][a-zA-Z0-9.-]*)/);
   if (!tagMatch) throw new Error('restore: text is not an element');
   const tag = tagMatch[1];
   // Self-closing roots pass trivially (opens counts exclude />); bare void
@@ -1161,22 +1168,22 @@ export function moveElement(content, fromLocation, toLocation, position, options
     );
   }
   const fromOwn = resolveElementSpan(normalized, fromLocation);
-  const fromSpan = widenToGuardExpression(normalized, fromOwn);
   // BEFORE the own-subtree check: when the moved element is the file's only
   // top-level element, "this would gut the component" is the truer message
   // (its only in-file targets ARE its own descendants).
   assertRootRemovalAllowed(normalized, fromOwn, fromLocation, options.allowRootRemoval);
+  if (!fromOwn.voidLike) assertSpanBalanced(normalized.slice(fromOwn.start, fromOwn.end), fromOwn.tag);
+  const fromSpan = widenToExpression(normalized, fromOwn);
   const toOwn = resolveElementSpan(normalized, toLocation);
-  const toSpan = position === 'inside-end' ? toOwn : widenToGuardExpression(normalized, toOwn);
+  assertTargetSpanSafe(normalized, toOwn, position);
+  const toSpan = position === 'inside-end' ? toOwn : widenToExpression(normalized, toOwn);
   if (toSpan.start >= fromSpan.start && toSpan.start < fromSpan.end) {
     throw new Error('Cannot move an element into its own subtree');
   }
   assertInsideEndAllowed(toSpan, position);
-  assertTargetSpanSafe(normalized, toSpan, position);
   structuralSpliceOffset(toSpan, position); // position validated before mutating
   const region = computeRemovalRegion(normalized, fromSpan);
   const removedSource = normalized.slice(region.start, region.end);
-  if (!fromSpan.voidLike) assertSpanBalanced(removedSource, fromSpan.tag);
   const afterRemove = normalized.slice(0, region.start) + normalized.slice(region.end);
   const removedLen = region.end - region.start;
   const shift = (o) => (o == null ? null : o >= region.end ? o - removedLen : o);

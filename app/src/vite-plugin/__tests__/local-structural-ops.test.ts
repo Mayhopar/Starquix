@@ -1190,6 +1190,69 @@ const show = { description: true };
   });
 });
 
+// Audit #8/#10: the same unit rule for `.map()` bodies and `(…)`-wrapped
+// guards. Delete on the first card wrote `{items.map((item) => )}` and the page
+// stopped building; a drop or paste next to the list landed INSIDE the
+// callback, repeated once per item. A ternary branch can't leave alone.
+describe('an element that is the whole value of a {…} expression is one unit', () => {
+  const SRC = `---
+// a stray { in frontmatter
+const items = ['One', 'Two'];
+const rows = [{ id: 1 }];
+---
+<main>
+  {items.map((item) => <div class="card">{item}</div>)}
+  <ul>
+    {rows.map(({ id }) => (
+      <li class="row">{id}</li>
+    ))}
+  </ul>
+  {big ? <h1 id="a">Big</h1> : <h2 id="b">Small</h2>}
+  {big && (
+    <p id="guarded">Shown</p>
+  )}
+  <a id="cta" href="/more">See all</a>
+</main>
+`;
+  const at = (line: number, column: number) => ({ file: 'x.astro', line, column });
+  const MAIN = at(6, 1), CARD = at(7, 24), ROW = at(10, 7), BIG = at(13, 10), SMALL = at(13, 32), GUARDED = at(15, 5), CTA = at(17, 3);
+
+  it('remove takes the whole expression and restores byte-exact', () => {
+    for (const [target, whole] of [
+      [CARD, '  {items.map((item) => <div class="card">{item}</div>)}\n'],
+      [ROW, '    {rows.map(({ id }) => (\n      <li class="row">{id}</li>\n    ))}\n'],
+      [GUARDED, '  {big && (\n    <p id="guarded">Shown</p>\n  )}\n'],
+    ] as const) {
+      const r = removeElementAtLocation(SRC, target);
+      expect(r.content).toBe(SRC.replace(whole, ''));
+      expect(restoreSourceAtLocation(r.content, at(r.removedLine, r.removedColumn), r.removedSource).content).toBe(SRC);
+    }
+  });
+
+  it('a drop or paste next to a loop body lands outside the callback', () => {
+    expect(insertMarkupAtLocation(SRC, CARD, '<p>Pasted</p>', 'after').content)
+      .toContain('{item}</div>)}\n  <p>Pasted</p>\n  <ul>');
+    expect(moveElement(SRC, CTA, CARD, 'before').content).toContain('<main>\n  <a id="cta" href="/more">See all</a>\n  {items.map(');
+    expect(moveElement(SRC, CTA, ROW, 'after').content).toContain('    ))}\n    <a id="cta" href="/more">See all</a>\n  </ul>');
+    expect(moveElement(SRC, CARD, CTA, 'after').content).toContain('See all</a>\n  {items.map((item) => <div class="card">{item}</div>)}\n</main>');
+  });
+
+  it('a ternary branch or a block-bodied callback is refused, never half-removed', () => {
+    for (const target of [BIG, SMALL]) {
+      expect(() => removeElementAtLocation(SRC, target)).toThrow(/expression/);
+      expect(() => moveElement(SRC, target, CTA, 'after')).toThrow(/expression/);
+      expect(() => insertMarkupAtLocation(SRC, target, '<p>x</p>', 'before')).toThrow(/expression/);
+    }
+    const block = SRC.replace('(item) => <div class="card">{item}</div>)}', '(item) => { return <div class="card">{item}</div>; })}');
+    expect(() => removeElementAtLocation(block, at(7, 33))).toThrow(/expression/);
+  });
+
+  it('plain markup next to braces is untouched (a stray `{` in frontmatter, a sibling of the list)', () => {
+    expect(removeElementAtLocation(SRC, MAIN, { allowRootRemoval: true }).content).toBe(SRC.slice(0, SRC.indexOf('<main>')));
+    expect(insertMarkupAtLocation(SRC, at(8, 3), '<hr />', 'before').content).toContain('{item}</div>)}\n  <hr />\n  <ul>');
+  });
+});
+
 // task-269: the insert dedents the block and indents every line to the
 // insertion point — also the lines INSIDE a <pre>, where leading spaces are
 // rendered text. A code mock came out shifted from its second line.
