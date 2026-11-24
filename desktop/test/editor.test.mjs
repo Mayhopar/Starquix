@@ -28,7 +28,8 @@ it('compares custom-scheme origins by scheme and host', () => {
 });
 // Security (audit 2026-10-18): the editor window holds window.sqDesktop, every
 // project and the stored tokens; the packaged build ships a CSP backstop so an
-// injected inline handler or javascript: URL never runs there.
+// injected inline handler or javascript: URL never runs there — nor a plugin <object>, nor a <base> that repoints
+// the editor's relative URLs (finding #45).
 it("serves every editor response with a script-src 'self' CSP (+ wasm: the editor runs the Astro compiler)", async () => {
   const { editorResponse } = await import('../src/editor.mjs');
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sq-editor-csp-'));
@@ -38,7 +39,7 @@ it("serves every editor response with a script-src 'self' CSP (+ wasm: the edito
     const fetchFile = async href => { fetched.push(href); return new Response('<html></html>', { headers: { 'Content-Type': 'text/html' } }); };
     const res = await editorResponse(root, 'starquix://app/editor/browser_1', fetchFile);
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-security-policy')).toBe("script-src 'self' 'wasm-unsafe-eval'");
+    expect(res.headers.get('content-security-policy')).toBe("script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'self'");
     expect(res.headers.get('content-type')).toBe('text/html');
     expect(await res.text()).toBe('<html></html>');
     expect(fetched).toEqual([pathToFileURL(path.join(root, 'index.html')).href]);

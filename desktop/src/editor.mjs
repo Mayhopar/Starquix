@@ -31,8 +31,10 @@ export async function editorFile(root, pathname) {
  *  window.sqDesktop, every project and the stored tokens, so only the build's
  *  own scripts run there — never an inline handler, a javascript: URL or eval.
  *  'wasm-unsafe-eval': the editor runs the Astro compiler as WebAssembly
- *  (durableEdits/commandReceipts.ts). */
-export const EDITOR_CSP = "script-src 'self' 'wasm-unsafe-eval'";
+ *  (durableEdits/commandReceipts.ts). No <object>/<embed>, and no <base> pointing its relative URLs elsewhere: the
+ *  editor uses neither. Fetches, frames and images stay unlisted: their origins (any loopback preview port, the relay,
+ *  AI and font hosts) are not one fixed set. */
+export const EDITOR_CSP = "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'self'";
 /** The packaged editor's answer to a starquix:// request. */
 export async function editorResponse(root, url, fetchFile) {
   const { host, pathname } = new URL(url);
