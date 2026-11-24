@@ -26,7 +26,7 @@
  */
 import type { DrawTool } from '@/context/ToolContext';
 
-/** Bare letter → tool armed. Both cases are accepted at the keydown site. */
+/** Bare letter → tool armed, keyed by shortcutKey (any case, any layout). */
 export const TOOL_SHORTCUTS: Record<string, DrawTool> = {
   v: 'select',
   a: 'frame',
@@ -43,7 +43,7 @@ export const TOOL_SHORTCUTS: Record<string, DrawTool> = {
 export const BREAKPOINT_SHORTCUT_KEYS = ['1', '2', '3', '4', '5', '6'];
 
 /**
- * Every bare key (lowercased) the parent acts on with no modifier. The bridge
+ * Every bare key (its shortcutKey) the parent acts on with no modifier. The bridge
  * forwards exactly this set; `globalShortcutParity` asserts the parent really
  * handles each one, so neither side can drift.
  */
@@ -57,3 +57,12 @@ export const BARE_SHORTCUT_KEYS: string[] = [
  * (not `key`) because shifted Digit1 produces '!'.
  */
 export const SHIFTED_SHORTCUT_CODE = 'Digit1';
+
+/**
+ * Every key (its shortcutKey) the editor acts on with ⌘/Ctrl held: save, the
+ * ⌘K picker, ⌃G grid, undo/redo, ⌘J, the element clipboard and zoom. The
+ * bridge preventDefaults exactly these in the frame; any other combo (⌘W, ⌘Q,
+ * ⌘M, ⌘H, ⌘,) is left to the app menu. `globalShortcutParity` asserts the
+ * parent handles each.
+ */
+export const COMBO_SHORTCUT_KEYS: string[] = ['s', 'k', 'g', 'z', 'y', 'j', 'c', 'x', 'v', 'd', '0', '=', '+', '-', '_'];

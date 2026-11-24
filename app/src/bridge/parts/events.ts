@@ -4,13 +4,17 @@
  * Mouse, keyboard, and wheel event handlers for design mode.
  * Click detection, hover tracking, drag initiation.
  */
-import { BARE_SHORTCUT_KEYS, SHIFTED_SHORTCUT_CODE } from '../globalShortcuts.ts';
+import { BARE_SHORTCUT_KEYS, SHIFTED_SHORTCUT_CODE, COMBO_SHORTCUT_KEYS } from '../globalShortcuts.ts';
+import { shortcutKey } from '../shortcutKey.js';
 
 export const BRIDGE_EVENTS = `
   // Interpolated from bridge/globalShortcuts.ts — THE one list of bare-key
   // editor shortcuts. Never hardcode keys here; add them there.
   var SQ_BARE_SHORTCUT_KEYS = ${JSON.stringify(BARE_SHORTCUT_KEYS)};
   var SQ_SHIFTED_SHORTCUT_CODE = ${JSON.stringify(SHIFTED_SHORTCUT_CODE)};
+  var SQ_COMBO_SHORTCUT_KEYS = ${JSON.stringify(COMBO_SHORTCUT_KEYS)};
+  // bridge/shortcutKey.js verbatim: the frame reads a key exactly as the editor does.
+  var sqShortcutKey = ${shortcutKey};
 
   IFrameBridge.prototype.setupEventListeners = function() {
     this.boundHandlers = {
@@ -53,7 +57,7 @@ export const BRIDGE_EVENTS = `
     var hasModifier = event.metaKey || event.ctrlKey;
     var isForwardableKey = ['Tab', 'Enter', 'Escape', 'Backspace', 'Delete'].indexOf(event.key) !== -1;
     var isBareShortcut = !hasModifier && !event.shiftKey && !event.altKey &&
-      SQ_BARE_SHORTCUT_KEYS.indexOf(String(event.key).toLowerCase()) !== -1;
+      SQ_BARE_SHORTCUT_KEYS.indexOf(sqShortcutKey(event)) !== -1;
     // Shift+1 (zoom to fit) is the one SHIFTED bare shortcut; shifted Digit1
     // reports key '!' so it has to be matched on event.code.
     var isShiftedShortcut = !hasModifier && event.shiftKey && !event.altKey &&
@@ -82,8 +86,9 @@ export const BRIDGE_EVENTS = `
       }
     });
 
-    // Prevent default for forwardable keys and modifier combos
-    if (isForwardableKey || hasModifier) {
+    // Prevent default for forwardable keys and the combos the editor handles;
+    // any other combo (⌘W, ⌘Q, ⌘M, ⌘,) still reaches the app menu.
+    if (isForwardableKey || (hasModifier && SQ_COMBO_SHORTCUT_KEYS.indexOf(sqShortcutKey(event)) !== -1)) {
       event.preventDefault();
     }
   };

@@ -5218,6 +5218,16 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   // editor shortcuts. Never hardcode keys here; add them there.
   var SQ_BARE_SHORTCUT_KEYS = ["v","a","t","s","b","r","o","l","p","1","2","3","4","5","6"];
   var SQ_SHIFTED_SHORTCUT_CODE = "Digit1";
+  var SQ_COMBO_SHORTCUT_KEYS = ["s","k","g","z","y","j","c","x","v","d","0","=","+","-","_"];
+  // bridge/shortcutKey.js verbatim: the frame reads a key exactly as the editor does.
+  var sqShortcutKey = function shortcutKey(e) {
+  var key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (key.length !== 1 || /[a-z0-9]/.test(key) || e.altKey) return key;
+  var digit = /^Digit(\d)$/.exec(e.code);
+  if (digit) return digit[1];
+  var letter = /^Key([A-Z])$/.exec(e.code);
+  return letter && key.charCodeAt(0) > 127 ? letter[1].toLowerCase() : key;
+};
 
   IFrameBridge.prototype.setupEventListeners = function() {
     this.boundHandlers = {
@@ -5260,7 +5270,7 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
     var hasModifier = event.metaKey || event.ctrlKey;
     var isForwardableKey = ['Tab', 'Enter', 'Escape', 'Backspace', 'Delete'].indexOf(event.key) !== -1;
     var isBareShortcut = !hasModifier && !event.shiftKey && !event.altKey &&
-      SQ_BARE_SHORTCUT_KEYS.indexOf(String(event.key).toLowerCase()) !== -1;
+      SQ_BARE_SHORTCUT_KEYS.indexOf(sqShortcutKey(event)) !== -1;
     // Shift+1 (zoom to fit) is the one SHIFTED bare shortcut; shifted Digit1
     // reports key '!' so it has to be matched on event.code.
     var isShiftedShortcut = !hasModifier && event.shiftKey && !event.altKey &&
@@ -5289,8 +5299,9 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
       }
     });
 
-    // Prevent default for forwardable keys and modifier combos
-    if (isForwardableKey || hasModifier) {
+    // Prevent default for forwardable keys and the combos the editor handles;
+    // any other combo (⌘W, ⌘Q, ⌘M, ⌘,) still reaches the app menu.
+    if (isForwardableKey || (hasModifier && SQ_COMBO_SHORTCUT_KEYS.indexOf(sqShortcutKey(event)) !== -1)) {
       event.preventDefault();
     }
   };
