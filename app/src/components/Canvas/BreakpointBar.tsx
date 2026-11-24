@@ -1,5 +1,5 @@
-import { memo, useCallback, useRef, useState } from 'react';
-import { useExclusiveMenu } from './hoverMenu';
+import { memo, useRef } from 'react';
+import { useHoverMenu } from './hoverMenu';
 import { GridChip } from './GridChip';
 import { Button, Menu, MenuItem } from '@/components/ui';
 import { ChevronDownIcon } from '@/assets/icons';
@@ -21,8 +21,6 @@ const BREAKPOINT_LABELS: Record<Breakpoint, string> = {
 
 const breakpoints: Breakpoint[] = ['base', 'sm', 'md', 'lg', 'xl', '2xl'];
 
-const HOVER_CLOSE_DELAY_MS = 150;
-
 /** Button that opens its Menu on hover (and click); closes on mouse-out of both. */
 function HoverMenuButton({
   label,
@@ -35,30 +33,15 @@ function HoverMenuButton({
   menuWidth?: number;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const { open, show, close, scheduleClose, cancelClose } = useHoverMenu();
   const triggerRef = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const cancelClose = useCallback(() => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-  }, []);
-  const scheduleClose = useCallback(() => {
-    cancelClose();
-    closeTimer.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY_MS);
-  }, [cancelClose]);
-
-  useExclusiveMenu(open, setOpen); // only one top-bar menu at a time (claiming closes the other one)
 
   return (
-    <div
-      ref={triggerRef}
-      onMouseEnter={() => { cancelClose(); setOpen(true); }}
-      onMouseLeave={scheduleClose}
-    >
+    <div ref={triggerRef} onMouseEnter={show} onMouseLeave={scheduleClose}>
       <Button
         variant="secondary"
         size="sm"
-        onClick={() => setOpen((o) => !o)}
+        onClick={show}
         className="px-3 gap-1.5"
         label={label}
         iconRight={
@@ -68,8 +51,8 @@ function HoverMenuButton({
           </span>
         }
       />
-      <Menu isOpen={open} onClose={() => setOpen(false)} triggerRef={triggerRef} placement="bottom" offset={4} width={menuWidth}>
-        <div onMouseEnter={cancelClose} onMouseLeave={scheduleClose} onClick={() => setOpen(false)}>
+      <Menu isOpen={open} onClose={close} triggerRef={triggerRef} placement="bottom" offset={4} width={menuWidth}>
+        <div onMouseEnter={cancelClose} onMouseLeave={scheduleClose} onClick={close}>
           {children}
         </div>
       </Menu>
@@ -101,7 +84,8 @@ export const BreakpointBar = memo(function BreakpointBar({ children }: { childre
   const activeMode = modes.find((m) => m.key === currentThemeMode) ?? modes[0];
 
   return (
-    <div className="flex-1 flex items-center justify-center gap-1">
+    // Never clips: narrower than its chips (the 900px minimum window), the row scrolls; centered while it fits (#37).
+    <div className="flex-1 self-stretch min-w-0 flex items-center justify-center-safe gap-1 overflow-x-auto scrollbar-thin *:shrink-0">
       <HoverMenuButton
         label={BREAKPOINT_LABELS[currentBreakpoint]}
         detail={String(BREAKPOINTS[currentBreakpoint])}

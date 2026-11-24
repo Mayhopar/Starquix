@@ -46,7 +46,7 @@ export function BlogBindingBlock({ binding, collections, builtIn }: Props) {
 
   if (!binding || !binding.hasSlot || !localProjectPath) return null;
   if (binding.custom) {
-    return <div className="pl-1 pr-8 pb-2 text-xs text-text-muted">This blog is wired by hand — edit its fetch in Source.</div>;
+    return <div className="pl-1 pr-8 pb-2 text-xs text-text-muted">This blog is wired by hand — edit it in Source.</div>;
   }
 
   const schemaOf = (name: string | null): Schema => collections.find((c) => c.name === name)?.inferredFields ?? [];

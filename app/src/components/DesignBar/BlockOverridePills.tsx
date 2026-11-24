@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { STATE_PREFIXES, THEME_PREFIXES, BREAKPOINT_PREFIXES } from '@/core/classes/constants';
 import { PrefixTag, type TagInfo, type TagCategory } from './PrefixTag';
+import { tokenHasVariant, VARIANT_LEAD } from './variantCell';
 
 const ALL_PREFIXES: { category: TagCategory; prefixes: readonly string[] }[] = [
   { category: 'breakpoint', prefixes: BREAKPOINT_PREFIXES },
@@ -25,12 +26,7 @@ export const BlockOverridePills: React.FC<BlockOverridePillsProps> = ({ classes,
 
     for (const { category, prefixes } of ALL_PREFIXES) {
       for (const prefix of prefixes) {
-        const prefixStr = prefix + ':';
-        const hasOverride = tokens.some(t => {
-          if (!t.includes(prefixStr)) return false;
-          const base = t.replace(/^(?:[\w-]+:)*/, '');
-          return blockPattern.test(base);
-        });
+        const hasOverride = tokens.some(t => tokenHasVariant(t, prefix) && blockPattern.test(t.replace(VARIANT_LEAD, '')));
         if (hasOverride) {
           found.push({ label: prefix, category, value: prefix });
         }

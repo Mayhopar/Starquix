@@ -44,4 +44,14 @@ describe('ZoomChip', () => {
     render(<ZoomChip scale={1} labelRef={ref} />);
     expect(ref.current?.textContent).toBe('100%');
   });
+
+  // Finding #32: the hover that precedes every click opened the menu, and the click then toggled it shut.
+  it('a hover opens the menu, and the click that follows keeps it open', () => {
+    render(<ZoomChip scale={1} />);
+    const chip = screen.getByRole('button', { name: /zoom options/i });
+    fireEvent.mouseEnter(chip.parentElement!);
+    expect(screen.getAllByRole('menuitem')).toHaveLength(4);
+    fireEvent.click(chip);
+    expect(screen.getAllByRole('menuitem')).toHaveLength(4);
+  });
 });

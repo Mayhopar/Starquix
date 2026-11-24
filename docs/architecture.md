@@ -38,9 +38,9 @@ Example: `src/components/Hero.astro:5:1`
 - `app/src/vite-plugin/index.ts` - injects the attributes
 - `preview-template/public/scripts/bridge.js` - reads them
 
-### Yjs Document (Single Source of Truth)
+### Yjs Document (Session Working Copy)
 
-All editor state lives in a Yjs CRDT document. This enables:
+The project files on disk are the source of truth. The Yjs doc is a disposable working copy, rebuilt from the files on every open and never persisted (`useProjectSync.ts`). Edits go through it and are written back to the files. It enables:
 - Collaborative editing (future)
 - Unified undo/redo across all operations
 - Reactive React updates

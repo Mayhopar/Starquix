@@ -72,10 +72,12 @@ npm --prefix app run dev -- --host 127.0.0.1 --port 3061 --strictPort   # the ed
 Then, in a second terminal:
 
 ```bash
-cd desktop && npm run deps && npm start      # desktop app
+cd desktop && npm run deps && npm run mcp && npm start      # desktop app (`mcp/` is built, not committed)
 ```
 
-Requires Node.js 22+ and npm 10. The desktop app runs on macOS, Windows and Linux.
+Requires Node.js 22.12+ and npm 10. The desktop app runs on macOS, Windows and Linux.
+
+A dev launch points `~/.starquix-mcp` (the agent relay launcher) at your checkout, so an installed Starquix app's agents use the dev relay until the installed app launches again.
 
 Tests: `cd app && npm run test:run` and `cd desktop && npm test`.
 

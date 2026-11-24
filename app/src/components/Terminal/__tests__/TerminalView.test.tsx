@@ -83,16 +83,28 @@ it('what xterm answers while replaying old output never reaches the shell; keys 
   h.finishWrite?.(); h.typed?.('ls\r');
   expect(h.input.mock.calls).toEqual([['p', 'ls\r']]);
 });
-it('themes all 16 ANSI colors from theme.css, not xterm\'s dark-screen defaults (white was 1.4:1 on the light Bg)', () => {
+/** jsdom resolves no var(): hand back the token a probe asked for, so a test sees which token each key reads. */
+function themeTokens(): ReturnType<typeof themeOf> {
   const host = document.createElement('div'); document.body.appendChild(host);
   const real = window.getComputedStyle;
-  // jsdom resolves no var(): hand back the token a probe asked for, so the test sees which token each key reads
   vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element) => (el.tagName === 'SPAN' ? { color: (el as HTMLElement).style.color } as CSSStyleDeclaration : real(el)));
-  const theme = themeOf(host);
+  try { return themeOf(host); } finally { host.remove(); vi.restoreAllMocks(); }
+}
+it('themes all 16 ANSI colors from theme.css, not xterm\'s dark-screen defaults (white was 1.4:1 on the light Bg)', () => {
+  const theme = themeTokens();
   const ansi = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
   for (const n of ansi) {
     expect(theme[n as keyof typeof theme], n).toBe(`var(--color-term-${n})`);
     expect(theme[`bright${n[0].toUpperCase()}${n.slice(1)}` as keyof typeof theme], `bright ${n}`).toBe(`var(--color-term-bright-${n})`);
   }
-  host.remove(); vi.restoreAllMocks();
+});
+it('selects like the rest of the chrome: the ::selection tint, the selected text in the theme ink (issue #9)', () => {
+  const theme = themeTokens();
+  expect(theme.selectionBackground).toBe('var(--color-bg-text-selection)');
+  expect(theme.selectionForeground).toBe('var(--color-text)');
+});
+it('a translucent token reaches xterm with its own alpha (an opaque selection color would be redrawn at xterm\'s 30%)', () => {
+  const pixel = { fillStyle: '', fillRect(): void {}, getImageData: () => ({ data: [81, 162, 255, 102] }) };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(pixel as unknown as CanvasRenderingContext2D);
+  expect(themeTokens().selectionBackground).toBe('rgba(81, 162, 255, 0.4)');
 });

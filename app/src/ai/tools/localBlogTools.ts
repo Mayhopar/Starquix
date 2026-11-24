@@ -165,7 +165,7 @@ export const LOCAL_BLOG_HANDLERS: Record<string, Handler> = {
     const { collectionName } = params as { collectionName: string };
     const [cur, all] = await Promise.all([currentBinding(ctx, params.slot), collections()]);
     if (!cur.ok) return fail(cur.message);
-    if (cur.binding.custom) return fail(`The blog on ${cur.file} is wired by hand — edit its fetch in the file.`);
+    if (cur.binding.custom) return fail(`The blog on ${cur.file} is wired by hand — edit it in the file.`);
     const col = all.find((c) => c.name === collectionName);
     if (!col) return missingCollection(collectionName);
     const b = cur.binding;
