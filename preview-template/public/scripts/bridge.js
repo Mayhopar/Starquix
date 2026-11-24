@@ -5285,7 +5285,8 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
         shiftKey: event.shiftKey,
         ctrlKey: event.ctrlKey,
         metaKey: event.metaKey,
-        altKey: event.altKey
+        altKey: event.altKey,
+        repeat: event.repeat
       }
     });
 

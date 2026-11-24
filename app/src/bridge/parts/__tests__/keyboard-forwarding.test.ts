@@ -73,6 +73,13 @@ describe('handleKeyDown forwards every bare-key editor shortcut', () => {
     ]);
   });
 
+  // The parent's repeat guards (wrap, delete) only see what the relay carries.
+  it('forwards key repeat', () => {
+    expect(forwarded(mount(), { key: 'g', code: 'KeyG', metaKey: true, repeat: true })).toEqual([
+      expect.objectContaining({ code: 'KeyG', repeat: true }),
+    ]);
+  });
+
   it('forwards nothing for a plain typed character that is not a shortcut', () => {
     expect(forwarded(mount(), { key: 'q', code: 'KeyQ' })).toEqual([]);
     expect(forwarded(mount(), { key: '7', code: 'Digit7' })).toEqual([]);

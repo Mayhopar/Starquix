@@ -9,6 +9,7 @@ const copy = {
   'rename-page': "Couldn't rename the page",
   'delete-element': "Couldn't delete the element",
   'move-element': "Couldn't move the element",
+  'wrap-elements': "Couldn't create the container",
   draw: "Couldn't add the shape",
   insert: "Couldn't add the component",
   'prepare-insert': "Couldn't prepare the component for insertion",

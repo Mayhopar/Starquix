@@ -30,7 +30,8 @@ A `Modal` takes part the same way: a Popover/Menu inside it registers with it.
   <MenuItem label="Grid" selected onSelect={…} />   // checkmark
 </Menu>
 ```
-- MenuItem: h-7, text-xs, `danger` (error tokens), `selected`, `disabled`, `icon` (node or slot spec).
+- MenuItem: h-7, text-xs, `danger` (error tokens), `selected`, `disabled`, `icon` (node or slot spec),
+  `shortcut` (right-aligned hint, at least 16px from the label).
 
 ## Don't
 - Never hand-roll `absolute` menus/dropdown lists — always Menu/Popover.

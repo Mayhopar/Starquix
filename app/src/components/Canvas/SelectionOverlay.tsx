@@ -395,6 +395,7 @@ export const SelectionOverlay = memo(function SelectionOverlay({
   // Zero deps beyond startDragSession: reads selectedRect, scale, etc. from propsRef.
   const handleMoveMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      if (e.button !== 0) return; // a right-click opens the layer menu instead
       e.preventDefault();
       e.stopPropagation();
 
@@ -435,6 +436,7 @@ export const SelectionOverlay = memo(function SelectionOverlay({
   // Handle flow drag -- initiates iframe-orchestrated drag after 8px threshold
   const handleFlowDragMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      if (e.button !== 0) return; // a right-click opens the layer menu instead
       e.preventDefault();
       e.stopPropagation();
 

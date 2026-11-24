@@ -59,7 +59,7 @@ function isInstanceKey(key: string): boolean {
   return /#\d+$/.test(key);
 }
 
-function isContainerTag(tagName: string): boolean {
+export function isContainerTag(tagName: string): boolean {
   const t = tagName.toLowerCase();
   return !VOID_TAGS.has(t) && !NO_BLOCK_CHILD_TAGS.has(t);
 }

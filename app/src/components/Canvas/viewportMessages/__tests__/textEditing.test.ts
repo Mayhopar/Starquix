@@ -198,6 +198,14 @@ describe('KEYBOARD_EVENT', () => {
     expect(spy).toHaveBeenCalled();
     expect((spy.mock.calls[0][0] as KeyboardEvent).metaKey).toBe(true);
   });
+
+  it('the synthetic keydown keeps the relayed repeat flag', () => {
+    const ctx = makeFakeCtx();
+    const spy = vi.fn();
+    document.addEventListener('keydown', spy, { once: true });
+    handleKeyboardEvent(ctx, { key: 'g', code: 'KeyG', metaKey: true, shiftKey: false, ctrlKey: false, altKey: false, repeat: true });
+    expect((spy.mock.calls[0][0] as KeyboardEvent).repeat).toBe(true);
+  });
 });
 
 describe('writer gating (dev: legacy file write is dead — design 2026-06-11 §1.3)', () => {
