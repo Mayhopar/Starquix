@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { awaitAccepted, hasPendingUserAcceptance, holdProjectInput, pushUserHeldInput } from '../acceptance';
+import { PostWriteQueue } from '@/postmodel/writeQueue';
 
 const P = 'held';
 beforeEach(async () => { await db.delete(); await db.open(); });
@@ -20,12 +21,15 @@ describe('held input scopes', () => {
     off1(); off2();
   });
 
-  it('pushUserHeldInput pushes only user-scoped holds, synchronously', () => {
+  // #22: ⌘Q within 1–3 s of typing in a post lost the text — the quit pushed only the user-scoped holds,
+  // and post typing (held 800 ms – 3 s by PostBodyEditor) has no stash to fall back on.
+  it('pushUserHeldInput (the quit flush) pushes every hold, post typing too, synchronously', () => {
     const user = vi.fn(), post = vi.fn();
-    const off1 = holdProjectInput(P, user, { user: true }); const off2 = holdProjectInput(P, post);
+    const off = holdProjectInput(P, user, { user: true });
+    new PostWriteQueue({ projectId: P, collection: 'posts', slug: 'hello' }).holdInput(post);
     pushUserHeldInput(P);
-    expect(user).toHaveBeenCalledTimes(1); expect(post).not.toHaveBeenCalled();
-    off1(); off2();
+    expect(user).toHaveBeenCalledTimes(1); expect(post).toHaveBeenCalledTimes(1);
+    off();
   });
 
   it('is scoped by project and released by its disposer', async () => {
