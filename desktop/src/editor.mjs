@@ -6,6 +6,16 @@ import { pathToFileURL } from 'node:url';
 export const EDITOR_ORIGIN = 'starquix://app';
 /** Node's URL reports 'null' for every non-special scheme; compare scheme + host. */
 export const originOf = url => { const u = new URL(url); return `${u.protocol}//${u.host}`; };
+const LOOPBACK = /^http:\/\/127\.0\.0\.1:\d+$/; // the dev editor and every preview (canvas) server: wrapper.mjs binds 127.0.0.1
+/** will-frame-navigate, true = main stops it (a web URL then opens in the system browser). The editor never leaves its
+ *  origin; a frame it embeds (the canvas) never leaves for a web page off the loopback previews; a site's own embeds
+ *  (a YouTube player, further down) navigate as the site wants. */
+export function strays({ url, isMainFrame, frame }, editorOrigin) {
+  const origin = originOf(url);
+  if (origin === editorOrigin) return false;
+  if (isMainFrame) return true;
+  return !frame?.parent?.parent && /^https?:/.test(origin) && !LOOPBACK.test(origin);
+}
 /** The editor main loads and trusts. Packaged: the custom scheme only (SQ_EDITOR_URL and the switch below are ignored).
  *  Unpackaged: SQ_EDITOR_URL (default the :3061 dev server) on a 127.0.0.1 loopback origin; SQ_DEV_EDITOR_LOCALHOST=1 (the runtime
  *  probe, desktop/probe) also accepts http://localhost:<port> = a different SITE than the 127.0.0.1 canvas, so the editor and the
@@ -13,7 +23,7 @@ export const originOf = url => { const u = new URL(url); return `${u.protocol}//
 export function resolveEditor({ isPackaged, env }) {
   const editorUrl = isPackaged ? `${EDITOR_ORIGIN}/` : env.SQ_EDITOR_URL ?? 'http://127.0.0.1:3061/';
   const editorOrigin = originOf(editorUrl);
-  const loopback = env.SQ_DEV_EDITOR_LOCALHOST === '1' ? /^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/ : /^http:\/\/127\.0\.0\.1:\d+$/;
+  const loopback = env.SQ_DEV_EDITOR_LOCALHOST === '1' ? /^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/ : LOOPBACK;
   if (!isPackaged && !loopback.test(editorOrigin)) throw new Error('The dev editor must be a loopback editor');
   return { editorUrl, editorOrigin };
 }

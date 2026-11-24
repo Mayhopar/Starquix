@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { editorFile, originOf } from '../src/editor.mjs';
+import { editorFile, originOf, strays } from '../src/editor.mjs';
 it('serves build files, SPA routes and nothing outside the build', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sq-editor-'));
   await fs.mkdir(path.join(root, 'assets'));
@@ -25,6 +25,18 @@ it('compares custom-scheme origins by scheme and host', () => {
   expect(originOf('starquix://evil/')).not.toBe('starquix://app');
   expect(originOf('data:text/html,x')).not.toBe('starquix://app');
   expect(originOf('http://127.0.0.1:3061/a')).toBe('http://127.0.0.1:3061');
+});
+// Finding #44 (will-frame-navigate): a web link clicked in Preview loaded the other site inside the canvas. A stray
+// navigation is stopped (main opens a web URL in the system browser); a site's own embeds are left alone.
+it('keeps the editor on its origin and the canvas on a loopback preview', () => {
+  const main = { parent: null }, canvas = { parent: main }, embed = { parent: canvas };
+  const go = (url, frame) => strays({ url, isMainFrame: frame === main, frame }, 'starquix://app');
+  expect(go('starquix://app/editor/x', main)).toBe(false);
+  for (const url of ['https://example.com/', 'http://127.0.0.1:4321/', 'about:blank']) expect(go(url, main)).toBe(true);
+  expect(go('https://example.com/a', canvas)).toBe(true);
+  for (const url of ['http://127.0.0.1:4321/about', 'starquix://app/x', 'about:srcdoc', 'blob:starquix://app/1'])
+    expect(go(url, canvas)).toBe(false);
+  expect(go('https://www.youtube.com/embed/x', embed)).toBe(false);
 });
 // Security (audit 2026-10-18): the editor window holds window.sqDesktop, every
 // project and the stored tokens; the packaged build ships a CSP backstop so an
