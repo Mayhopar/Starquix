@@ -136,7 +136,8 @@ function renderSide(
   if (Array.isArray(side)) {
     return side.map((spec, i) => (
       <React.Fragment key={i}>
-        <span className={cx('contents', spec.showOnHover && '[&>*]:invisible group-hover/row:[&>*]:visible')}>
+        {/* Opacity, not visibility: a hidden action stays in the Tab order and shows while focus is in it. */}
+        <span className={cx('contents', spec.showOnHover && '[&>*]:opacity-0 group-hover/row:[&>*]:opacity-100 focus-within:[&>*]:opacity-100')}>
           {renderSlot(spec, slotSize)}
         </span>
       </React.Fragment>

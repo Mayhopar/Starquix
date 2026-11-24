@@ -31,8 +31,6 @@ export const TOOL_SHORTCUTS: Record<string, DrawTool> = {
   v: 'select',
   a: 'frame',
   t: 'text',
-  s: 'slot',
-  b: 'blog',
   r: 'rect',
   o: 'ellipse',
   l: 'line',

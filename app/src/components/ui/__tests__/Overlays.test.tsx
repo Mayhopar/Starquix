@@ -98,6 +98,18 @@ describe('ui/Popover', () => {
     expect(screen.queryByRole('button', { name: 'inner' })).toBeNull();
   });
 
+  // Finding #36: a click on the canvas never reaches this document's mousedown — it moves focus into the iframe.
+  it('a click into an iframe (the canvas) closes it; the window losing focus to another app does not', async () => {
+    const onClose = vi.fn();
+    render(<><ControlledHost open onClose={onClose} /><iframe title="canvas" /></>);
+    const blurWindow = async () => { window.dispatchEvent(new Event('blur')); await new Promise((r) => setTimeout(r, 0)); };
+    await blurWindow();
+    expect(onClose).not.toHaveBeenCalled();
+    screen.getByTitle('canvas').focus();
+    await blurWindow();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('uncontrolled: trigger click toggles', () => {
     render(
       <Popover trigger={<button>open me</button>}>

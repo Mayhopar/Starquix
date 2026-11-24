@@ -205,8 +205,14 @@ function PopoverPanel({
         onClose();
       }
     };
+    // A click into an iframe (the canvas) never reaches this document's mousedown: it moves focus into the frame.
+    const handleBlur = () => setTimeout(() => { if (document.activeElement?.tagName === 'IFRAME') onClose(); });
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, [isOpen, onClose, triggerRef]);
 
   useEffect(() => {

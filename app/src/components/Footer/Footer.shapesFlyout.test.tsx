@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { Footer } from './Footer';
+import { TOOL_SHORTCUTS } from '@/bridge/globalShortcuts';
 
 // Stub icon imports (jsdom cannot use the SVG data-URI components).
 // Proxy needs then→undefined + has trap (see task-065 notes).
@@ -79,15 +80,13 @@ describe('Shapes flyout clipping', () => {
     expect(flyout.querySelectorAll('button').length).toBe(5);
   });
 
-  it('Frame and Slot share ONE toolbar button; its flyout holds both', () => {
+  // Finding #35: a slot or blog draw is always refused in a project's own pages, so neither tool is offered.
+  it('offers no tool that can only fail: Frame is a plain button, and no button or letter arms Slot or Blog', () => {
     renderFooter();
-    expect(screen.queryByRole('button', { name: /^Slot/ })).toBeNull(); // no standalone Slot button
-    fireEvent.click(screen.getByTestId('frames-button'));
-    const flyout = screen.getByTestId('frames-flyout');
-    const titles = Array.from(flyout.querySelectorAll('button')).map(b => b.getAttribute('title'));
-    expect(titles).toEqual(['Frame (A)', 'Slot']);
-    fireEvent.click(flyout.querySelectorAll('button')[1]);
-    expect(screen.queryByTestId('frames-flyout')).toBeNull(); // picking closes it
-    expect(setActiveToolMock).toHaveBeenLastCalledWith('slot');
+    fireEvent.click(screen.getByRole('button', { name: 'Frame (A)' }));
+    expect(setActiveToolMock).toHaveBeenLastCalledWith('frame');
+    expect(screen.queryByRole('button', { name: /Slot/ })).toBeNull();
+    expect(Object.values(TOOL_SHORTCUTS)).not.toContain('slot');
+    expect(Object.values(TOOL_SHORTCUTS)).not.toContain('blog');
   });
 });

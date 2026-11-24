@@ -5216,7 +5216,7 @@ IFrameBridge.prototype.handleSetMediaDemo = function(payload) {
   
   // Interpolated from bridge/globalShortcuts.ts — THE one list of bare-key
   // editor shortcuts. Never hardcode keys here; add them there.
-  var SQ_BARE_SHORTCUT_KEYS = ["v","a","t","s","b","r","o","l","p","1","2","3","4","5","6"];
+  var SQ_BARE_SHORTCUT_KEYS = ["v","a","t","r","o","l","p","1","2","3","4","5","6"];
   var SQ_SHIFTED_SHORTCUT_CODE = "Digit1";
   var SQ_COMBO_SHORTCUT_KEYS = ["s","k","g","z","y","j","c","x","v","d","0","=","+","-","_"];
   // bridge/shortcutKey.js verbatim: the frame reads a key exactly as the editor does.

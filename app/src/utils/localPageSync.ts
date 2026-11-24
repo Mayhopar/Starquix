@@ -520,7 +520,7 @@ export function _resetLocalPageSyncForTests(): void {
  *  honestly instead, so the Home badge never moves. ONE message for the UI
  *  toast and the AI tool refusal. */
 export const LOCAL_HOME_IS_INDEX =
-  'In local projects the home page is your index.astro — rename page files in your editor to change it.';
+  'The home page is your index.astro — rename page files in your editor to change it.';
 
 /** Gap 26: page order in local mode. src/pages has no order, so the editor
  *  keeps the root order (as routes) on the project row and the open-time

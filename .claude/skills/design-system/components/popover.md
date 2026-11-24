@@ -3,7 +3,8 @@
 `import { Popover, Menu, MenuItem } from '@/components/ui'`
 
 ## Popover — THE positioning engine
-Portal to body, viewport flip + clamp, click-outside + Escape close.
+Portal to body, viewport flip + clamp, click-outside + Escape close. A click into an iframe (the canvas) is outside
+too: it never reaches the editor's document, so focus moving into a frame closes the popover.
 Tokens: `bg-bg border-stroke rounded-inner shadow-flyout z-flyout`.
 
 ```tsx
