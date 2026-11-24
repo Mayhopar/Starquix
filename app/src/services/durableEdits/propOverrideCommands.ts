@@ -1,6 +1,6 @@
 import type * as Y from 'yjs';
 import type { SourceLocation } from '@/store/types';
-import { isCrossFileAtOrigin, allowsCrossFileOverrideWrite, captureLocalWriteOrigin, type LocalWriteOrigin } from '@/utils/localWriteScope';
+import { isCrossFileAtOrigin, allowsCrossFileOverrideWrite, captureLocalWriteOrigin, localFileLabel, type LocalWriteOrigin } from '@/utils/localWriteScope';
 import { overrideChain, sharedChain, planOverride, latestScan, type OverrideHop, type OverrideKind, type PropFileChange } from '@/utils/propOverrides';
 import { parseSourceLocationFromKey } from '@/utils/sourceLocationKey';
 import { forEachEditedSourceClassEntry, editedSourceClassValue, sourceClassBaseValue, FILE_FIELD } from '@/store/sourceOverrideEntries';
@@ -8,63 +8,69 @@ import { forEachSourceTextEntry } from '@/store/sourceTextEntries';
 import { getObservedFileValue } from '@/services/classWriteBaseline';
 import { getActiveSaveProjectId } from '@/services/pendingProjectMutations';
 import { readProjectedSourceState, withProjectedSource } from './projectedSource';
+import { SourcePreparationRefused } from './commandReceipts';
 import type { MaterializationCommand } from './types';
 
-export interface PropOverrideTarget { hops: OverrideHop[]; element: SourceLocation; tagName: string; kind: OverrideKind }
+/** `refused`: no file can carry the edit — the reason preparePropOverrides refuses it with. */
+export interface PropOverrideTarget { hops: OverrideHop[]; element: SourceLocation; tagName: string; kind: OverrideKind; refused?: string }
 type Item = { target: PropOverrideTarget; value: string | null; key?: string };
 
 /**
- * An instance edit on a PAGE surface (the write-scope law keeps the component
- * file itself untouched) — captured at the gesture: the usage chain from the
- * scan the user is looking at. Null = not an instance, a chain the scan cannot
- * prove, or one usage tag rendering several copies (the edit then stays an
- * editor overlay, as before files carried overrides).
+ * How files carry an element edit made on a PAGE surface (the write-scope law
+ * keeps the component file itself untouched) — captured at the gesture from the
+ * scan the user is looking at. Null = written directly (same file, a master
+ * surface, not local, or not scanned yet); a target = the page passes a prop.
+ * `refused` = nothing can: no source position, a chain the scan cannot prove,
+ * or one usage tag rendering several copies. A files-truth canvas loses an
+ * editor-only edit on reload, so the edit is refused, not kept on screen.
  */
 export function capturePropOverride(key: string, sourceLocation: SourceLocation | undefined, origin: LocalWriteOrigin,
   kind: OverrideKind = 'class'): PropOverrideTarget | null {
-  if (!sourceLocation || !origin.armed || !origin.pageFile) return null;
+  if (!origin.armed || !origin.pageFile) return null;
+  const refuse = (refused: string): PropOverrideTarget =>
+    ({ hops: [], element: sourceLocation ?? { file: '', line: 0, column: 0 }, tagName: '', kind, refused });
+  // No position = an untracked key (`dynamic:…`); a source key without a passed location is resolved later, as before.
+  if (!sourceLocation) return parseSourceLocationFromKey(key) ? null : refuse('not editable — open in code');
   if (!isCrossFileAtOrigin(origin, sourceLocation.file) || allowsCrossFileOverrideWrite(origin, sourceLocation.file)) return null;
   const scan = latestScan();
   const el = scan.find(e => e.key === key);
-  const hops = el ? overrideChain(scan, key, origin.pageFile) : null;
-  if (!el || !hops) return null;
-  if (sharedChain(scan, key, origin.pageFile, hops)) {
-    console.warn('[overrides] one usage renders several copies — kept in the editor only', key);
-    return null;
-  }
+  if (!el) return null;
+  const hops = overrideChain(scan, key, origin.pageFile);
+  if (!hops || sharedChain(scan, key, origin.pageFile, hops)) return refuse(`it comes from ${localFileLabel(sourceLocation.file)} — edit it there`);
   return { hops, element: el.sourceLocation ?? sourceLocation, tagName: el.tagName, kind };
 }
 
-const captureForKey = (key: string, kind: OverrideKind, origin: LocalWriteOrigin) =>
-  capturePropOverride(key, parseSourceLocationFromKey(key) ?? undefined, origin, kind);
+/** Push / Reset / migration: a refused capture is skipped, as before. */
+const captureForKey = (key: string, kind: OverrideKind, origin: LocalWriteOrigin) => {
+  const target = capturePropOverride(key, parseSourceLocationFromKey(key) ?? undefined, origin, kind);
+  return target?.refused ? null : target;
+};
 
 /**
  * Plan several overrides as ONE set of file changes — two edits on one page
- * file must chain, not race from the same `beforeSource`. A shape a prop cannot
- * express (text with expressions, a dynamic img src, a moved tag) keeps that
- * edit editor-only rather than refusing it (`ok: false`).
+ * file must chain, not race from the same `beforeSource`. `refused` = the first
+ * edit no prop can carry: a refused capture, or a shape a prop cannot express
+ * (text with expressions, a dynamic img src, a moved tag).
  */
-async function planAll(projectId: string, items: readonly Item[]): Promise<{ files: PropFileChange[]; ok: boolean }> {
+async function planAll(projectId: string, items: readonly Item[]): Promise<{ files: PropFileChange[]; refused?: string }> {
   const files = new Map<string, PropFileChange>();
   const fetched = new Map<string, Promise<string | null>>();
   const fetch = (file: string) => fetched.get(file) ?? fetched.set(file, readProjectedSourceState(projectId, file)).get(file)!;
   const read = async (file: string) => files.get(file)?.afterSource ?? fetch(file);
   const base = async (file: string) => files.get(file)?.beforeSource ?? fetch(file);
-  let ok = true;
+  let refused: string | undefined;
   for (const { target, value } of items) {
+    if (target.refused) { refused ??= target.refused; continue; }
     let changes: PropFileChange[];
     try { changes = await planOverride(read, target.hops, target.element, target.tagName, target.kind, value, base); }
-    catch (error) {
-      console.warn('[overrides] not written to files — kept in the editor only:', error instanceof Error ? error.message : error, target);
-      ok = false; continue;
-    }
+    catch (error) { refused ??= error instanceof Error ? error.message : String(error); continue; }
     for (const change of changes) {
       const prior = files.get(change.file);
       files.set(change.file, { ...change, beforeSource: prior?.beforeSource ?? change.beforeSource,
         identityMaps: [...prior?.identityMaps ?? [], ...change.identityMaps ?? []] });
     }
   }
-  return { files: [...files.values()].filter(f => f.afterSource !== f.beforeSource), ok };
+  return { files: [...files.values()].filter(f => f.afterSource !== f.beforeSource), refused };
 }
 
 /** One journaled file write of whatever `plan` decides. */
@@ -84,10 +90,14 @@ const noteWritten = (projectId: string, items: readonly Item[]) => {
   for (const i of items) if (i.key) written.set(writtenKey(projectId, i.target.kind, i.key), i.value);
 };
 
-/** The file batch writing overrides as props (value null = drop the page prop). */
+/** The file batch writing overrides as props (value null = drop the page prop).
+ *  THE gate of every class/text edit acceptance (both callers run it in
+ *  `prepare`): an edit no file can carry throws, so the caller's revert + toast
+ *  runs instead of the canvas keeping an edit the next reload drops. */
 export async function preparePropOverrides(projectId: string, revision: number, items: readonly Item[]): Promise<MaterializationCommand | null> {
   if (!items.length) return null;
-  const { files } = await withProjectedSource(projectId, revision, () => planAll(projectId, items));
+  const { files, refused } = await withProjectedSource(projectId, revision, () => planAll(projectId, items));
+  if (refused) throw new SourcePreparationRefused(refused);
   noteWritten(projectId, items);
   return files.length ? { kind: 'file-batch', payload: { files } } : null;
 }
@@ -97,9 +107,9 @@ export async function preparePropOverrides(projectId: string, revision: number, 
 export async function acceptPropOverride(projectId: string, key: string, location: SourceLocation, kind: OverrideKind,
   value: string, origin: LocalWriteOrigin): Promise<boolean> {
   const target = capturePropOverride(key, location, origin, kind);
-  if (!target) return false;
+  if (!target || target.refused) return false;
   let ok = true;
-  await acceptPlanned(projectId, async () => { const r = await planAll(projectId, [{ target, value }]); ok = r.ok; return r.files; });
+  await acceptPlanned(projectId, async () => { const r = await planAll(projectId, [{ target, value }]); ok = !r.refused; return r.files; });
   if (ok) noteWritten(projectId, [{ target, value, key }]);
   return ok;
 }

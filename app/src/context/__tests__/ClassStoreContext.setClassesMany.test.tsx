@@ -17,6 +17,7 @@ import { projectFsRuntime } from '@/test/projectFsRuntime';
 import { setActiveSaveProjectId } from '@/services/pendingProjectMutations';
 import { resetClassWriteBaselines } from '@/services/classWriteBaseline';
 import { sourceVersion } from '@/services/durableEdits/sourceIdentity';
+import { setLocalExpectedRoute, setLocalPageFile, _resetLocalPageSyncForTests } from '@/utils/localPageSync';
 
 const F = 'src/pages/index.astro';
 // Line 7 holds TWO spans: growing the first span's class moves the second span's column (ledger E6/E7).
@@ -155,6 +156,20 @@ describe('setClassesMany (ledger E1–E6)', () => {
     const rows = await listUnmaterialized(projectId);
     expect(rows).toHaveLength(1);
     expect(rows[0].commands.filter(c => c.kind === 'class-write')).toHaveLength(1);
+  });
+
+  it('a Not-editable element (no source position) on a page view is refused, not kept on the canvas (issue #7 L3 ghost)', async () => {
+    await mount();
+    const GHOST = 'dynamic:h1:1@x';
+    setLocalPageFile(F); setLocalExpectedRoute('/');
+    let ok = true;
+    try {
+      await act(async () => { ok = await api.setClasses(GHOST, 'text-center'); });
+    } finally { _resetLocalPageSyncForTests(); }
+    expect(ok).toBe(false);
+    expect(h.doc.getMap('sourceClasses').has(GHOST)).toBe(false);
+    expect(await listUnmaterialized(projectId)).toHaveLength(0);
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toBe('Style not saved: not editable — open in code');
   });
 
   it('a single edit keeps today\'s toast text (no element suffix)', async () => {

@@ -15,6 +15,7 @@ import { isLocalProjectId } from '@/utils/localMode';
 import { getLocalScanVersion, getLocalSurfaceGeneration } from '@/utils/localPageSync';
 import { getActiveSaveProjectGeneration } from '@/services/pendingProjectMutations';
 import { viteTextWriter } from '@/services/ViteTextWriter';
+import { SourcePreparationRefused } from '@/services/durableEdits/commandReceipts';
 import { clearTextDraft } from './textDrafts';
 import type {
   EditModeExitedPayload,
@@ -71,7 +72,9 @@ export function handleEditModeExited(ctx: ViewportMessageContext, payload: unkno
   if (p.textContent !== p.originalText) {
     const parsed = parseSourceKey(p.key);
 
-    if (local && parseKey(p.key)?.type === 'source') {
+    // Files are truth: every local text edit is accepted (or refused) by the one gesture acceptance —
+    // an untracked element's text used to take the doc-only path below and vanish on reload.
+    if (local) {
       const previewGesture = beginPreviewTextGesture(ctx, p.key);
       return acceptEditorCommands(ctx.env.doc, localSourceActions(ctx, p.key, {
         type: 'UPDATE_SOURCE_TEXT', sourceKey: p.key, textContent: p.textContent, originalText: p.originalText,
@@ -156,20 +159,27 @@ export function handleEditModeExited(ctx: ViewportMessageContext, payload: unkno
   }
 }
 
+/** A refusal the user can act on: a dynamic expression, or an edit no file can carry. */
+const isRefusal = (err: unknown) =>
+  err instanceof SourcePreparationRefused || /dynamic expression/.test(String((err as Error)?.message ?? err));
+
 /**
  * A REJECTED text write is a divergence: the canvas shows the edit, the file
- * does not. The one refusal the user can act on is a dynamic expression —
+ * does not. The refusals the user can act on: a dynamic expression —
  * `<p>{work.data.description}</p>` renders a value (in the component view a
  * stub) that must never be written over the binding (sq-source-plugin
- * updateTextContent, measured 2026-09-10). Say where to edit it, and put the
- * rendered value back in the doc AND the frame so what the user sees is what
- * the file renders. Everything else stays a console error as before.
+ * updateTextContent, measured 2026-09-10) — and an edit no file can carry
+ * (SourcePreparationRefused: Not editable, a loop copy, prop text). Say where
+ * to edit it, and put the rendered value back in the doc AND the frame so what
+ * the user sees is what the file renders; the draft goes too, or the next scan
+ * re-enters edit mode with it. Everything else stays a console error as before.
  */
 function onTextWriteFailed(ctx: ViewportMessageContext, p: EditModeExitedPayload, err: unknown): void {
   console.error('[ViewportFrame] Text save failed:', err);
   const message = String((err as Error)?.message ?? err);
-  if (!/dynamic expression/.test(message)) return;
+  if (!isRefusal(err)) return;
   toast.error(message);
+  void clearTextDraft(p.key);
   if (parseSourceKey(p.key).type !== 'instance') {
     ctx.actions.dispatch({ type: 'CLEAR_SOURCE_TEXT', sourceKey: p.key });
   }
@@ -218,7 +228,7 @@ export function handleMarkupChanged(ctx: ViewportMessageContext, payload: unknow
     }), ctx.actions.claimSnapshot?.()).then(() => { void clearTextDraft(p.key); }).catch(err => {
       console.error('[ViewportFrame] Markup acceptance failed:', err);
       if (!previewGesture.isCurrent()) return;
-      if (/dynamic expression/.test(String(err?.message ?? err))) toast.error(String(err.message));
+      if (isRefusal(err)) { toast.error(String(err.message)); void clearTextDraft(p.key); }
       ctx.refs.iframe.current?.contentWindow?.postMessage({ type: 'RESTORE_ORIGINAL_TEXT', payload: { key: p.key } }, '*');
     }).finally(() => { markupCommits.delete(p.key); previewGesture.finish(); });
   }
