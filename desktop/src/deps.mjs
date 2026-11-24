@@ -1,6 +1,6 @@
 // A project's packages: the ONE shared runtime (Astro, MDX, Tailwind…) plus, for an imported
-// site that declares more, its own extras installed once into <project>/.sq/deps with the
-// bundled npm. node_modules is then a merged folder of links (shared first, extras after), so
+// site that declares more (or a newer major), its own extras installed once into <project>/.sq/deps with the
+// bundled npm. node_modules is then a merged folder of links (see linkNodeModules for the order), so
 // both Node and Vite (preserveSymlinks) resolve every package from inside the project.
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -19,14 +19,21 @@ const absent = error => { if (error.code === 'ENOENT') return null; throw error;
 // folder, so a copy (first one wins, like the links) runs the same package.
 const linkBin = (from, to) => (process.platform === 'win32' ? fs.copyFile(from, to, fs.constants.COPYFILE_EXCL) : fs.symlink(from, to));
 
-/** Declared packages (dependencies + devDependencies) the shared runtime lacks: [[name, range]]. */
+/** A version's or range's major: its first number ('^4.1.0' → 4); NaN without one ('latest', '*'). */
+export const major = range => Number(/(\d+)/.exec(String(range ?? ''))?.[1] ?? NaN);
+/** Astro's own packages: every site runs the runtime's (one Astro); astro-upgrade.mjs moves a site's pins to them. */
+export const astroPackage = name => name === 'astro' || name.startsWith('@astrojs/');
+
+/** Declared packages (dependencies + devDependencies) the shared runtime lacks, or carries at an older major than the
+ *  site declares (a Tailwind 4 site on the runtime's Tailwind 3, #13) — Astro's own aside: [[name, range]]. */
 export async function missingPackages(projectDir, sharedDir) {
   const manifest = JSON.parse(await fs.readFile(path.join(projectDir, 'package.json'), 'utf8').catch(() => '{}'));
   const declared = { ...manifest.devDependencies, ...manifest.dependencies };
   const missing = [];
   for (const [name, range] of Object.entries(declared)) {
     if (name.startsWith('@types/') || typeof range !== 'string') continue; // types never run
-    if (!await fs.stat(path.join(sharedDir, name)).catch(absent)) missing.push([name, range]);
+    const shared = await fs.readFile(path.join(sharedDir, name, 'package.json'), 'utf8').then(JSON.parse, absent);
+    if (!shared || (major(range) > major(shared.version) && !astroPackage(name))) missing.push([name, range]);
   }
   return missing.sort(([a], [b]) => a.localeCompare(b));
 }
@@ -66,7 +73,8 @@ async function packageEntries(dir) {
 }
 
 /** <project>/node_modules: a link to the shared runtime, or — with extras — a merged folder of
- *  per-package links (shared wins: one Astro for every project). A real node_modules the
+ *  per-package links: the extras the site declared (its own newer major of a runtime package wins, #13), then
+ *  shared (one Astro for every project), then what the extras pulled in. A real node_modules the
  *  project brought itself is kept as is. Rebuilt on every open (self-healing, cheap). */
 export async function linkNodeModules(projectDir, sharedDir, extrasDir) {
   const link = path.join(projectDir, 'node_modules');
@@ -81,7 +89,8 @@ export async function linkNodeModules(projectDir, sharedDir, extrasDir) {
   const staging = `${link}.sq-${process.pid}-${Date.now()}`;
   await fs.mkdir(staging);
   const linked = new Set();
-  for (const [dir, names] of [[sharedDir, await packageEntries(sharedDir)], [extrasDir, await packageEntries(extrasDir)]]) {
+  const declared = Object.keys(JSON.parse(await fs.readFile(path.join(extrasDir, '../package.json'), 'utf8')).dependencies); // installPackages' list
+  for (const [dir, names] of [[extrasDir, declared], [sharedDir, await packageEntries(sharedDir)], [extrasDir, await packageEntries(extrasDir)]]) {
     for (const name of names) {
       if (linked.has(name)) continue; linked.add(name);
       await fs.mkdir(path.dirname(path.join(staging, name)), { recursive: true });
