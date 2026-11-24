@@ -102,6 +102,14 @@ const ownsSides = (type: SpacingType, sides: Side[]): Owns => {
 
 const SIDE_NAMES: Record<Side, string> = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
 
+/** A margin side set to `auto`: a read-only value in a field box (the whole box focuses it); × switches back to a number. */
+const AutoField = ({ icon, 'aria-label': ariaLabel, onRemove }: { icon: React.ReactNode; 'aria-label': string; onRemove: () => void }) => (
+  <Field readOnly value="auto" onChange={() => {}} icon={icon} aria-label={ariaLabel} trailing={
+    <IconButton size="sm" onClick={onRemove} title="Remove auto"
+      className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text">×</IconButton>
+  } />
+);
+
 // Icon mapping for padding sides (swapped: top↔bottom, left↔right)
 const PADDING_ICONS = {
   t: PaddingBottomIcon,
@@ -192,22 +200,7 @@ const SpacingControl: React.FC<SpacingControlProps> = ({
               {(['t', 'l', 'b', 'r'] as Side[]).map(side => {
                 const Icon = type === 'p' ? PADDING_ICONS[side] : MARGIN_ICONS[side];
                 return values[side].isAuto && type === 'm' && !mixed[side] ? (
-                  <div key={side} className="flex items-center h-7 border border-input-stroke rounded-inner overflow-hidden bg-input-fill">
-                    <span className="w-4 h-4 ml-1 flex items-center justify-center shrink-0 text-text-secondary">
-                      <Icon className="w-4 h-4" />
-                    </span>
-                    <div className="flex-1 flex items-center">
-                      <span className="flex-1 py-1 px-1 text-xs text-text">auto</span>
-                      <IconButton
-                        size="sm"
-                        onClick={() => onValueChange(side, '', 'px', false)}
-                        className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text"
-                        title="Remove auto"
-                      >
-                        ×
-                      </IconButton>
-                    </div>
-                  </div>
+                  <AutoField key={side} icon={<Icon className="w-4 h-4" />} aria-label={`${label} ${SIDE_NAMES[side]}`} onRemove={() => onValueChange(side, '', 'px', false)} />
                 ) : (
                   <SpacingField
                     key={side}
@@ -245,22 +238,7 @@ const SpacingControl: React.FC<SpacingControlProps> = ({
             /* Collapsed: Y and X inputs side by side */
             <div className="grid grid-cols-2 gap-1">
               {yValue.isAuto && type === 'm' && !mixed.y ? (
-                <div className="flex items-center h-7 border border-input-stroke rounded-inner overflow-hidden bg-input-fill">
-                  <span className="w-4 h-4 ml-1 flex items-center justify-center shrink-0 text-text-secondary">
-                    <MarginYIcon className="w-4 h-4" />
-                  </span>
-                  <div className="flex-1 flex items-center">
-                    <span className="flex-1 py-1 px-1 text-xs text-text">auto</span>
-                    <IconButton
-                      size="sm"
-                      onClick={() => onValueChange('y', '', 'px', false)}
-                      className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text"
-                      title="Remove auto"
-                    >
-                      ×
-                    </IconButton>
-                  </div>
-                </div>
+                <AutoField icon={<MarginYIcon className="w-4 h-4" />} aria-label={`${label} Y`} onRemove={() => onValueChange('y', '', 'px', false)} />
               ) : (
                 <SpacingField
                   spacingType={type}
@@ -298,22 +276,7 @@ const SpacingControl: React.FC<SpacingControlProps> = ({
                 />
               )}
               {xValue.isAuto && type === 'm' && !mixed.x ? (
-                <div className="flex items-center h-7 border border-input-stroke rounded-inner overflow-hidden bg-input-fill">
-                  <span className="w-4 h-4 ml-1 flex items-center justify-center shrink-0 text-text-secondary">
-                    <MarginXIcon className="w-4 h-4" />
-                  </span>
-                  <div className="flex-1 flex items-center">
-                    <span className="flex-1 py-1 px-1 text-xs text-text">auto</span>
-                    <IconButton
-                      size="sm"
-                      onClick={() => onValueChange('x', '', 'px', false)}
-                      className="w-auto h-auto px-1 bg-transparent hover:bg-transparent text-3xs text-text-secondary hover:text-text"
-                      title="Remove auto"
-                    >
-                      ×
-                    </IconButton>
-                  </div>
-                </div>
+                <AutoField icon={<MarginXIcon className="w-4 h-4" />} aria-label={`${label} X`} onRemove={() => onValueChange('x', '', 'px', false)} />
               ) : (
                 <SpacingField
                   spacingType={type}

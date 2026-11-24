@@ -18,6 +18,16 @@
 - Numeric fields get universal ↑/↓ (±1) and Shift+↑/↓ (±10) stepping unless you
   pass your own `onKeyDown`.
 - `InputContainer` is internal — never import it in new code.
+- The whole box is one hit target (issue #10): a press on the border, padding, leading label/icon, `prefix`, `unit` or
+  the select chevron focuses the input (caret at the near end; an `onFocus` select-all is kept) or opens the select; a
+  click there reaches the input's `onClick` once. One cursor across the box: text, or pointer for a select / a read-only
+  field with `onClick`. A button, link or other focusable element in a slot keeps its own clicks — never wrap a Field
+  in your own click-to-focus div.
+- A field-looking box that cannot be a Field (a table cell holding bare inputs, the chat composer, a picker's own
+  value boxes) spreads `fieldBox` (`import { fieldBox } from '@/components/ui'`): `<td {...fieldBox} className="… cursor-text">`.
+  Same contract: a press anywhere focuses the box's first input/select/textarea; controls inside keep their own clicks;
+  a nested `fieldBox` (an opacity input + `%` inside a colour cell) wins over the outer one. Not on a scroll container:
+  its scrollbar presses would be taken.
 
 ## Window fields (the Figma Input)
 ```tsx
@@ -41,6 +51,11 @@
   radios, icon buttons inside fields, the SegmentedControl track) use the same two tokens — never `bg-bg-contrast`. A
   hand-rolled field box outside the kit does too; `styles/__tests__/inputFill.test.ts` fails on one painting
   `bg-bg-contrast`.
+- One dropdown chevron: `FieldChevron` (16px, `text-text-secondary`) — the select Field's, 5px from the box's outer
+  right edge (1px border + the 4px slot gap). A Button that opens a menu but looks like a select (font picker, colour
+  picker) is `<Button variant="outline" className={`${fieldTrigger} w-full pl-2 …`} iconRight={<FieldChevron />}>`:
+  `fieldTrigger` swaps the outline's inset ring for the Field's real 1px border and ends on that 4px gap, so its
+  chevron lands on the select's x. Never a bare `ChevronDownIcon` with its own margin, colour or opacity in a field box.
 - Loading state: `<Labeled label="Address" skeleton><Field size="lg" skeleton … /></Labeled>` — the label becomes a bar
   of its own width (no helper line), the field its own 24/28/32px box pulsing (no input). In a window form that is
   `<Prop label="Address" skeleton />`. Wrap the set in `role="status"` + an `aria-label`.
