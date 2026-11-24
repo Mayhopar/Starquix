@@ -93,9 +93,8 @@ export function getPropertySlot(className: string): string {
 
 /**
  * Merge classes using slot-based replacement.
- * Override classes replace base classes with the same property slot.
- *
- * If multiple overrides target the same slot, the last one wins.
+ * Override classes replace base classes with the same property slot; every override token of a slot is kept
+ * (ring-2 ring-blue-500 share a slot and both stay — audit #2).
  *
  * @example
  * mergeClasses('bg-red-500 text-white', 'bg-blue-500')
@@ -129,9 +128,10 @@ export function mergeClasses(
   if (overrideArr.length === 0) return baseArr.join(' ');
 
   // Build map of override slots
-  const overrideBySlot = new Map<string, string>();
+  const overrideBySlot = new Map<string, string[]>();
   for (const cls of overrideArr) {
-    overrideBySlot.set(getPropertySlot(cls), cls);
+    const slot = getPropertySlot(cls);
+    overrideBySlot.set(slot, [...overrideBySlot.get(slot) ?? [], cls]);
   }
 
   // Slots cleared transitively by overrides (e.g. `px-0` clears existing
@@ -150,7 +150,7 @@ export function mergeClasses(
     const slot = getPropertySlot(cls);
     if (overrideBySlot.has(slot)) {
       if (!usedSlots.has(slot)) {
-        result.push(overrideBySlot.get(slot)!);
+        result.push(...overrideBySlot.get(slot)!);
         usedSlots.add(slot);
       }
     } else if (clearedSlots.has(slot)) {
@@ -161,9 +161,9 @@ export function mergeClasses(
   }
 
   // Add override classes that didn't replace existing slots
-  for (const [slot, cls] of overrideBySlot) {
+  for (const [slot, classes] of overrideBySlot) {
     if (!usedSlots.has(slot)) {
-      result.push(cls);
+      result.push(...classes);
     }
   }
 
