@@ -3,7 +3,7 @@
  * C11). The assignment IS the card's type line `CollectionEntry<"x">`; nothing
  * else stores it. Pure functions over file sources.
  */
-import { cardTagsOf, FRONTMATTER_RE, importStatementRe, parseBlogBindings, resolveImportPath, slotSpans, type EmitOptions } from '@/utils/blogBinding';
+import { cardTagsOf, FRONTMATTER_RE, importStatementRe, parseBlogBindings, renameCardTags, resolveImportPath, slotSpans, type EmitOptions } from '@/utils/blogBinding';
 import { CARD_FILE, cardCollectionOf, cardLinksItself, cardNameFor, DEFAULT_CARD, entryVarOf, isCardSource } from '@/utils/cardFields';
 import { importSpecifierFor } from '@/utils/localStructural';
 import { assignCard, cardCollectionsOf, setCardCollection } from '@/utils/cardSetup';
@@ -100,13 +100,9 @@ export function planCardMove(
     for (const [tag, target] of renderedComponents(file, fm + tpl)) {
       const gone = !!missing?.has(target) && files[target] == null;
       if (target === cardFile || (!gone && (files[target] == null || !isCardSource(files[target])))) continue;
-      const oldProp = gone ? tpl.match(new RegExp(String.raw`<${tag}\s+([\w$]+)=\{`))?.[1] ?? 'post' : entryPropOf(files[target]);
-      tpl = tpl
-        .replace(new RegExp(String.raw`<${tag}\b([^>]*?)\b${oldProp}=\{`, 'g'), `<${name}$1${prop}={`)
-        .replace(new RegExp(String.raw`<${tag}\b`, 'g'), `<${name}`)
-        .replace(new RegExp(String.raw`</${tag}\s*>`, 'g'), `</${name}>`);
+      tpl = renameCardTags(tpl, tag, name, gone ? null : entryPropOf(files[target]), prop);
       // The old card's import goes only when no other slot still renders it.
-      if (!new RegExp(String.raw`<${tag}\b`).test(head + tpl + foot)) fm = fm.replace(new RegExp(String.raw`^[ \t]*import\s+${tag}\s+from\s+['"][^'"]+['"];?[ \t]*\r?\n`, 'm'), '');
+      if (!new RegExp(String.raw`<${tag}\b`).test((head + tpl + foot).replace(/<!--[\s\S]*?-->|\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ''))) fm = fm.replace(new RegExp(String.raw`^[ \t]*import\s+${tag}\s+from\s+['"][^'"]+['"];?[ \t]*\r?\n`, 'm'), '');
       swapped = true;
     }
     if (!swapped) continue;

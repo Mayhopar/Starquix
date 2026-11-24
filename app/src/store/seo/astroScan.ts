@@ -86,7 +86,8 @@ export function skipJs(src: string, i: number): number {
   return j;
 }
 
-const NAME_RE = /[A-Za-z][\w.:-]*/y;
+const NAME_RE = /[A-Za-z][\w$.:-]*/y; // `$` too: a component is any JS identifier (`<Blog$Card />`)
+const CLOSE_RE = new RegExp(String.raw`<\/\s*(${NAME_RE.source})\s*>`, 'y');
 
 /** Parse an open tag at `i` (`src[i] === '<'`). Null when it is not a tag. */
 function parseOpenTag(src: string, i: number): Omit<Tag, 'parent' | 'expr'> | null {
@@ -181,7 +182,7 @@ export function scanTags(src: string, from = 0): Tag[] {
     if (ch === '{') { stack.push({ kind: 'js', start: i, tags: [] }); i++; continue; }
     if (ch === '<' && src.startsWith('<!--', i)) { const n = src.indexOf('-->', i + 4); i = n < 0 ? src.length : n + 3; continue; }
     if (ch === '<' && src[i + 1] === '/') {
-      const m = /<\/\s*([A-Za-z][\w.:-]*)\s*>/y;
+      const m = CLOSE_RE;
       m.lastIndex = i;
       const cm = m.exec(src);
       if (cm) {
@@ -226,6 +227,23 @@ export function scanTags(src: string, from = 0): Tag[] {
 export function attrOf(tag: Tag, name: string): Attr | undefined {
   const lower = name.toLowerCase();
   return tag.attrs.find((a) => a.name.toLowerCase() === lower);
+}
+
+// ── Splices: every write is a byte splice ───────────────────────────────────
+
+export type Splice = Span & { text: string };
+
+/** Apply non-overlapping splices (positions in `src`): everything between them stays byte-for-byte. */
+export function applySplices(src: string, splices: Splice[]): string {
+  // Equal starts apply in the given order (stable sort): a replacement before an insert at its start.
+  return [...splices].sort((a, b) => b.start - a.start).reduce((s, x) => s.slice(0, x.start) + x.text + s.slice(x.end), src);
+}
+
+/** Remove attribute `a` with the whitespace before it. */
+export function removeAttr(src: string, a: Span): Splice {
+  let start = a.start;
+  while (start > 0 && /\s/.test(src[start - 1])) start--;
+  return { start, end: a.end, text: '' };
 }
 
 // ── Frontmatter: props + local consts ───────────────────────────────────────
