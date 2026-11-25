@@ -155,6 +155,20 @@ it('releasing aborts the departed document\'s in-flight requests', async () => {
   await sessions.closeAll();
 });
 
+it('release(id, lease) frees that lease only: a stale lease or another project is untouched', async () => {
+  const instance = () => ({ ready: Promise.resolve({ url: 'http://127.0.0.1:4567', generation: 1 }), stop: vi.fn(async () => {}),
+    state: () => ({ phase: 'running' }) });
+  const sessions = createSessions({ projects: { seed: async () => '/owned/p' }, spawn: instance, emit() {}, graceMs: 60_000 });
+  await sessions.start('a', 'lease-a'); await sessions.start('b', 'lease-b');
+  await sessions.release('a', 'not-a-lease');
+  expect(() => sessions.get('a', 'lease-a')).not.toThrow();
+  await sessions.release('a', 'lease-a');
+  expect(() => sessions.get('a', 'lease-a')).toThrow('Stale');
+  expect(() => sessions.get('b', 'lease-b')).not.toThrow();
+  await expect(sessions.start('a', 'next-document')).resolves.toBeDefined(); // adopted, not "still owned"
+  await sessions.closeAll();
+});
+
 function hooked(over = {}) {
   const calls = [];
   const sessions = createSessions({ projects: { seed: async () => '/S/p' },
