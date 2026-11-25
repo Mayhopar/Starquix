@@ -56,6 +56,7 @@ import { armPageSwitchFlushBoundary, flushPendingSourceWrites } from '@/utils/pe
 import { DeployModal } from '@/components/DeployModal';
 import { VersionsWindow } from '@/components/VersionPanel';
 import { isDesktop } from '@/services/desktopDriver';
+import { isWebDemo } from '@/services/webDesktop';
 import { createGitClient } from '@/services/git/gitClient';
 import { useKeyboardShortcuts, useComponentsModal, useReorderElements } from '@/hooks';
 import { useAutoConvertSvgSelection } from '@/hooks/useAutoConvertSvgSelection';
@@ -184,7 +185,8 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
   const [isExporting, setIsExporting] = useState(false);
   // Publish and Versions are two windows, one open at a time (docs/plans/2026-10-20-publish-sheet-design.md S3).
   const [publishWindow, setPublishWindow] = useState<'publish' | 'versions' | null>(null);
-  const deployGithub = useMemo(() => (isDesktop() ? { client: createGitClient(projectId) } : undefined), [projectId]);
+  // The web demo has no git, sign-ins or outbound internet (cloud web-demo/DESIGN.md "Out for v1"): no Publish, no Versions.
+  const deployGithub = useMemo(() => (isDesktop() && !isWebDemo() ? { client: createGitClient(projectId) } : undefined), [projectId]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [isReorderPending, setHideGutterHandles] = useState(false);
   const reorderPendingRef = useRef(false);
@@ -932,8 +934,8 @@ function EditorContent({ projectId, onProjectMissing }: EditorContentProps) {
           onCloseAdd={onCloseModal}
           onExport={handleExport}
           isExporting={isExporting}
-          onDeploy={() => setPublishWindow('publish')}
-          onVersions={isDesktop() ? () => setPublishWindow('versions') : undefined}
+          onDeploy={isWebDemo() ? undefined : () => setPublishWindow('publish')}
+          onVersions={deployGithub ? () => setPublishWindow('versions') : undefined}
           onHome={handleBackToProjects}
           hideTools={!designSurface}
         />

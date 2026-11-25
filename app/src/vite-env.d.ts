@@ -2,6 +2,10 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_URL: string;
+  /** '1' = the web demo build (services/webDesktop.ts): the editor talks to a per-visitor web-host over HTTP. */
+  readonly VITE_SQ_WEB?: string;
+  /** Web demo: the web-host API base (default '/api', the demo Worker). */
+  readonly VITE_SQ_WEB_API?: string;
 }
 
 interface ImportMeta {

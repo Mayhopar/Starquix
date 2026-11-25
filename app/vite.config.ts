@@ -52,6 +52,9 @@ export default defineConfig(({ mode }) => {
       // Scoped to localhost with any port — that is exactly the set of origins
       // the local runtime spawns, and it is a dev server either way.
       cors: { origin: /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/ },
+      // Web demo (VITE_SQ_WEB=1 npm run dev): /api → a bare `node desktop/src/web-host.mjs`, or the demo Worker
+      // (VITE_SQ_WEB_HOST: wrangler dev, or https://demo.starquix.app, which routes by Host: hence changeOrigin).
+      proxy: env.VITE_SQ_WEB === '1' ? { '/api': { target: env.VITE_SQ_WEB_HOST || 'http://127.0.0.1:8080', changeOrigin: true } } : undefined,
     },
     optimizeDeps: {
       include: ['jszip', 'react-simple-code-editor'],

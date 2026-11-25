@@ -59,6 +59,8 @@ vi.mock('@/utils/serverMode', () => ({
 vi.mock('./AISettings', () => ({ AISettings: () => null }));
 vi.mock('./AISettingsButton', () => ({ AISettingsButton: () => null }));
 vi.mock('@/components/Terminal/TerminalView', () => ({ TerminalView: () => null }));
+let webDemo = false;
+vi.mock('@/services/webDesktop', () => ({ isWebDemo: () => webDemo }));
 
 const onHome = vi.fn();
 function renderFooter(hideTools = false) {
@@ -69,7 +71,17 @@ function renderFooter(hideTools = false) {
 const controlRow = () => screen.getByTestId('footer-control-tab');
 
 describe('footer control row', () => {
-  beforeEach(() => { toolState = { activeTool: 'select', isPreview: false }; });
+  beforeEach(() => { toolState = { activeTool: 'select', isPreview: false }; webDemo = false; });
+
+  it('keeps Add in the web demo, where there is no Terminal: AI · Add · Design · Settings, no Publish', () => {
+    webDemo = true;
+    render(<Footer projectId="browser_test" onOpenModal={vi.fn()} onExport={vi.fn()} hideTools={false} onHome={onHome} />);
+    const items = [...controlRow().querySelectorAll('[title], [data-testid="footer-divider"]')]
+      .map(el => el.getAttribute('title') ?? '|')
+      .map(t => (t.startsWith('Add component') ? 'Add' : t));
+    expect(items).toEqual(['Back to projects', '|', 'AI', 'Add', 'Design', 'Settings', '|', 'Preview']);
+    expect(screen.queryByTitle('Publish')).toBeNull();
+  });
 
   it('reads 🏠 | [AI · Terminal · Add · Design · Settings] | ▶, below the Design tools (owner 2026-11-11)', () => {
     renderFooter();

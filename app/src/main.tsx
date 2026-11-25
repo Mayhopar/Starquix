@@ -1,4 +1,5 @@
 // src/main.tsx
+import './services/webDesktopEntry'; // first: the web demo's sqDesktop must exist before any module checks isDesktop()
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { init } from '@plausible-analytics/tracker';

@@ -41,6 +41,7 @@ import {
 import type { ShapeKind } from '@/components/Canvas/shapeMarkup';
 import { TerminalView } from '@/components/Terminal/TerminalView';
 import { isDesktop } from '@/services/desktopDriver';
+import { isWebDemo } from '@/services/webDesktop';
 import { Button, FloatingPanel, IconButton, Spinner, cx, type ButtonProps } from '@/components/ui';
 import { shortcutLabel } from '@/utils/platform';
 
@@ -59,7 +60,8 @@ type Props = {
   onCloseAdd?: () => void;
   onExport: () => void;
   isExporting?: boolean;
-  onDeploy: () => void;
+  /** Publish; omitted in the web demo (no sign-ins or outbound internet there). */
+  onDeploy?: () => void;
   /** Versions + GitHub panel; omitted off desktop (no project folder to version). */
   onVersions?: () => void;
   /** Back to the projects list — 🏠 at the bar's left (owner 2026-11-11; it was the sidebar's top-left). */
@@ -560,8 +562,11 @@ export function Footer({ projectId, onOpenModal, addOpen = false, onCloseAdd, on
   }, []);
 
   // The strip's tabs; on a canvas Add sits after Terminal. tabCount below counts exactly these.
-  const stripTabs = SEGMENT_TABS.filter(({ tab }) => tab !== 'manual' || controls === 'canvas');
+  // The web demo has no shell (cloud web-demo/DESIGN.md security #4): no Terminal tab.
+  const stripTabs = SEGMENT_TABS.filter(({ tab }) => (tab !== 'manual' || controls === 'canvas') && (tab !== 'terminal' || !isWebDemo()));
   const showAdd = controls === 'canvas';
+  // Add follows Terminal, or AI where there is no Terminal (the web demo): AI · [Terminal] · Add · Design · Settings.
+  const addAfter: FooterTab = stripTabs.some(({ tab }) => tab === 'terminal') ? 'terminal' : 'ai';
   const segmentedControl = (
     <div className="flex gap-0.5">
       {stripTabs.map(({ tab, title, icon }) => {
@@ -579,7 +584,7 @@ export function Footer({ projectId, onOpenModal, addOpen = false, onCloseAdd, on
                 />
               )}
             </span>
-            {tab === 'terminal' && showAdd && (
+            {tab === addAfter && showAdd && (
               <StripButton
                 on={addOpen}
                 off="bg-bg-hover text-text hover:bg-bg-selected-hover"
@@ -1014,11 +1019,13 @@ export function Footer({ projectId, onOpenModal, addOpen = false, onCloseAdd, on
                   icon={<HistoryIcon className="w-6 h-6" />}
                 />
               )}
-              <FooterButton
-                onClick={onDeploy}
-                title="Publish"
-                icon={<RocketIcon className="w-6 h-6" />}
-              />
+              {onDeploy && (
+                <FooterButton
+                  onClick={onDeploy}
+                  title="Publish"
+                  icon={<RocketIcon className="w-6 h-6" />}
+                />
+              )}
               <Divider />
               <FooterButton
                 onClick={() => setTheme(isDark ? 'light' : 'dark')}
