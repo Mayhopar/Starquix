@@ -240,7 +240,7 @@ function fakeGate() {
   const prompts: { reason: string; message?: string; minutes: number; siteKey: string }[] = [];
   let n = 0;
   return { prompts, closed: 0,
-    gate: { prompt: vi.fn(async (p: { reason: string; message?: string; minutes: number; siteKey: string }) => { prompts.push(p); return `token-${++n}`; }),
+    gate: { ask: vi.fn(async (p: { reason: string; message?: string; minutes: number; siteKey: string }) => { prompts.push(p); return `token-${++n}`; }),
       close: vi.fn() } };
 }
 
@@ -261,7 +261,7 @@ describe('sessions (DESIGN.md security #9)', () => {
     const w = worker(); w.state.active = true; const g = fakeGate();
     const api = createWebDesktop('/api', { fetch: w.fetch, gate: g.gate, page: new EventTarget() });
     await api.exists('p');
-    expect(g.gate.prompt).not.toHaveBeenCalled();
+    expect(g.gate.ask).not.toHaveBeenCalled();
   });
 
   it('shows why a session could not begin (full, budget, ...) and lets the visitor try again', async () => {

@@ -8,7 +8,7 @@ export type GateReason = 'required' | 'ended';
 export interface GatePrompt { reason: GateReason; minutes: number; siteKey: string; message?: string }
 export interface SessionGate {
   /** Show the gate (or update it with `message`) and resolve with a Turnstile token. */
-  prompt(p: GatePrompt): Promise<string>;
+  ask(p: GatePrompt): Promise<string>;
   close(): void;
 }
 
@@ -38,7 +38,7 @@ export function createSessionGate(doc: Document = document): SessionGate {
     const e = doc.createElement(tag); e.setAttribute('style', style); if (text) e.textContent = text; return e;
   };
   return {
-    prompt({ reason, minutes, siteKey, message }) {
+    ask({ reason, minutes, siteKey, message }) {
       root?.remove(); if (widget && turnstile) turnstile.remove(widget); widget = null;
       root = el('div', 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);font:14px/1.45 system-ui,sans-serif');
       root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('data-testid', 'demo-session-gate');

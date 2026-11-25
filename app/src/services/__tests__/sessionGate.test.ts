@@ -8,7 +8,7 @@ describe('session gate', () => {
 
   it('asks for a first session with the session length, as a modal dialog, and loads Turnstile', () => {
     const gate = createSessionGate();
-    void gate.prompt({ reason: 'required', minutes: 20, siteKey: 'k' }).catch(() => {});
+    void gate.ask({ reason: 'required', minutes: 20, siteKey: 'k' }).catch(() => {});
     expect(dialog()?.getAttribute('role')).toBe('dialog');
     expect(dialog()?.getAttribute('aria-modal')).toBe('true');
     expect(dialog()?.textContent).toContain('Try Starquix in your browser');
@@ -18,8 +18,8 @@ describe('session gate', () => {
 
   it('says the session ended, shows why a new one was refused, and replaces itself on the next prompt', () => {
     const gate = createSessionGate();
-    void gate.prompt({ reason: 'ended', minutes: 20, siteKey: 'k' }).catch(() => {});
-    void gate.prompt({ reason: 'ended', minutes: 20, siteKey: 'k', message: 'The demo is full. Try again in a minute.' }).catch(() => {});
+    void gate.ask({ reason: 'ended', minutes: 20, siteKey: 'k' }).catch(() => {});
+    void gate.ask({ reason: 'ended', minutes: 20, siteKey: 'k', message: 'The demo is full. Try again in a minute.' }).catch(() => {});
     expect(document.querySelectorAll('[data-testid="demo-session-gate"]')).toHaveLength(1);
     expect(dialog()?.textContent).toContain('Your demo session ended');
     expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe('The demo is full. Try again in a minute.');
@@ -27,7 +27,7 @@ describe('session gate', () => {
 
   it('closes', () => {
     const gate = createSessionGate();
-    void gate.prompt({ reason: 'required', minutes: 20, siteKey: 'k' }).catch(() => {});
+    void gate.ask({ reason: 'required', minutes: 20, siteKey: 'k' }).catch(() => {});
     gate.close();
     expect(dialog()).toBeNull();
   });

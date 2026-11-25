@@ -115,7 +115,7 @@ export function createWebDesktop(base = '/api', deps: Deps = {}): SqDesktop {
       const i = await handshake(); let message: string | undefined;
       gateUi ??= createSessionGate();
       for (;;) {
-        const token = await gateUi.prompt({ reason, minutes: i.minutes, siteKey: i.turnstileSiteKey, message });
+        const token = await gateUi.ask({ reason, minutes: i.minutes, siteKey: i.turnstileSiteKey, message });
         const r = await doFetch(`${base}/session`, { method: 'POST', credentials: 'same-origin',
           headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) });
         if (r.ok) break;
