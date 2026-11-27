@@ -61,3 +61,33 @@ describe('handleSetFontsCss', () => {
     expect(style.textContent).toBe('@font-face{font-family:X;}');
   });
 });
+
+describe('reportFontFamilies', () => {
+  it('posts FONT_FAMILIES with each declared face family, Chrome quotes stripped', () => {
+    const bridge = mountFontsBridge();
+    const faces = [{ family: '"Open Sans"' }, { family: 'Open Sans' }, { family: "'My Brand'" }, { family: '' }];
+    Object.defineProperty(document, 'fonts', { value: faces, configurable: true });
+    bridge.reportFontFamilies();
+    expect(bridge.sendToParent).toHaveBeenLastCalledWith({ type: 'FONT_FAMILIES', payload: { fontFamilies: ['Open Sans', 'Open Sans', 'My Brand'] } });
+  });
+
+  it('no FontFaceSet → empty list', () => {
+    const bridge = mountFontsBridge();
+    Object.defineProperty(document, 'fonts', { value: undefined, configurable: true });
+    bridge.reportFontFamilies();
+    expect(bridge.sendToParent).toHaveBeenLastCalledWith({ type: 'FONT_FAMILIES', payload: { fontFamilies: [] } });
+  });
+
+  it('a <head> change (CSS tab, CSS HMR) re-reports after a short settle', async () => {
+    vi.useFakeTimers();
+    try {
+      const bridge = mountFontsBridge();
+      Object.defineProperty(document, 'fonts', { value: [{ family: 'Brand' }], configurable: true });
+      bridge.watchFontFamilies();
+      document.head.appendChild(document.createElement('style'));
+      await Promise.resolve();
+      vi.advanceTimersByTime(300);
+      expect(bridge.sendToParent).toHaveBeenLastCalledWith({ type: 'FONT_FAMILIES', payload: { fontFamilies: ['Brand'] } });
+    } finally { vi.useRealTimers(); }
+  });
+});

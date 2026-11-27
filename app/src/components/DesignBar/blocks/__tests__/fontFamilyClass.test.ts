@@ -21,6 +21,12 @@ describe('fontFamilyClass helpers', () => {
     // a bare var() is a WEIGHT in Tailwind 3.4 (task-264): a font pick must not strip it
     expect(stripFontFamilyClasses('font-[var(--weight)] font-sans')).toBe('font-[var(--weight)]');
   });
+  it('a stack reads as its first family; a pick replaces the whole stack', () => {
+    const stack = 'font-["KTF_Rublena","Arial_Black","Arial"]';
+    expect(classesToFamily(`m-0 ${stack} font-black`)).toEqual({ kind: 'family', value: 'KTF Rublena' });
+    expect(classesToFamily("font-['Open_Sans',sans-serif]")).toEqual({ kind: 'family', value: 'Open Sans' });
+    expect(stripFontFamilyClasses(`m-0 ${stack} font-black`)).toBe('m-0 font-black');
+  });
   it('an unquoted family is a family: read by name, stripped by a pick', () => {
     expect(classesToFamily('font-[Inter] font-bold')).toEqual({ kind: 'family', value: 'Inter' });
     expect(stripFontFamilyClasses('font-[Inter] font-[650] p-2')).toBe('font-[650] p-2');

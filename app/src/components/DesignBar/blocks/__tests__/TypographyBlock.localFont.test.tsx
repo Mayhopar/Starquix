@@ -55,17 +55,19 @@ vi.mock('@/db', () => ({ db: { assets: { get: h.dbGet } }, getAssetBlob: vi.fn()
 // The real select needs a full catalog popover; the branch under test only
 // needs onChange to fire with a family name.
 vi.mock('../FontFamilySelect', () => ({
-  FontFamilySelect: ({ onChange }: { onChange: (v: string) => void }) => (
-    <><button data-testid="pick-font" onClick={() => onChange('Open Sans')} /><button data-testid="system-font" onClick={() => onChange('serif')} /></>
+  FontFamilySelect: ({ onChange, inherited }: { onChange: (v: string) => void; inherited?: string }) => (
+    <><span data-testid="inherited">{inherited}</span><button data-testid="pick-font" onClick={() => onChange('Open Sans')} /><button data-testid="system-font" onClick={() => onChange('serif')} /></>
   ),
 }));
 
 import { TypographyBlock } from '../TypographyBlock';
 import { LOCAL_FONT_NO_HEAD_WARNING } from '@/utils/localFonts';
+import { setSiteFonts } from '@/services/siteFonts';
 
 beforeEach(() => {
   vi.clearAllMocks();
   h.projectId = 'browser_lf_testsite';
+  setSiteFonts('', []);
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   h.pickLocal.mockResolvedValue({ css: 'LOCAL_CSS', warning: null });
@@ -90,6 +92,26 @@ describe('TypographyBlock local-mode fonts (gap-61)', () => {
       family: 'Open Sans',
       entry: { source: 'google', css: 'LOCAL_CSS', assetIds: [] },
     });
+  });
+
+  it('a family the site already loads only writes the class — no download, no stylesheet write', async () => {
+    setSiteFonts('browser_lf_testsite', ['Open Sans']);
+    const onClassesChange = vi.fn();
+    render(<TypographyBlock classes="" computedStyles={null} onClassesChange={onClassesChange} />);
+    fireEvent.click(screen.getByTestId('pick-font'));
+    expect(onClassesChange).toHaveBeenCalledWith('font-["Open_Sans"]', expect.any(Function));
+    expect(h.pickLocal).not.toHaveBeenCalled();
+    expect(h.pickGoogle).not.toHaveBeenCalled();
+    expect(h.dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('names the inherited family only when the picker lists it', () => {
+    setSiteFonts('browser_lf_testsite', ['Brand Sans']);
+    const styles = (fontFamily: string) => ({ fontFamily } as never);
+    const { rerender } = render(<TypographyBlock classes="" computedStyles={styles('"Brand Sans", sans-serif')} onClassesChange={vi.fn()} />);
+    expect(screen.getByTestId('inherited').textContent).toBe('Brand Sans');
+    rerender(<TypographyBlock classes="" computedStyles={styles('ui-sans-serif, system-ui, sans-serif')} onClassesChange={vi.fn()} />);
+    expect(screen.getByTestId('inherited').textContent).toBe('');
   });
 
   it('maps the known missing stylesheet warning to neutral appearance guidance', async () => {

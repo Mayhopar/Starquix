@@ -442,6 +442,7 @@ export const BRIDGE_SCANNING = `
           predicted: this._predictedScan === true
         }
       });
+      this.reportFontFamilies();
       this._predictedScan = false;
 
       // Mark elements as ready and process any pending class updates

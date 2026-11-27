@@ -17,6 +17,7 @@ import { pickGoogleFont } from '@/services/googleFonts';
 import { isLocalProjectId } from '@/utils/localMode';
 import { pickLocalGoogleFont, uploadLocalFont, updateLocalCustomFont, LOCAL_FONT_NO_HEAD_WARNING } from '@/utils/localFonts';
 import { selectProjectFonts } from '@/store/fontSelectors';
+import { useSiteFonts } from '@/services/siteFonts';
 import { selectProjectId } from '@/store/selectors';
 import { useYjsValue, useDispatch } from '@/store/hooks';
 import { db, getAssetBlob } from '@/db';
@@ -290,6 +291,7 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
   const dispatch = useDispatch();
   const projectId = useYjsValue(selectProjectId);
   const projectFonts = useYjsValue(selectProjectFonts);
+  const siteFonts = useSiteFonts(projectId || '');
   const [fontLoading, setFontLoading] = useState(false);
   const [fontError, setFontError] = useState<string | null>(null);
   const [fontNotice, setFontNotice] = useState<'apply' | 'preview' | 'stylesheet' | 'settings' | null>(null);
@@ -423,6 +425,13 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
     whitespace: useMixedValue(parseWhitespace),
   };
 
+  // No family class: name the family the element renders with when the picker lists it
+  // (a generic or system stack stays "Default Font").
+  const inheritedFamily = useMemo(() => {
+    const first = (computedStyles?.fontFamily ?? '').split(',')[0].trim().replace(/^["']|["']$/g, '');
+    return projectFonts[first] || siteFonts.includes(first) ? first : '';
+  }, [computedStyles, projectFonts, siteFonts]);
+
   // Three-dots menu state (outside-click + Escape close handled by Popover)
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -440,8 +449,8 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
       return;
     }
 
-    // Already picked (google or custom) — just write the class.
-    if (projectFonts[value]) {
+    // Already picked (google or custom) or loaded by the site itself — just write the class.
+    if (projectFonts[value] || siteFonts.includes(value)) {
       onClassesChange(`${stripped} ${familyToClass(value)}`.trim(), OWNS.family);
       return;
     }
@@ -475,7 +484,7 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
     } finally {
       operation.finish();
     }
-  }, [classes, elementKey, onClassesChange, projectFonts, projectId, dispatch, isLocal]);
+  }, [classes, elementKey, onClassesChange, projectFonts, siteFonts, projectId, dispatch, isLocal]);
 
   const handleFontUpload = useCallback(async (file: File) => {
     const validationError = validateFontFile(file);
@@ -648,6 +657,8 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
           value={fontFamily}
           mixed={mixed.family}
           projectFonts={projectFonts}
+          siteFonts={siteFonts}
+          inherited={inheritedFamily}
           disabled={fontLoading}
           onChange={handleFontFamilyChange}
           onUploadClick={() => fontFileInputRef.current?.click()}

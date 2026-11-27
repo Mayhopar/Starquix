@@ -26,6 +26,7 @@ describe('viewport message registry', () => {
       'ELEMENT_HOVER_END',
       'ELEMENT_RECT',
       'ELEMENT_RECT_RESPONSE',
+      'FONT_FAMILIES',
       'GRID_GEOMETRY_RESPONSE',
       'IFRAME_READY',
       'IMAGE_PREVIEW_REFRESH',

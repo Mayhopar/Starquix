@@ -7,10 +7,11 @@ export function isSystemFontValue(value: string): boolean {
 }
 
 const SYSTEM_RE = new RegExp(`^font-(${SYSTEM_FONT_VALUES.join('|')})$`);
-// Extracts the NAME from a single-family token, quoted or not. Membership in the
-// fontFamily slot is the registry's call (getPropertyGroup), not this regex's: a
-// stack or font-[family-name:var(--x)] is in the slot but has no one name to show.
-const FAMILY_NAME_RE = /^font-\[["']?([^\]"',:]+)["']?\]$/;
+// Extracts the NAME from a family token, quoted or not — for a stack
+// (font-["KTF_Rublena","Arial"]) the first family, the one that renders. Membership
+// in the fontFamily slot is the registry's call (getPropertyGroup), not this regex's:
+// font-[family-name:var(--x)] is in the slot but has no name to show.
+const FAMILY_NAME_RE = /^font-\[["']?([^\]"',:]+)["']?(?:,[^\]]*)?\]$/;
 
 export function familyToClass(family: string): string {
   return `font-["${family.replace(/ /g, '_')}"]`;

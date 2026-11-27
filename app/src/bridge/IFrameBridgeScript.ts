@@ -173,6 +173,7 @@ export const IFRAME_BRIDGE_SCRIPT = `
     this.setupNavigationDetection();
     this.injectDesignModeStyles();
     this.armFixedRepaintOnResize();
+    this.watchFontFamilies();
     this.notifyReady();
   }
 

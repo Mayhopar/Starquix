@@ -1,9 +1,11 @@
 /**
  * Font family dropdown with live previews. Each row renders in its own font
  * (Google families via subsetted css2 preview links, project fonts via their
- * Dexie bytes). "Upload font…" lives inside the list. The full catalog is
- * listed most-popular-first (catalog JSON is popularity-sorted); previews
- * load lazily as rows scroll into view.
+ * Dexie bytes, else the css2 link when Google has the name). "Project fonts"
+ * = picked/uploaded fonts + every family the site's page loads itself.
+ * "Upload font…" lives inside the list. The full catalog is
+ * listed most-popular-first (catalog JSON is popularity-sorted), a page at a
+ * time as the list scrolls; previews load lazily as rows scroll into view.
  */
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import fontCatalog from '@/assets/fontCatalog.json';
@@ -15,10 +17,17 @@ import type { ProjectFontEntry } from '@/store/fontCommands';
 const SYSTEM_FONTS = SYSTEM_FONT_VALUES.map(v => ({
   label: v.charAt(0).toUpperCase() + v.slice(1), value: v, className: `font-${v}`,
 }));
+const GOOGLE_NAMES = new Set(fontCatalog.families.map(f => f.f));
+const NO_FONTS: string[] = [];
+const PAGE = 50;
 
 interface FontFamilySelectProps {
   value: string; // '' | 'sans'|'serif'|'mono' | family name
   projectFonts: Record<string, ProjectFontEntry>;
+  /** Families the site's page loads itself (services/siteFonts). */
+  siteFonts?: string[];
+  /** No family class: the family the element renders with — shown dimmed, like Size's computed value. */
+  inherited?: string;
   disabled?: boolean;
   onChange: (value: string) => void;
   onUploadClick: () => void;
@@ -27,7 +36,7 @@ interface FontFamilySelectProps {
 }
 
 export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
-  value: valueProp, projectFonts, disabled, onChange, onUploadClick, mixed = false,
+  value: valueProp, projectFonts, siteFonts = NO_FONTS, inherited, disabled, onChange, onUploadClick, mixed = false,
 }) => {
   // Mixed shows no family (nothing ticked, no preview font); picking one sets it on every member.
   const value = mixed ? '' : valueProp;
@@ -36,17 +45,18 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const projectNames = useMemo(() => Object.keys(projectFonts).sort(), [projectFonts]);
+  const projectNames = useMemo(
+    () => [...new Set([...Object.keys(projectFonts), ...siteFonts])].sort(), [projectFonts, siteFonts]);
 
-  // Full catalog, already popularity-sorted in the JSON. ponytail: 1941 plain
-  // rows, no virtualization — previews are lazy so render cost is just DOM;
-  // virtualize if the popover ever feels slow.
+  // Full catalog, already popularity-sorted in the JSON, rendered PAGE rows at a
+  // time: mounting all 1941 (each naming its own font) cost seconds per open.
+  const [limit, setLimit] = useState(PAGE);
   const googleRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return fontCatalog.families
-      .filter(f => (!q || f.f.toLowerCase().includes(q)) && !(f.f in projectFonts))
+      .filter(f => (!q || f.f.toLowerCase().includes(q)) && !projectNames.includes(f.f))
       .map(f => f.f);
-  }, [query, projectFonts]);
+  }, [query, projectNames]);
 
   const filteredProjectNames = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -61,27 +71,28 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
     }
   }, [isOpen, filteredProjectNames, projectFonts]);
 
-  // Google previews load lazily as rows scroll into view (1941 rows — eager
-  // loading would fire ~1900 stylesheet requests). IO clips against ancestor
+  // Rows scrolling into view load their Google preview; the [data-more] row
+  // renders the next page. Created by the first row that needs it — row refs
+  // attach in the commit, before any effect runs. IO clips against ancestor
   // overflow, so root: null is correct even inside the scrolling popover.
   const observerRef = useRef<IntersectionObserver | null>(null);
-  useEffect(() => {
-    if (!isOpen) return;
-    const observer = new IntersectionObserver((entries) => {
+  const observeRow = useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    observerRef.current ??= new IntersectionObserver((entries, observer) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;
-        const family = (e.target as HTMLElement).dataset.family;
-        if (family) ensurePreviewFont(family);
-        observer.unobserve(e.target);
+        const row = e.target as HTMLElement;
+        observer.unobserve(row);
+        if (row.dataset.more) setLimit(l => l + PAGE);
+        else if (row.dataset.family) ensurePreviewFont(row.dataset.family);
       }
     }, { rootMargin: '100px' });
-    observerRef.current = observer;
-    return () => { observer.disconnect(); observerRef.current = null; };
-  }, [isOpen]);
-
-  const observeRow = useCallback((el: HTMLElement | null) => {
-    if (el) observerRef.current?.observe(el);
+    observerRef.current.observe(el);
   }, []);
+  // Closing (or unmounting) drops the rows' observations with them.
+  useEffect(() => {
+    if (isOpen) return () => { observerRef.current?.disconnect(); observerRef.current = null; };
+  }, [isOpen]);
 
   // Preview the applied family on the closed button too.
   useEffect(() => {
@@ -94,12 +105,13 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
     if (isOpen) searchRef.current?.focus();
   }, [isOpen]);
 
-  const close = () => { setIsOpen(false); setQuery(''); };
+  const close = () => { setIsOpen(false); setQuery(''); setLimit(PAGE); };
   const pick = (v: string) => { close(); onChange(v); };
 
+  const showInherited = !mixed && !value && !!inherited;
   const buttonLabel = mixed ? 'Mixed' : value
     ? (SYSTEM_FONTS.find(s => s.value === value)?.label ?? value)
-    : 'Default Font';
+    : (inherited || 'Default Font');
 
   // Google rows carry data-family + the IO ref (on a wrapper span — MenuItem
   // doesn't forward refs/data attrs) so their preview loads on
@@ -122,7 +134,7 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
         iconRight={<FieldChevron />}
       >
         <span
-          className="flex-1 min-w-0 truncate text-left"
+          className={`flex-1 min-w-0 truncate text-left${showInherited ? ' text-text-secondary' : ''}`}
           style={value && !isSystemFontValue(value) ? { fontFamily: `"${value}"` } : undefined}
         >
           {buttonLabel}
@@ -136,7 +148,7 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
             <input
               ref={searchRef}
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => { setQuery(e.target.value); setLimit(PAGE); }}
               placeholder={`Search ${fontCatalog.families.length} fonts…`}
               className="w-full h-6 px-2 bg-bg border border-stroke rounded-sm text-xs text-text outline-none"
             />
@@ -153,11 +165,12 @@ export const FontFamilySelect: React.FC<FontFamilySelectProps> = ({
             {filteredProjectNames.length > 0 && (
               <div className="px-2 pt-2 pb-0.5 text-3xs text-text-secondary uppercase">Project fonts</div>
             )}
-            {filteredProjectNames.map(name => fontRow(name))}
+            {filteredProjectNames.map(name => fontRow(name, !projectFonts[name]?.assetIds[0] && GOOGLE_NAMES.has(name)))}
             {googleRows.length > 0 && (
               <div className="px-2 pt-2 pb-0.5 text-3xs text-text-secondary uppercase">Google Fonts</div>
             )}
-            {googleRows.map(name => fontRow(name, true))}
+            {googleRows.slice(0, limit).map(name => fontRow(name, true))}
+            {googleRows.length > limit && <span key={`more-${limit}`} ref={observeRow} data-more="1" className="block h-px" />}
             {query && googleRows.length === 0 && filteredProjectNames.length === 0 && (
               <div className="px-2 py-2 text-xs text-text-secondary">No fonts found</div>
             )}
