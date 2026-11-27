@@ -2,7 +2,7 @@
 // + posts fragment; re-bind replaces the fetch in place; unbind restores the
 // bare slot byte-for-byte; a custom fetch is refused (null) — never rewritten.
 import { describe, it, expect } from 'vitest';
-import { cardTagsOf, emitBlogBinding, parseBlogBinding, parseBlogBindings, renameCardTags, UNBOUND, type BlogBinding, type EmitOptions } from '../blogBinding';
+import { cardTagsOf, emitBlogBinding, parseBlogBinding, parseBlogBindings, renameCardTags, stampPostCards, UNBOUND, type BlogBinding, type EmitOptions } from '../blogBinding';
 import { firstSlot, TWO_SLOTS } from './fixtures/lists';
 
 const UNBOUND_PAGE = `---
@@ -270,5 +270,38 @@ describe('renameCardTags (the card picker / missing-card swap)', () => {
   it('a gone card (no source to read): its entry is the prop passing a bare identifier, not the first braced prop', () => {
     expect(renameCardTags('<Old h2Class={"text-4xl"} post={post} />', 'Old', 'BlogCard', null, 'post'))
       .toBe('<BlogCard h2Class={"text-4xl"} post={post} />');
+  });
+});
+
+describe('stampPostCards: a loop the binding did not write gets its cards\' post stamp', () => {
+  const slot = (posts: string) => `---\nconst posts = await getCollection('blog');\n---\n<BlogSlot>\n  <Fragment slot="posts">\n    ${posts}\n  </Fragment>\n</BlogSlot>\n`;
+  const W = (id: string) => `<div class="contents" data-sq-post-slug={${id}}>`;
+
+  it('an AI loop (live: starquix.app/blog) — a JSX comment, then one card per branch of a ternary', () => {
+    const loop = '{/* highlight posts render the wide card */}\n    {posts.map((post) => isHighlight(post) ? <BlogCardHighlight post={post} href={`/blog/${post.id}`} /> : <BlogCard post={post} href={`/blog/${post.id}`} />)}';
+    const out = stampPostCards(slot(loop), true);
+    expect(out).toBe(slot(`{/* highlight posts render the wide card */}\n    {posts.map((post) => isHighlight(post) ? ${W('post.id')}<BlogCardHighlight post={post} href={\`/blog/\${post.id}\`} /></div> : ${W('post.id')}<BlogCard post={post} href={\`/blog/\${post.id}\`} /></div>)}`));
+    expect(stampPostCards(out, true)).toBe(out); // idempotent: a stamped tag is left alone
+  });
+
+  it('a `)` in a comment or a nested {…} inside the callback does not close it', () => {
+    expect(stampPostCards(slot('{posts.map((p) => /* wide) */ fmt({ a: 1 }) && <A post={p} />)}'), false))
+      .toBe(slot(`{posts.map((p) => /* wide) */ fmt({ a: 1 }) && ${W('p.slug')}<A post={p} /></div>)}`));
+  });
+
+  it('any entry name, extra params, a chained call, a multi-line card', () => {
+    expect(stampPostCards(slot('{posts.map((p, i) => <A post={p} />)}'), false)).toBe(slot(`{posts.map((p, i) => ${W('p.slug')}<A post={p} /></div>)}`));
+    expect(stampPostCards(slot('{posts.map(p => <A post={p} />).slice(0, 3)}'), false)).toBe(slot(`{posts.map(p => ${W('p.slug')}<A post={p} /></div>).slice(0, 3)}`));
+    expect(stampPostCards(slot('{posts.map((post) => (\n      <a href="/x"><A post={post} /></a>\n    ))}'), false))
+      .toBe(slot(`{posts.map((post) => (\n      ${W('post.slug')}<a href="/x"><A post={post} /></a></div>\n    ))}`));
+  });
+
+  it('leaves alone: the binding\'s own loop, a tag outside the map callback, a non-BlogSlot posts fragment', () => {
+    const bound = slot('{posts.map((post) => <div class="contents" data-sq-post-slug={post.slug}><A post={post} /></div>)}');
+    expect(stampPostCards(bound, false)).toBe(bound);
+    expect(stampPostCards(slot('{posts.length ? posts.map((p) => <A post={p} />) : <p>No (posts) yet</p>}'), false))
+      .toBe(slot(`{posts.length ? posts.map((p) => ${W('p.slug')}<A post={p} /></div>) : <p>No (posts) yet</p>}`));
+    const other = '<Other>\n  <Fragment slot="posts">{posts.map((p) => <A post={p} />)}</Fragment>\n</Other>\n';
+    expect(stampPostCards(other, false)).toBe(other);
   });
 });

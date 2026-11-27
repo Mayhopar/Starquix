@@ -344,5 +344,13 @@ describe('quiet re-emit over every slot (task-244 L20)', () => {
     expect(out).toContain('<div class="contents" data-sq-post-slug={post.slug}><WorkCard work={post} /></div>');
     _resetCardTitleLocksForTests();
   });
+
+  it("a custom slot's own unstamped loop (an AI's) keeps its code and gains only the post stamp", async () => {
+    const ai = "---\nimport { getCollection } from 'astro:content';\nimport BlogSlot from '../components/BlogSlot.astro';\nimport BlogCard from '../components/BlogCard.astro';\nconst posts = (await getCollection('blog')).filter(mine);\n---\n<BlogSlot>\n  <Fragment slot=\"posts\">\n    {posts.map((post) => <BlogCard post={post} href={`/blog/${post.slug}`} />)}\n  </Fragment>\n</BlogSlot>\n";
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ content: ai }), { status: 200 }));
+    expect(await reemitLocalBlogSlots({ pageFile: 'src/pages/blog.astro', localProjectPath: 'wc://p' })).toEqual({ ok: true });
+    expect(writeRestoreRegion).toHaveBeenCalledTimes(1);
+    expect(writeRestoreRegion.mock.calls[0][2]).toBe(ai.replace('<BlogCard', '<div class="contents" data-sq-post-slug={post.slug}><BlogCard').replace('/>)}', '/></div>)}'));
+  });
 });
 

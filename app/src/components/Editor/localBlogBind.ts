@@ -14,7 +14,7 @@ import { importSpecifierFor } from '@/utils/localStructural';
 import { readLocalFile, rewriteLocalFile } from '@/utils/localElementSource';
 import { settleAcceptedWrites } from '@/utils/acceptedSource';
 import { CARD_FILE, cardCopy, cardFileFor, DEFAULT_CARD, ownCardFile } from '@/utils/cardFields';
-import { cardTagsOf, detectPostRoute, emitBlogBinding, importStatementRe, parseBlogBindings, rebaseRelativeImports, resolveImportPath, slotSpans, type BlogBinding } from '@/utils/blogBinding';
+import { cardTagsOf, detectPostRoute, emitBlogBinding, importStatementRe, parseBlogBindings, rebaseRelativeImports, resolveImportPath, slotSpans, stampPostCards, type BlogBinding } from '@/utils/blogBinding';
 import { allCardAssignments, cardSourceOf } from '@/utils/cardTitleLock';
 import { cardEmitOptions } from '@/utils/cardAssignment';
 import type { PushStructuralUndo, StructuralOp } from '@/store/structuralUndo';
@@ -178,7 +178,8 @@ export async function bindLocalBlogSlot({ pageFile, localProjectPath, binding, p
 /**
  * The quiet shape upgrade over EVERY slot of a page (L20): each bound,
  * non-custom slot re-emits with the card it renders (a no-op when already
- * current); a custom slot is skipped, never reverting the others.
+ * current); a custom slot keeps its code, only its cards gain the post stamp
+ * (stampPostCards), never reverting the others.
  */
 export async function reemitLocalBlogSlots({ pageFile, localProjectPath, pushUndo }: Pick<BindLocalBlogSlotArgs, 'pageFile' | 'localProjectPath' | 'pushUndo'>): Promise<BindResult> {
   if (!isLocalPageInSync()) return { ok: false, reason: LOCAL_PAGE_SWITCHING_REASON };
@@ -196,6 +197,7 @@ export async function reemitLocalBlogSlots({ pageFile, localProjectPath, pushUnd
       const href = routes ? detectPostRoute(b.collection!, routes) : b.href;
       after = emitBlogBinding(after, { ...b, href }, cardEmitOptions(pageFile, cardFile, await cardSource(cardFile)), b.slot) ?? after;
     }
+    after = stampPostCards(after); // a custom slot's own loop (an AI's, a hand edit): only its cards' post stamp
     if (after === before) return { ok: true };
     return await commitWholeLocalFile({ file: pageFile, before, after, pushUndo, failure: 'Could not update the blog' });
   } finally {

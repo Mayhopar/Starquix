@@ -8,7 +8,7 @@
 import { siteUsesContentLayer } from '@/utils/siteAstro';
 import { escapeRegex } from './regex';
 import { importSpecifierFor } from './localStructural';
-import { applySplices, attrOf, removeAttr, scanTags, splitFrontmatter, type Span, type Splice, type Tag } from '@/store/seo/astroScan';
+import { applySplices, attrOf, removeAttr, scanTags, skipJs, skipString, splitFrontmatter, type Span, type Splice, type Tag } from '@/store/seo/astroScan';
 
 export type BlogSort = 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc';
 export type Schema = ReadonlyArray<{ name: string; type: string }>;
@@ -283,6 +283,56 @@ function cardWrapper(href: string | null, cardLinks: boolean, id: string) {
   return { kind, link, stamp, want, open: kind === 'a' ? `<a ${link} class="block" ${stamp}>` : `<div${want ? ` class="${want}"` : ''} ${stamp}>` };
 }
 type CardWrapper = ReturnType<typeof cardWrapper>;
+
+/** `.map((post) =>` / `.map((post, i) =>` / `.map(post =>` at the start: group 1|2 = the entry's name. */
+const MAP_ARROW_RE = /^\.map\(\s*(?:\(\s*([A-Za-z_$][\w$]*)\s*(?:,[^()]*)?\)|([A-Za-z_$][\w$]*))\s*=>/;
+
+/**
+ * A posts loop the binding did not write (an AI's or a hand-written `{posts.map((post) => …)}`) renders its cards
+ * unstamped: the editor cannot tell which post a card is ("Go to post", the card root). Each tag such a loop returns
+ * gets the box-less stamped wrapper a bound self-linking card gets (cardWrapper) — the layout does not change. Only
+ * tags inside a `.map` callback (the entry in scope); a tag already stamped is left alone, so it is idempotent.
+ */
+export function stampPostCards(source: string, contentLayer = siteUsesContentLayer()): string {
+  if (!source.includes('<BlogSlot')) return source;
+  const tags = scanTags(source, splitFrontmatter(source)?.templateStart ?? 0);
+  const edits: Splice[] = [];
+  tags.forEach((frag, f) => {
+    if (frag.name !== 'Fragment' || attrOf(frag, 'slot')?.value !== 'posts' || tags[frag.parent]?.name !== 'BlogSlot') return;
+    const items = tags.filter((t) => t.parent === f && t.expr);
+    const spans = items.map((t) => ({ start: t.start, end: t.close?.end ?? t.openEnd }));
+    items.forEach((t, i) => {
+      const entry = !attrOf(t, 'data-sq-post-slug') && mapEntryAt(source, t.expr!.start, t.start, spans);
+      if (!entry) return;
+      const w = cardWrapper(null, true, `${entry}.${contentLayer ? 'id' : 'slug'}`);
+      const { start, end } = spans[i];
+      edits.push({ start, end: start, text: w.open }, { start: end, end, text: `</${w.kind}>` });
+    });
+  });
+  return applySplices(source, edits);
+}
+
+/** The entry of the innermost `.map((x) => …)` callback still open at `at` (scanning the expression whose `{` is at
+ *  `from`, the tags of `skip` jumped over), else null — a tag outside every map callback (`{cond ? posts.map(…) :
+ *  <Empty/>}`) has no entry. A nested `{…}` is skipped whole: `from` is the innermost expression holding `at`. */
+function mapEntryAt(src: string, from: number, at: number, skip: Span[]): string | null {
+  const open: Array<string | null> = [];
+  for (let k = from + 1; k < at;) {
+    const c = src[k];
+    const tag = skip.find((s) => s.start === k);
+    if (tag) { k = tag.end; continue; }
+    if (c === '"' || c === "'" || c === '`') { k = skipString(src, k); continue; }
+    if (c === '{') { k = skipJs(src, k); continue; }
+    if (c === '/' && src[k + 1] === '/') { const n = src.indexOf('\n', k); k = n < 0 ? at : n; continue; }
+    if (c === '/' && src[k + 1] === '*') { const n = src.indexOf('*/', k + 2); k = n < 0 ? at : n + 2; continue; }
+    const map = c === '.' ? MAP_ARROW_RE.exec(src.slice(k, at)) : null;
+    if (map) { open.push(map[1] ?? map[2]); k += map[0].length; continue; }
+    if (c === '(') open.push(null);
+    else if (c === ')') open.pop();
+    k++;
+  }
+  return open.filter((e) => e !== null).pop() ?? null;
+}
 
 type PostsShape = { list: Span; wrapper?: Tag; card: Tag };
 
