@@ -28,6 +28,7 @@ import {
   handleReady,
   handleIframeReady,
   handleAssetsOwned,
+  handleFontFamilies,
   handleContentHeight,
   handlePageChanged,
 } from './lifecycle';
@@ -68,6 +69,7 @@ export function buildMessageHandlers(): Record<string, MessageHandler> {
     READY: handleReady as MessageHandler,
     IFRAME_READY: handleIframeReady as MessageHandler,
     ASSETS_OWNED: handleAssetsOwned as MessageHandler,
+    FONT_FAMILIES: handleFontFamilies as MessageHandler,
     CONTENT_HEIGHT: handleContentHeight as MessageHandler,
     PAGE_CHANGED: handlePageChanged as MessageHandler,
     ELEMENTS_SCANNED: handleElementsScanned as MessageHandler,

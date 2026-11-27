@@ -28,4 +28,23 @@ IFrameBridge.prototype.updateFontsStyleSheet = function() {
     style.textContent = resolved;
     this._lastFontsCss = resolved;
   };
+
+// FONT_FAMILIES: every family this page declares (@font-face from any
+// stylesheet, loaded or not) — the font picker lists the site's own fonts.
+IFrameBridge.prototype.reportFontFamilies = function() {
+    // Chrome serializes a spaced family as a CSS string: "Open Sans". The editor dedupes.
+    var families = Array.from(document.fonts || [], function(face) {
+      return String(face.family || '').replace(/^\\s*["']|["']\\s*$/g, '').trim();
+    }).filter(Boolean);
+    this.sendToParent({ type: 'FONT_FAMILIES', payload: { fontFamilies: families } });
+  };
+
+// The CSS tab, a picked font and CSS HMR change only <head>, which scans ignore.
+IFrameBridge.prototype.watchFontFamilies = function() {
+    var self = this, timer = null;
+    new MutationObserver(function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() { self.reportFontFamilies(); }, 300);
+    }).observe(document.head || document.documentElement, { childList: true, subtree: true, characterData: true });
+  };
 `;

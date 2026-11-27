@@ -13,6 +13,7 @@ import { viteStructuralWriter } from '@/services/ViteStructuralWriter';
 import { resumeLocalVariablesCss } from '@/services/localVariablesCss';
 import { getActiveSaveProjectId } from '@/services/pendingProjectMutations';
 import { findLocalProjectEntry } from '@/utils/localMode';
+import { setSiteFonts } from '@/services/siteFonts';
 import type { ContentHeightPayload, IframeReadyPayload } from '@/bridge';
 import type { ViewportMessageContext } from './context';
 
@@ -91,6 +92,11 @@ export function handleAssetsOwned(_ctx: ViewportMessageContext, payload: unknown
   const ids = (payload as { ids?: string[] } | null)?.ids ?? [];
   lastOwnedAssetIds = ids;
   window.dispatchEvent(new CustomEvent('sq:assets-owned', { detail: { ids } }));
+}
+
+/** FONT_FAMILIES (each scan + any <head> change): the families the page declares — the picker's site fonts. */
+export function handleFontFamilies(ctx: ViewportMessageContext, payload: unknown): void {
+  setSiteFonts(ctx.env.projectId ?? '', (payload as { fontFamilies?: unknown } | null)?.fontFamilies);
 }
 
 export function handleContentHeight(ctx: ViewportMessageContext, payload: unknown): void {
