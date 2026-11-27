@@ -417,11 +417,13 @@ const OPS = {
     const url = sub ? `https://${name}.${sub}.workers.dev` : null;
     if (offline === 'true') return { ...none, connected: true, account, offline: url }; // U3: "Publish again" brings it back here
     // Review 6 (ledger 48): a failing domain lookup never hides the site and Publish changes; a sign-out still surfaces.
-    const [domain, reachable] = await Promise.all([domainState(ctx, engine, account.id, name, probe).catch(async e => {
+    const [domain, reachable, exists] = await Promise.all([domainState(ctx, engine, account.id, name, probe).catch(async e => {
       if (e.code === 'cloudflare-signed-out') throw e;
       return { name: await engine.config(CF.domain), state: 'unknown', sentTo: null };
-    }), !!url && reach(ctx, url, probe)]);
-    return { connected: true, account, accounts: [], worker: { name, url, reachable }, published: !!head && head === at, domain, offline: null };
+    }), !!url && reach(ctx, url, probe),
+    // A Worker deleted outside the app is not "published": Publish recreates it. Cloudflare not answering changes nothing.
+    cf.scripts(account.id).then(list => list.some(w => w.name === name), () => true)]);
+    return { connected: true, account, accounts: [], worker: { name, url, reachable }, published: !!head && head === at && exists, domain, offline: null };
   },
   /** Get a domain (C3/C8): with the price the user saw → buy (main re-checks it); without one → attach a domain already
    *  theirs, never a purchase; `domain: null` forgets the shown one (Cloudflare untouched). */

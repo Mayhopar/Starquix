@@ -380,6 +380,16 @@ it('cloudflareStatus: not connected → empty, no .git; several accounts → the
   expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(false); // ledger 36
 });
 
+it('a Worker deleted outside the app is not published (Publish recreates it); Cloudflare not answering keeps the state', async () => {
+  const cf = fakeCloudflare(); const ctx = cfCtx(cf); const site = await published(cf, ctx);
+  expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(true);
+  cf.workers.delete('my-site');
+  expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(false);
+  cf.scripts = async () => { throw Object.assign(new Error('x'), { code: 'cloudflare' }); };
+  cf.workers.set('my-site', 't1');
+  expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(true);
+});
+
 it('C8. cloudflareDomain: Buy carries the shown price + currency + auto-renew; without a price it NEVER buys (owned → attach only)', async () => {
   const cf = fakeCloudflare(); const ctx = cfCtx(cf); const dir = await published(cf, ctx);
   await runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'bakery.com', price: '10.44', currency: 'USD', autoRenew: false });
