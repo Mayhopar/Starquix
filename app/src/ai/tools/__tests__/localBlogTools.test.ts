@@ -253,6 +253,16 @@ describe('edit_file / write_file (journaled files-truth source writes)', () => {
     expect(changes).toEqual([{ file: 'src/components/New.astro', beforeSource: null, afterSource: '<div />\n' }]);
   });
 
+  it("stamps the cards of a posts loop the model writes, and says so (the model's next edit must read_file)", async () => {
+    const page = (card: string) => `<BlogSlot>\n  <Fragment slot="posts">\n    {posts.map((post) => ${card})}\n  </Fragment>\n</BlogSlot>\n`;
+    const { r, changes } = await accepted(page('<p />'), { path: 'src/pages/blog.astro', oldString: '<p />', newString: '<BlogCard post={post} />' });
+    expect(changes).toEqual([{ file: 'src/pages/blog.astro', beforeSource: page('<p />'), afterSource: page('<div class="contents" data-sq-post-slug={post.slug}><BlogCard post={post} /></div>') }]);
+    expect(r.message).toContain('data-sq-post-slug');
+    // .astro only: the same text in another file is not a page loop
+    const other = await accepted(null, { path: 'src/data.ts', content: page('<p />') }, 'write_file');
+    expect(other.changes).toEqual([{ file: 'src/data.ts', beforeSource: null, afterSource: page('<p />') }]);
+  });
+
   it('reports a retained (not yet written) edit as not done', async () => {
     m(readProjectedSourceState).mockResolvedValue('a');
     m(acceptFileChanges).mockImplementation(async (_f: string, input: () => Promise<unknown>) => { await input(); return { projectId: ID, revision: 1 }; });

@@ -75,6 +75,7 @@ const LOCAL_HANDLERS = { ...LOCAL_BLOG_HANDLERS, ...LOCAL_SOURCE_HANDLERS, ...LO
 const PAGE_INDEPENDENT_LOCAL_WRITES = new Set<string>(['edit_file', 'write_file', 'select_page', 'set_breakpoint', 'update_page_seo']);
 const LOCAL_HIDDEN_TOOLS = new Set([...LOCAL_HIDDEN_BLOG_TOOLS, ...LOCAL_HIDDEN_SOURCE_TOOLS]);
 import { rewriteLocalFile } from '@/utils/localElementSource';
+import { stampPostCards } from '@/utils/blogBinding';
 import { awaitProjectFiles, awaitJournaledFiles } from '@/services/durableEdits/sourceMaterialization';
 import { downloadFilesTruthZip, projectFilesAsArtifacts } from '@/export/filesTruthZip';
 import { fail, findScannedByKey, isLocalCtx, requireCurrentLocalPage } from './localToolUtils';
@@ -1162,14 +1163,23 @@ async function executeCommand(
         if (parts.length > 2 && !replaceAll) throw new Error(`oldString occurs ${parts.length - 1} times in ${path} — add context to make it unique, or pass replaceAll.`);
         return replaceAll ? parts.join(newString) : current.replace(oldString, () => newString);
       };
+      // A posts loop the model writes gets its cards' post stamp here, not by its own memory (stampPostCards).
+      let stamped = false;
+      const stampedFrom = (current: string | null): string => {
+        const next = nextFrom(current);
+        const out = path.endsWith('.astro') ? stampPostCards(next) : next;
+        stamped = out !== next;
+        return out;
+      };
       try {
         ctx.takeSnapshot();
-        const r = await rewriteLocalFile(path, nextFrom, ctx.claimSnapshot?.());
+        const r = await rewriteLocalFile(path, stampedFrom, ctx.claimSnapshot?.());
         if (!r.changed) return { success: true, message: `${path} unchanged` };
+        const note = stamped ? ' — each posts-loop card now sits in <div class="contents" data-sq-post-slug={…}> (the editor reads the card\'s post from it: keep it; read_file before editing that loop)' : '';
         // task-270: a new file under src/pages IS a page — the doc follows the files.
         const [pageId] = r.created ? followLocalPageFiles(ctx.doc, [path]) : [];
-        if (pageId) return { success: true, message: `Created ${path} — page "${pageId}" (select_page opens it)`, data: { pageId } };
-        return { success: true, message: r.created ? `Created ${path}` : `Wrote ${path}` };
+        if (pageId) return { success: true, message: `Created ${path} — page "${pageId}" (select_page opens it)${note}`, data: { pageId } };
+        return { success: true, message: `${r.created ? 'Created' : 'Wrote'} ${path}${note}` };
       } catch (err) {
         return fail(`${commandType} failed: ${err instanceof Error ? err.message : 'the file was not written'}`);
       }
