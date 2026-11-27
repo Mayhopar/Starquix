@@ -2,18 +2,26 @@ import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/store/hooks', () => ({ useDispatch: () => vi.fn(), useEditorDoc: () => ({}), useYjsValue: () => [] }));
-vi.mock('@/context/UndoContext', () => ({ useUndoContext: () => ({ takeSnapshot: vi.fn() }), useOptionalUndoContext: () => null }));
+vi.mock('@/context/UndoContext', () => ({ useUndoContext: () => ({ takeSnapshot: vi.fn(), claimSnapshot: () => 'snap' }), useOptionalUndoContext: () => null }));
 vi.mock('@/store/collectionSelectors', () => ({ selectContentCollections: () => [] }));
+const schema = vi.hoisted(() => ({ required: vi.fn(async (): Promise<string[]> => []), makeOptional: vi.fn(async () => {}) }));
+vi.mock('@/core/collections/content-ops', async original => {
+  const actual = await original<typeof import('@/core/collections/content-ops')>();
+  return { ...actual, readRequiredLocalFields: schema.required, contentOps: { ...actual.contentOps, makeLocalCollectionFieldOptional: schema.makeOptional } };
+});
+vi.mock('@/components/Editor/localFieldBind', () => ({ bindLocalCardImageField: vi.fn(), readLocalCardImageField: async () => null }));
 import { FrontmatterForm } from '../FrontmatterForm';
 import type { CollectionField } from '@/core/collections/types';
 const fields: CollectionField[] = [{ id: 'cover', name: 'cover', type: 'image', required: false }];
-function mount(cover = '', upload?: (f: File) => Promise<string>, commitResult = true) {
+function mount(cover = '', upload?: (f: File) => Promise<string>, { commitResult = true, required = false, localCollection = null as string | null } = {}) {
   let latest = { cover };
+  const formFields = [{ ...fields[0], required }];
   const onChange = vi.fn();
   const commit = vi.fn(async () => commitResult);
   function Form() {
     const [value, setValue] = useState(latest);
-    return <FrontmatterForm frontmatter={value} fields={fields} collectionId={null} onChange={next => { latest = next as typeof latest; onChange(next); setValue(latest); }} onBlur={commit} onUploadMedia={upload} />;
+    return <FrontmatterForm frontmatter={value} fields={formFields} collectionId={null} fieldSource={required ? 'schema' : undefined} localCollection={localCollection}
+      onChange={next => { latest = next as typeof latest; onChange(next); setValue(latest); }} onBlur={commit} onUploadMedia={upload} />;
   }
   const view = render(<Form />);
   fireEvent.click(screen.getByRole('button', { name: 'Edit cover' }));
@@ -24,7 +32,7 @@ async function drop() {
     dataTransfer: { files: [new File(['x'], 'x.png', { type: 'image/png' })], types: ['Files'] },
   }));
 }
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); schema.required.mockResolvedValue([]); });
 describe('image property editor', () => {
   it('uses the native media upload and publishes its path before committing', async () => {
     const { onChange, commit, latest } = mount('', async () => './images/x.png');
@@ -32,10 +40,33 @@ describe('image property editor', () => {
     expect(latest()).toEqual({ cover: './images/x.png' });
     expect(onChange.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
   });
-  it('shows remote images and omits Clear without a proven optional image schema deletion', () => {
-    mount('https://example.test/a.png', async () => '');
+  it('deletes an optional image: the key leaves the post (publish, then commit) and its row stays', async () => {
+    const { latest, onChange, commit } = mount('https://example.test/a.png', async () => '');
     expect(screen.getByAltText('Current media')).toHaveAttribute('src', 'https://example.test/a.png');
-    expect(screen.queryByRole('button', { name: /delete|clear/i })).toBeNull();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
+    expect(latest()).toEqual({});
+    expect(onChange.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
+    expect(screen.getByRole('textbox', { name: 'Image path' })).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit cover' })).toBeInTheDocument();
+  });
+  it('offers no Delete for a required image', () => {
+    mount('./images/a.png', async () => '', { required: true });
+    expect(screen.queryByRole('button', { name: /delete|remove media/i })).toBeNull();
+  });
+  it.each([true, false])('files-truth: the collection schema requires the field: %s → Delete hidden, with the way out', async required => {
+    schema.required.mockResolvedValue(required ? ['cover'] : []);
+    mount('./images/a.png', async () => '', { localCollection: 'works' });
+    await act(async () => {});
+    expect(schema.required).toHaveBeenCalledWith('works');
+    expect(!!screen.queryByRole('button', { name: 'Delete' })).toBe(!required);
+    expect(!!screen.queryByText(/Make it optional in Manage collection fields/)).toBe(required);
+  });
+  it('files-truth: an unreadable schema keeps the image (no Delete)', async () => {
+    schema.required.mockRejectedValue(new Error('read failed'));
+    mount('./images/a.png', async () => '', { localCollection: 'works' });
+    await act(async () => {});
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
   });
   it('publishes a manually typed post-relative path without rewriting it', () => {
     const { latest } = mount();
@@ -51,7 +82,7 @@ describe('image property editor', () => {
     expect(screen.getByRole('status')).toHaveTextContent('The image could not be added');
   });
   it('keeps the image draft visible after a refused save', async () => {
-    const { latest } = mount('', async () => './images/x.png', false);
+    const { latest } = mount('', async () => './images/x.png', { commitResult: false });
     await drop();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Done' })));
     expect(screen.getByRole('textbox', { name: 'Image path' })).toHaveValue('./images/x.png');
@@ -110,4 +141,26 @@ it('can dismiss a reopened image editor that shows the accepted path', async () 
   expect(screen.getByRole('textbox', { name: 'Image path' })).toHaveValue('./images/original.png');
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Done' })));
   expect(screen.queryByRole('textbox', { name: 'Image path' })).toBeNull();
+});
+
+it('files-truth: Manage collection fields makes a schema-required field optional (one undoable change)', async () => {
+  schema.required.mockResolvedValue(['cover']);
+  render(<FrontmatterForm frontmatter={{ cover: './images/a.png' }} fields={fields} collectionId={null} localCollection="works" onChange={() => {}} onBlur={async () => true} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Manage collection fields' }));
+  const makeOptional = await screen.findByRole('button', { name: 'Make collection field cover optional' });
+  await act(async () => fireEvent.click(makeOptional));
+  expect(schema.makeOptional).toHaveBeenCalledWith('works', 'cover', 'snap');
+  expect(screen.queryByRole('button', { name: 'Make collection field cover optional' })).toBeNull();
+});
+
+it('keeps a deleted image row while the post is open, even when re-inference drops the field (no other post has it)', async () => {
+  function Form() {
+    const [value, setValue] = useState<Record<string, unknown>>({ cover: './images/a.png' });
+    // As the disk inference does after the save: a key no post holds is no longer a field.
+    return <FrontmatterForm frontmatter={value} fields={'cover' in value ? fields : []} collectionId={null} onChange={setValue} onBlur={async () => true} onUploadMedia={async () => './images/b.png'} />;
+  }
+  render(<Form />); fireEvent.click(screen.getByRole('button', { name: 'Edit cover' }));
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Done' })));
+  expect(screen.getByRole('button', { name: 'Edit cover' })).toBeInTheDocument();
 });

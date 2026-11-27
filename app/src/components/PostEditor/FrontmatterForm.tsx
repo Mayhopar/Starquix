@@ -12,7 +12,7 @@ import { PlusIcon } from '@/assets/icons';
 import { useDispatch, useEditorDoc } from '@/store/hooks';
 import { useUndoContext } from '@/context/UndoContext';
 import { selectContentCollections } from '@/store/collectionSelectors';
-import { contentOps } from '@/core/collections/content-ops';
+import { contentOps, readRequiredLocalFields } from '@/core/collections/content-ops';
 import { describeProperties, propertyLabel, propertyValueSummary } from './propertyDescriptors';
 import { bindLocalCardImageField, readLocalCardImageField } from '@/components/Editor/localFieldBind';
 import { usePostPropertyImage } from './usePostPropertyImage';
@@ -149,6 +149,7 @@ export const FrontmatterForm = memo(function FrontmatterForm({ frontmatter, read
   const canManageFields = !!collectionId || !!localCollection;
   const publish = useCallback((key: string, value: unknown) => {
     const next = { ...values.current, [key]: value };
+    if (value === undefined) delete next[key]; // a property's Delete: the key leaves the post
     values.current = next; onChange(next);
   }, [onChange]);
   const commit = async () => { try { return await onBlur(); } catch { return false; } };
@@ -201,13 +202,42 @@ export const FrontmatterForm = memo(function FrontmatterForm({ frontmatter, read
     }
     finally { setManagingBusy(false); }
   };
+  // Fields the collection's schema requires (files-truth): no Delete for them, and the manager offers
+  // "Make optional". Re-read whenever a popover opens (⌘Z may have put a declaration back); null = unknown → no Delete.
+  const [requiredNames, setRequiredNames] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!localCollection) return;
+    let live = true; setRequiredNames(null);
+    void readRequiredLocalFields(localCollection).then(names => { if (live) setRequiredNames(names); }, () => {});
+    return () => { live = false; };
+  }, [localCollection, managing, activeKey]);
+  const schemaRequired = (key: string) => localCollection ? requiredNames && requiredNames.includes(key) : false;
+  const makeOptional = async (field: CollectionField) => {
+    if (!localCollection || collectionFieldState(managementOwner) !== 'idle' || managingBusy) return;
+    setManagingBusy(true); setManagementError(null);
+    try {
+      await runCollectionFieldChange(managementOwner, () => {
+        takeSnapshot(); // one ⌘Z puts the declaration back
+        return contentOps.makeLocalCollectionFieldOptional(localCollection, field.name, claimSnapshot());
+      }, durableLocal);
+      if (mounted.current) setRequiredNames(names => names && names.filter(name => name !== field.name));
+    } catch { blockManagement(); }
+    finally { setManagingBusy(false); }
+  };
+  const fieldActionsDisabled = managingBusy || adding || managementBlocked || managementPending;
+  const fieldAction = (label: string, ariaLabel: string, run: () => Promise<void>) => ({ type: 'custom' as const, unboxed: true,
+    node: <Button label={label} aria-label={ariaLabel} variant="ghost" size="sm" disabled={fieldActionsDisabled} onClick={() => { void run(); }} /> });
   const renderProperty = (descriptor: typeof properties[number]) => <PostPropertyRow key={descriptor.key} descriptor={descriptor} value={frontmatter[descriptor.key]}
     active={activeKey === descriptor.key} onEdit={next => {
       if (busyKey || managingBusy) return;
       setActiveKey(previous => next ? descriptor.key : previous === descriptor.key ? null : previous);
-    }} onChange={publish} onCommit={commit}
+    }} onChange={(key, value) => {
+      // A deleted key keeps its row while the post is open, even when no other post holds it.
+      if (value === undefined && descriptor.field) setAddedTypes(prev => ({ ...prev, [key]: descriptor.field!.type }));
+      publish(key, value);
+    }} onCommit={commit}
     error={descriptor.required && descriptor.field && isEmpty(frontmatter[descriptor.key], descriptor.field.type) ? 'Required' : null}
-    postFile={postFile} projectPath={projectPath} onUploadMedia={onUploadMedia && (file => onUploadMedia(file, descriptor.key).then((src) => {
+    postFile={postFile} projectPath={projectPath} schemaRequired={schemaRequired(descriptor.key)} onUploadMedia={onUploadMedia && (file => onUploadMedia(file, descriptor.key).then((src) => {
       // The attribute just uploaded into is the cover — on the card too.
       if (localCollection) { setCoverKey(descriptor.key); void bindLocalCardImageField(descriptor.key); }
       return src;
@@ -256,7 +286,8 @@ export const FrontmatterForm = memo(function FrontmatterForm({ frontmatter, read
           onDone={() => { cancelAdd(); if (!durableLocal) void commit(); }} onCancel={cancelAdd} />}
         {fields.filter(field => !LOCKED_FIELDS.has(field.name)).map(field =>
           <Row key={field.id} title={<span title={field.name}>{propertyLabel(field.name)}</span>} size="sm" hover={false} className="px-0"
-          right={[{ type: 'custom', unboxed: true, node: <Button label="Remove" aria-label={`Remove collection field ${field.name}`} variant="ghost" size="sm" disabled={managingBusy || adding || managementBlocked || managementPending} onClick={() => { void remove(field); }} /> }]} />)}
+          right={[...(schemaRequired(field.name) ? [fieldAction('Make optional', `Make collection field ${field.name} optional`, () => makeOptional(field))] : []),
+            fieldAction('Remove', `Remove collection field ${field.name}`, () => remove(field))]} />)}
       </div>
     </Popover>
   </div>;

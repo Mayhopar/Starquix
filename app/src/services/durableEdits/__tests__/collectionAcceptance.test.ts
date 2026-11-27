@@ -55,6 +55,17 @@ it('accepts all post patches and the selected schema in one revision before sour
   expect(runtime.read(second)).toBe(secondSource); expect(runtime.read(other)).toBe(secondSource);
 });
 
+it('makes a field optional with one schema edit and no post change; refuses when the schema has nothing to change', async () => {
+  await contentOps.makeLocalCollectionFieldOptional('posts', 'title');
+  const rows = await db.durableEdits.toArray();
+  expect(rows).toHaveLength(1);
+  expect(rows[0].commands[0]).toEqual({ kind: 'file-batch', payload: { files: [
+    { file: config, beforeSource: originalConfig, afterSource: originalConfig.replace('  title: z.string(),', '  title: z.string().optional(),') },
+  ] } });
+  await expect(contentOps.makeLocalCollectionFieldOptional('posts', 'custom')).rejects.toThrow('could not be made optional');
+  expect(await db.durableEdits.count()).toBe(1);
+});
+
 it('prepares removal against accepted post and schema bytes before the first operation materializes', async () => {
   await contentOps.addLocalCollectionField('posts', 'rank', 0);
   await contentOps.removeLocalCollectionField('posts', 'rank');

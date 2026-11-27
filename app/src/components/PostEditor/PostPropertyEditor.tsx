@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Field, OperationNotice } from '@/components/ui';
 import { MediaSurface } from '@/components/DesignBar/blocks/FillBlock';
-export function PostPropertyImageEditor({ value, preview, onChange, onCommit, onUploadMedia, onBusyChange, onDraftValidityChange }: {
+export function PostPropertyImageEditor({ value, preview, onChange, onCommit, onUploadMedia, onBusyChange, onDraftValidityChange, deletable, requiredBySchema }: {
   value: string; preview: { url: string | null; unavailable: boolean };
-  onChange: (value: string) => void; onCommit: () => Promise<boolean | void>;
+  /** Delete (drops the key) is offered; else, when the collection's schema requires the field, say so */
+  deletable: boolean; requiredBySchema: boolean;
+  /** `undefined` drops the key from the post. */
+  onChange: (value: string | undefined) => void; onCommit: () => Promise<boolean | void>;
   onUploadMedia?: (file: File) => Promise<string>; onBusyChange: (busy: boolean) => void;
   onDraftValidityChange: (valid: boolean) => void;
 }) {
@@ -13,6 +16,12 @@ export function PostPropertyImageEditor({ value, preview, onChange, onCommit, on
   const mounted = useRef(true); const pathRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
   const uploading = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  // The post owner presents save refusal; this property remains open.
+  const publish = async (src: string | undefined) => {
+    setPathDraft(src ?? ''); setError(null); onDraftValidityChange(true);
+    onChange(src);
+    await onCommit();
+  };
   const upload = async (files: File[]) => {
     if (!files[0] || !onUploadMedia || uploading.current) return;
     uploading.current = true;
@@ -21,10 +30,7 @@ export function PostPropertyImageEditor({ value, preview, onChange, onCommit, on
       const src = await onUploadMedia(files[0]);
       if (!mounted.current) return;
       if (typeof src !== 'string' || !src.trim() || /^blob:/i.test(src.trim())) throw new Error('No writable image path');
-      setPathDraft(src); onDraftValidityChange(true);
-      onChange(src);
-      // The post owner presents save refusal; this property remains open.
-      await onCommit();
+      await publish(src);
     } catch {
       if (mounted.current) setError('The image could not be added. Your current value is still here. Try the upload again.');
     } finally {
@@ -37,7 +43,7 @@ export function PostPropertyImageEditor({ value, preview, onChange, onCommit, on
       onFiles={files => { void upload(files); }} onOpenPicker={() => {
         const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
         input.onchange = () => { void upload(Array.from(input.files ?? [])); }; input.click();
-      }} previewUrl={preview.url} onDelete={null} primaryLabel="Upload" error={null} />}
+      }} previewUrl={preview.url} onDelete={deletable && value ? () => { void publish(undefined); } : null} primaryLabel="Upload" error={null} />}
     {!onUploadMedia && preview.url && <img src={preview.url} alt="Current media" className="w-full h-20 object-cover rounded-inner" />}
     <Field ref={pathRef} aria-label="Image path" value={pathDraft} disabled={busy} placeholder="Empty" onChange={next => {
       setPathDraft(next);
@@ -47,6 +53,7 @@ export function PostPropertyImageEditor({ value, preview, onChange, onCommit, on
       if (!valid) { setError('Use a file path or image URL. Preview URLs cannot be saved.'); return; }
       setError(null); onChange(next);
     }} />
+    {value && requiredBySchema && <div className="text-xs text-text-muted">Required by the collection. Make it optional in Manage collection fields to delete it.</div>}
     {preview.unavailable && <div className="text-xs text-text-muted">Image preview unavailable. The stored path is unchanged.</div>}
     {error && <OperationNotice title={error} />}
   </div>;

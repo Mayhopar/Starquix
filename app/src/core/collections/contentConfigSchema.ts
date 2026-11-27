@@ -72,9 +72,9 @@ function schemaObjectSpan(config: string, collection: string): { open: number; c
   return close === -1 ? null : { open, close };
 }
 
-/** Top-level properties of an object body: `[start, end)` of each `name: value` incl. its trailing comma. */
-function properties(body: string): Array<{ name: string; start: number; end: number }> {
-  const out: Array<{ name: string; start: number; end: number }> = [];
+/** Top-level properties of an object body: `[start, end)` of each `name: value` incl. its trailing comma; `value` = just past its colon. */
+function properties(body: string): Array<{ name: string; start: number; value: number; end: number }> {
+  const out: Array<{ name: string; start: number; value: number; end: number }> = [];
   let i = 0;
   while (i < body.length) {
     const m = body.slice(i).match(/^\s*(?:\/\/[^\n]*\n\s*)*(?:(['"]?)([A-Za-z_$][\w$-]*)\1)\s*:/);
@@ -91,7 +91,7 @@ function properties(body: string): Array<{ name: string; start: number; end: num
       else if (')}]'.includes(c)) depth--;
       else if (c === ',' && depth === 0) { j++; break; }
     }
-    out.push({ name: m[2], start, end: j });
+    out.push({ name: m[2], start, value: i + m[0].length, end: j });
     i = j;
   }
   return out;
@@ -147,4 +147,42 @@ export function isImageSchemaFieldIn(config: string, collection: string, field: 
   const body = config.slice(span.open + 1, span.close);
   const prop = properties(body).find((p) => p.name === field);
   return !!prop && /:\s*image\s*\(\s*\)/.test(body.slice(prop.start, prop.end));
+}
+
+/** A property's value expression: its outer call chain (bracket contents dropped: `image().optional()`,
+ * `z.object()`) and the body offset where it ends — before the trailing comma or a trailing comment. */
+function declaration(body: string, prop: { value: number; end: number }): { chain: string; end: number } {
+  const value = body.slice(prop.value, prop.end).replace(/,$/, '').trimEnd();
+  let chain = '', end = value.length;
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i];
+    if (c === '/' && (value[i + 1] === '/' || value[i + 1] === '*')) { end = value.slice(0, i).trimEnd().length; break; }
+    if ('({['.includes(c)) { const close = matchBracket(value, i); if (close === -1) break; chain += c + value[close]; i = close; continue; }
+    chain += c;
+  }
+  return { chain: chain.trim(), end: prop.value + end };
+}
+
+/** A value that may be missing from a post: `.optional()`, `.nullish()`, `.default(…)`, `z.optional(…)`. */
+const MAY_BE_MISSING = /(^|\.)(optional|nullish|default)\(\)/;
+
+/** Names `collection`'s schema declares as required — a post without them fails Astro's content validation. */
+export function requiredFieldsIn(config: string, collection: string): string[] {
+  const span = schemaObjectSpan(config, collection);
+  if (!span) return [];
+  const body = config.slice(span.open + 1, span.close);
+  return properties(body).filter((p) => !MAY_BE_MISSING.test(declaration(body, p).chain)).map((p) => p.name);
+}
+
+/** Appends `.optional()` to a required declaration (before any trailing comment); undeclared or already optional → unchanged. */
+export function makeFieldOptionalInContentConfig(config: string, collection: string, name: string): string {
+  const span = schemaObjectSpan(config, collection);
+  if (!span) return config;
+  const body = config.slice(span.open + 1, span.close);
+  const prop = properties(body).find((p) => p.name === name);
+  if (!prop) return config;
+  const decl = declaration(body, prop);
+  if (MAY_BE_MISSING.test(decl.chain)) return config;
+  const at = span.open + 1 + decl.end;
+  return `${config.slice(0, at)}.optional()${config.slice(at)}`;
 }

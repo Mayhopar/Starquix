@@ -8,6 +8,7 @@ import { acceptCollectionFieldChange } from '@/services/durableEdits/collectionA
 import { mergeText } from '@/services/durableEdits/rebase';
 import { readOnlyFrontmatterKeys } from '@/postmodel/frontmatterCapabilities';
 import { contentEntryOf } from './postFileName';
+import { requiredFieldsIn } from './contentConfigSchema';
 import { postSourceParts, changedFrontmatter, equalPostValue, prepareFrontmatterPatch, prepareFrontmatterRemoval, applyPreparedPostPatch, PostSourceConflict, type PostUpdateOptions } from '@/postmodel/frontmatterPatch';
 
 // --- Frontmatter helpers ---
@@ -242,6 +243,12 @@ export async function readLocalContentConfig(): Promise<{ file: string; content:
   return null;
 }
 
+/** The fields `collection`'s own schema requires — a post cannot drop them. No config or no declaration → none. */
+export async function readRequiredLocalFields(collection: string): Promise<string[]> {
+  const config = await readLocalContentConfig();
+  return config ? requiredFieldsIn(config.content, collection) : [];
+}
+
 async function localFetchCollections(dirPath: string): Promise<DiscoveredCollection[]> {
   const readDisk = async (): Promise<Record<string, string> | null> => {
     const resp = await localFetch(`/__sq/local/content?path=${encodeURIComponent(dirPath)}`);
@@ -290,6 +297,9 @@ export function preparePostUpdate(raw: string, frontmatter: Record<string, unkno
       if (!sameField(before.frontmatter, attempt.frontmatter, key)) affected.add(key);
     }
   }
+  // A key the candidate dropped since the baseline is removed (Delete on a property). Only against a
+  // baseline: a caller without one (structural undo's `{}`) sends values, not the whole frontmatter.
+  if (options?.baseline) for (const key of Object.keys(before.frontmatter)) if (!has(frontmatter, key)) affected.add(key);
   const removals: string[] = [];
   for (const key of affected) {
     if (!sameField(current.frontmatter, before.frontmatter, key)
@@ -388,6 +398,14 @@ export const contentOps = {
     const dir = localContentPath;
     if (!dir) return;
     await acceptCollectionFieldChange(dir, collection, { action: 'remove', name }, snapshot);
+    window.dispatchEvent(new Event('sq:content-changed'));
+  },
+
+  /** Appends `.optional()` to the field's declaration in the content config (posts untouched). */
+  async makeLocalCollectionFieldOptional(collection: string, name: string, snapshot?: MutationSnapshot): Promise<void> {
+    const dir = localContentPath;
+    if (!dir) return;
+    await acceptCollectionFieldChange(dir, collection, { action: 'optional', name }, snapshot);
     window.dispatchEvent(new Event('sq:content-changed'));
   },
 

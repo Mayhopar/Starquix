@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockAddLocal = vi.fn();
 const mockRemoveLocal = vi.fn();
-vi.mock('@/core/collections/content-ops', () => ({ contentOps: {
+vi.mock('@/core/collections/content-ops', () => ({ readRequiredLocalFields: async () => [], contentOps: {
   addLocalCollectionField: (...args: unknown[]) => mockAddLocal(...args),
   removeLocalCollectionField: (...args: unknown[]) => mockRemoveLocal(...args),
 } }));
