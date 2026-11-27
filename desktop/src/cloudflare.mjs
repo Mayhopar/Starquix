@@ -244,14 +244,20 @@ export function createCloudflare({ fetch: rawFetch = globalThis.fetch, store, cr
     const r = status === 404 ? null : body.result;
     return r ? { state: r.state, action: r.context?.action ?? null, sentTo: r.context?.confirmation_sent_to ?? null } : null;
   }
-  /** Ledger 53/58/59: the zone must be active first; apex + www point at the Worker (Cloudflare adds DNS + the certificate). */
-  async function attach(a, worker, d) {
+  /** Ledger 53/58/59: the zone must be active first; apex + www point at the Worker (Cloudflare adds DNS + the certificate).
+   *  `takeOver` (the user's "Use it here"): move hostnames another of the account's Workers holds (override_existing_origin,
+   *  as wrangler and alchemy send it). A refusal names that Worker as `holder` — DNS records alone leave it null. */
+  async function attach(a, worker, d, takeOver = false) {
     const z = await zone(a, d);
     if (z?.status !== 'active') return 'pending';
-    const put = hostname => call(`/accounts/${seg(a)}/workers/domains`, send('PUT', { hostname, service: worker, zone_id: z.id }));
+    const put = hostname => call(`/accounts/${seg(a)}/workers/domains`,
+      send('PUT', { hostname, service: worker, zone_id: z.id, ...(takeOver && { override_existing_origin: true }) }));
     try { await put(d); } catch (e) {
       const text = (e.errors ?? []).map(x => x.message).join(' ');
-      if (e.code === 'cloudflare' && (e.status === 409 || /already (exists|has)|dns record|conflict/i.test(text))) throw fail('domain-conflict', 'The domain already points somewhere else');
+      if (e.code === 'cloudflare' && (e.status === 409 || /already (exists|has)|dns record|conflict/i.test(text))) {
+        const bound = (await call(`/accounts/${seg(a)}/workers/domains?${new URLSearchParams({ hostname: d })}`).catch(() => null))?.body.result ?? [];
+        throw fail('domain-conflict', 'The domain already points somewhere else', { holder: bound.find(x => x.hostname === d && x.service !== worker)?.service ?? null });
+      }
       throw e;
     }
     await put(`www.${d}`).catch(() => {}); // the apex is the site; www is a convenience

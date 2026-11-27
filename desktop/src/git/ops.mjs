@@ -146,7 +146,7 @@ async function domainState(ctx, engine, account, worker, probe) {
   if (reg?.state === 'action_required') return out('confirm-email', reg.sentTo);
   if (reg?.state === 'failed') return out('failed');
   try { if (await cf.attach(account, worker, name) === 'pending') return out('setting-up'); } // 58
-  catch (e) { if (e.code === 'domain-conflict') return out('conflict'); throw e; }
+  catch (e) { if (e.code === 'domain-conflict') return { ...out('conflict'), holder: e.holder ?? null }; throw e; }
   await engine.setConfig(CF.attached, 'true');
   return out('https');
 }
@@ -417,11 +417,13 @@ const OPS = {
     const url = sub ? `https://${name}.${sub}.workers.dev` : null;
     if (offline === 'true') return { ...none, connected: true, account, offline: url }; // U3: "Publish again" brings it back here
     // Review 6 (ledger 48): a failing domain lookup never hides the site and Publish changes; a sign-out still surfaces.
-    const [domain, reachable] = await Promise.all([domainState(ctx, engine, account.id, name, probe).catch(async e => {
+    const [domain, reachable, exists] = await Promise.all([domainState(ctx, engine, account.id, name, probe).catch(async e => {
       if (e.code === 'cloudflare-signed-out') throw e;
       return { name: await engine.config(CF.domain), state: 'unknown', sentTo: null };
-    }), !!url && reach(ctx, url, probe)]);
-    return { connected: true, account, accounts: [], worker: { name, url, reachable }, published: !!head && head === at, domain, offline: null };
+    }), !!url && reach(ctx, url, probe),
+    // A Worker deleted outside the app is not "published": Publish recreates it. Cloudflare not answering changes nothing.
+    cf.scripts(account.id).then(list => list.some(w => w.name === name), () => true)]);
+    return { connected: true, account, accounts: [], worker: { name, url, reachable }, published: !!head && head === at && exists, domain, offline: null };
   },
   /** Get a domain (C3/C8): with the price the user saw → buy (main re-checks it); without one → attach a domain already
    *  theirs, never a purchase; `domain: null` forgets the shown one (Cloudflare untouched). */
@@ -434,10 +436,13 @@ const OPS = {
     const cf = ctx.cloudflare; const account = await signedInAccount(cf);
     const worker = await ownWorker(engine, account);
     if (!worker) throw fail('invalid', 'Publish to Cloudflare first');
+    const takeOver = a.takeOver === true && !buying; // "Use it here": only a literal true moves it off another Worker
     const state = buying ? await cf.buy(account.id, a.domain, { price: a.price, currency: a.currency }, a.autoRenew) : 'succeeded';
     await engine.setConfig(CF.domain, a.domain); await engine.setConfig(CF.attached, undefined);
-    // Review 3a: once bought (or taken over), a failing attach is the poll's job (58) — never a "failed purchase".
-    if (state === 'succeeded' && await cf.attach(account.id, worker, a.domain).catch(() => 'pending') === 'attached') await engine.setConfig(CF.attached, 'true');
+    // Review 3a: once bought (or taken over), a failing attach is the poll's job (58) — never a "failed purchase";
+    // a refused "Use it here" is reported, or the notice would just come back with no reason.
+    if (state === 'succeeded' && await cf.attach(account.id, worker, a.domain, takeOver)
+      .catch(e => { if (takeOver) throw e; return 'pending'; }) === 'attached') await engine.setConfig(CF.attached, 'true');
     return { state };
   },
   async cloudflareSearch(ctx, _engine, a) {

@@ -340,6 +340,16 @@ describe('CloudflarePublish — the domain (sheet 21–23)', () => {
     expect(screen.getByRole('button', { name: 'Check again' })).toBeTruthy();
   });
 
+  it('59. on another of the account\'s Workers → named; Use it here moves it (takeOver, never a purchase)', async () => {
+    const held = S({ worker: WORKER, published: true, domain: { name: 'bakery.com', state: 'conflict', sentTo: null, holder: 'landing-page' } });
+    const c = fakeClient([held, domain('live')]);
+    open(c, status({ host: 'cloudflare' }));
+    expect(await screen.findByText('bakery.com is on your other site, landing-page.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Open DNS' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Use it here' }));
+    await waitFor(() => expect(c.log).toEqual(['domain:"bakery.com",{"takeOver":true}']));
+  });
+
   it('21/62. detached after it was live → Connect again (attach only, never a purchase)', async () => {
     const c = fakeClient([domain('detached'), domain('live')]);
     open(c, status({ host: 'cloudflare' }));

@@ -220,9 +220,11 @@ function fakeCloudflare(over = {}) {
     search: async (_a, q) => { log.push(`search:${q}`); return [{ name: q, kind: 'buy', price: '10.44', renewal: '10.44', currency: 'USD' }]; },
     buy: async (_a, d, quote, autoRenew) => { log.push(`buy:${d}:${quote.price}:${quote.currency}:${autoRenew}`); return state.buyState; },
     registration: async () => state.registration,
-    attach: async (_a, w, d) => {
-      log.push(`attach:${w}:${d}`);
-      if (state.conflict) throw Object.assign(new Error('x'), { code: 'domain-conflict' });
+    attach: async (_a, w, d, takeOver) => {
+      log.push(`attach:${w}:${d}${takeOver ? ':takeOver' : ''}`);
+      // conflict: true = DNS records, a string = the account's Worker holding it (a take-over moves only that one)
+      if (state.conflict && !(takeOver && typeof state.conflict === 'string')) throw Object.assign(new Error('x'),
+        { code: 'domain-conflict', holder: typeof state.conflict === 'string' ? state.conflict : null });
       if (!state.zoneActive) return 'pending';
       domains.set(d, w); return 'attached';
     },
@@ -378,6 +380,16 @@ it('cloudflareStatus: not connected → empty, no .git; several accounts → the
   expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(false); // ledger 36
 });
 
+it('a Worker deleted outside the app is not published (Publish recreates it); Cloudflare not answering keeps the state', async () => {
+  const cf = fakeCloudflare(); const ctx = cfCtx(cf); const site = await published(cf, ctx);
+  expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(true);
+  cf.workers.delete('my-site');
+  expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(false);
+  cf.scripts = async () => { throw Object.assign(new Error('x'), { code: 'cloudflare' }); };
+  cf.workers.set('my-site', 't1');
+  expect((await runGitOp(ctx, site, 'cloudflareStatus')).published).toBe(true);
+});
+
 it('C8. cloudflareDomain: Buy carries the shown price + currency + auto-renew; without a price it NEVER buys (owned → attach only)', async () => {
   const cf = fakeCloudflare(); const ctx = cfCtx(cf); const dir = await published(cf, ctx);
   await runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'bakery.com', price: '10.44', currency: 'USD', autoRenew: false });
@@ -432,7 +444,27 @@ it('53–62. domain states: registering → confirm-email → setting-up (re-att
   cf.state.registration = { state: 'failed', action: null, sentTo: null };
   expect(await domainOf()).toMatchObject({ name: 'fail.com', state: 'failed' });
   cf.state.registration = null; cf.state.conflict = true;
-  expect(await domainOf()).toMatchObject({ state: 'conflict' }); // 59
+  expect(await domainOf()).toMatchObject({ state: 'conflict', holder: null }); // 59
+});
+
+it('59. on another of the account\'s Workers → conflict names it; Use it here (takeOver) moves it; a refused take-over is reported; a buy never takes over', async () => {
+  const cf = fakeCloudflare(); const ctx = cfCtx(cf); const dir = await published(cf, ctx);
+  const domainOf = async () => (await runGitOp(ctx, dir, 'cloudflareStatus')).domain;
+  cf.state.conflict = 'landing-page';
+  await runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'bakery.com' }); // picked: the plain attach fails quietly → the poll says why
+  expect(await domainOf()).toMatchObject({ name: 'bakery.com', state: 'conflict', holder: 'landing-page' });
+  await runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'bakery.com', takeOver: 'yes' }); // only a literal true
+  expect(cf.log.at(-1)).toBe('attach:my-site:bakery.com');
+  await runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'bakery.com', takeOver: true });
+  expect(cf.log.at(-1)).toBe('attach:my-site:bakery.com:takeOver');
+  expect(await cfg(dir, 'starquix.cloudflareAttached')).toBe('true');
+  expect(await domainOf()).toMatchObject({ state: 'live' });
+
+  cf.state.conflict = true; // DNS records: a take-over cannot move them → reported, not swallowed
+  await rejectsWith(runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'other.com', takeOver: true }), 'domain-conflict');
+  cf.state.conflict = false;
+  await runGitOp(ctx, dir, 'cloudflareDomain', { domain: 'new.com', price: '10.44', currency: 'USD', autoRenew: false, takeOver: true });
+  expect(cf.log.at(-1)).toBe('attach:my-site:new.com');
 });
 
 it('50/69. cloudflareSearch: trimmed, lower-cased, spaces collapsed; accents/symbols → invalid-domain; empty → invalid; needs the account', async () => {

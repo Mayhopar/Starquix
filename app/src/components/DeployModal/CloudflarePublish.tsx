@@ -146,7 +146,10 @@ export function CloudflarePublish({ client, status: s, projectName, check, list,
     live: { badge: { label: 'Live', variant: 'success' } },
     failed: { badge: { label: 'Failed', variant: 'error' }, notice: { title: "Cloudflare couldn't register it.", detail: 'Nothing was registered.',
       action: { label: 'Use another domain', onClick: () => void run('domain', async () => { await client.cloudflareDomain(null); setSearching(true); }) } } },
-    conflict: { badge: { label: 'Points elsewhere', variant: 'warning' }, notice: { title: `${domain?.name ?? 'The domain'} already points somewhere else.`,
+    conflict: { badge: { label: 'Points elsewhere', variant: 'warning' }, notice: domain?.holder ? { // another of their own Workers has it
+      title: `${domain.name} is on your other site, ${domain.holder}.`, detail: 'Use it here and this site takes its place.',
+      action: { label: 'Use it here', onClick: () => void run('domain', async () => { await client.cloudflareDomain(domain.name, { takeOver: true }); watch(); }) } }
+    : { title: `${domain?.name ?? 'The domain'} already points somewhere else.`,
       detail: 'Remove its DNS records on Cloudflare, then check again.', action: { label: 'Check again', onClick: recheck },
       links: account && domain ? [{ href: dash(account.id, `${domain.name}/dns/records`), label: 'Open DNS' }] : undefined } },
     detached: { badge: { label: 'Not connected', variant: 'warning' }, notice: { title: 'The domain is not connected to this site anymore.',
