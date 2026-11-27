@@ -40,6 +40,15 @@ describe('preparePostUpdate → source preservation', () => {
     const current = raw.replace('Old body.', 'External body.');
     expect(write(current, post.frontmatter, 'Mine.', post)).toBe(current);
   });
+  it('drops a key the editor removed since its baseline; outside changes and baseline-less writes keep it', () => {
+    const source = '---\ntitle: Hi\ncover: ./a.png # hero\ndate: 2026-09-09\n---\nBody\n';
+    const post = parseFrontmatter(source);
+    const { cover: _cover, ...withoutCover } = post.frontmatter;
+    expect(write(source, withoutCover, post.body, post)).toBe('---\ntitle: Hi\ndate: 2026-09-09\n---\nBody\n');
+    const outside = source.replace('./a.png', './b.png');
+    expect(write(outside, withoutCover, post.body, post)).toBe(outside); // D5: the newer outside value stays
+    expect(write(source, {}, post.body)).toBe(source); // structural undo's values-only write
+  });
   it('keeps an outside property change over a stale one (newest wins, D5)', () => {
     const post = parseFrontmatter(raw);
     const current = raw.replace('Before', 'External');

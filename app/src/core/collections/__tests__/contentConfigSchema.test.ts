@@ -5,7 +5,7 @@
 // site never sees the field. No config, or a collection the config does not
 // declare → unchanged.
 import { describe, it, expect } from 'vitest';
-import { addFieldToContentConfig, removeFieldFromContentConfig, zodFor, isImageSchemaFieldIn } from '../contentConfigSchema';
+import { addFieldToContentConfig, removeFieldFromContentConfig, zodFor, isImageSchemaFieldIn, requiredFieldsIn, makeFieldOptionalInContentConfig } from '../contentConfigSchema';
 
 const IMPORTED = `import { defineCollection, z } from "astro:content";
 
@@ -135,5 +135,27 @@ describe('isImageSchemaFieldIn', () => {
     expect(isImageSchemaFieldIn(PERSONAL_SITE, 'works', 'preview1')).toBe(false);
     expect(isImageSchemaFieldIn(PERSONAL_SITE, 'blog', 'image')).toBe(false);
     expect(isImageSchemaFieldIn('', 'works', 'image')).toBe(false);
+  });
+});
+
+describe('requiredFieldsIn / makeFieldOptionalInContentConfig', () => {
+  const MIXED = SCAFFOLD.replace('    draft: z.boolean().default(false),\n', `    draft: z.boolean().default(false),
+    hero: z.optional(z.string()),
+    seo: z.object({ t: z.string().optional() }),
+    url: z.string().url().default('https://x.test/(a)'),
+    last: z.string() // keep
+`);
+  it('reads a declaration as required from its outer call chain only (nested and quoted text say nothing)', () => {
+    expect(requiredFieldsIn(IMPORTED, 'works')).toEqual(['image', 'title']);
+    expect(requiredFieldsIn(MIXED, 'blog')).toEqual(['title', 'seo', 'last']);
+    expect(requiredFieldsIn(IMPORTED, 'blog')).toEqual([]);
+  });
+  it('appends .optional() to exactly that declaration', () => {
+    expect(makeFieldOptionalInContentConfig(IMPORTED, 'works', 'image')).toBe(IMPORTED.replace('image: image(),', 'image: image().optional(),'));
+    expect(makeFieldOptionalInContentConfig(MIXED, 'blog', 'seo')).toBe(MIXED.replace('seo: z.object({ t: z.string().optional() }),', 'seo: z.object({ t: z.string().optional() }).optional(),'));
+  });
+  it('lands before a trailing comment, and is a no-op when already optional or undeclared', () => {
+    expect(makeFieldOptionalInContentConfig(MIXED, 'blog', 'last')).toBe(MIXED.replace('last: z.string() // keep', 'last: z.string().optional() // keep'));
+    for (const name of ['link', 'featured', 'nope']) expect(makeFieldOptionalInContentConfig(IMPORTED, 'works', name)).toBe(IMPORTED);
   });
 });

@@ -1,5 +1,5 @@
 import { CONTENT_CONFIG_FILES, parseFrontmatter } from '@/core/collections/content-ops';
-import { addFieldToContentConfig, removeFieldFromContentConfig } from '@/core/collections/contentConfigSchema';
+import { addFieldToContentConfig, makeFieldOptionalInContentConfig, removeFieldFromContentConfig } from '@/core/collections/contentConfigSchema';
 import type { FieldType } from '@/core/collections/types';
 import { applyPreparedPostPatch, prepareFrontmatterPatch, prepareFrontmatterRemoval } from '@/postmodel/frontmatterPatch';
 import { localFetch } from '@/utils/sqLocalBase';
@@ -9,7 +9,7 @@ import { projectedSourceFiles, readProjectedSourceState } from './projectedSourc
 import type { DurableFileChange } from './types';
 
 type CollectionFieldChange = { action: 'add'; name: string; defaultValue: unknown; type: FieldType }
-  | { action: 'remove'; name: string };
+  | { action: 'remove'; name: string } | { action: 'optional'; name: string };
 
 /** Runs inside the acceptance lane, so every preceding accepted post is part
  * of this collection even while its source projection is still pending. */
@@ -34,7 +34,8 @@ export function acceptCollectionFieldChange(folder: string, collection: string, 
   const frozen = structuredClone(change);
   return acceptFileChanges(folder, async () => {
     const files: DurableFileChange[] = [];
-    const posts = Object.entries(await readProjectedContentFiles(projectId))
+    // Making a field optional is a schema edit only: every post stays valid as it is.
+    const posts = frozen.action === 'optional' ? [] : Object.entries(await readProjectedContentFiles(projectId))
       .filter(([file]) => file.startsWith(`src/content/${collection}/`)).sort(([left], [right]) => left.localeCompare(right));
     for (const [file, beforeSource] of posts) {
       if (frozen.action === 'add' && Object.prototype.hasOwnProperty.call(parseFrontmatter(beforeSource).frontmatter, frozen.name)) continue;
@@ -50,10 +51,12 @@ export function acceptCollectionFieldChange(folder: string, collection: string, 
       if (beforeSource === null) continue;
       const afterSource = frozen.action === 'add'
         ? addFieldToContentConfig(beforeSource, collection, frozen.name, frozen.type)
-        : removeFieldFromContentConfig(beforeSource, collection, frozen.name);
+        : frozen.action === 'remove' ? removeFieldFromContentConfig(beforeSource, collection, frozen.name)
+          : makeFieldOptionalInContentConfig(beforeSource, collection, frozen.name);
       if (afterSource !== beforeSource) files.push({ file, beforeSource, afterSource });
       break;
     }
+    if (frozen.action === 'optional' && !files.length) throw new Error('The field could not be made optional.');
     return files;
   }, undefined, undefined, snapshot);
 }

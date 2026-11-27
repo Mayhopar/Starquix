@@ -5,11 +5,13 @@ import { StringListPropertyEditor } from './StringListPropertyEditor';
 import { PostPropertyImageEditor } from './PostPropertyEditor';
 import { usePostPropertyImage } from './usePostPropertyImage';
 
-export function PostPropertyRow({ descriptor, value, active, onEdit, onChange, onCommit, error, postFile = null, projectPath = null, onUploadMedia, busy = false, onBusyChange = () => {} }: {
+export function PostPropertyRow({ descriptor, value, active, onEdit, onChange, onCommit, error, postFile = null, projectPath = null, onUploadMedia, busy = false, onBusyChange = () => {}, schemaRequired = false }: {
   descriptor: PropertyDescriptor; value: unknown; active: boolean; onEdit: (open: boolean) => void;
   onChange: (key: string, value: unknown) => void; onCommit: () => Promise<boolean | void>; error: string | null;
   postFile?: string | null; projectPath?: string | null; onUploadMedia?: (file: File) => Promise<string>;
   busy?: boolean; onBusyChange?: (busy: boolean) => void;
+  /** the collection's schema requires the field (null: not known yet — nothing is deleted) */
+  schemaRequired?: boolean | null;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
@@ -71,7 +73,8 @@ export function PostPropertyRow({ descriptor, value, active, onEdit, onChange, o
         <Row size="sm" hover={false} title={propertyLabel(key)} className="px-0" />
         {editor === 'readonly' ? <><div className="text-xs text-text-muted">{descriptor.readOnlyReason}</div><div className="text-2xs text-text-muted">Display value</div><pre className="text-xs text-text whitespace-pre-wrap break-words">{propertyInspection(value)}</pre></>
           : editor === 'list' ? <StringListPropertyEditor value={Array.isArray(value) ? value as string[] : []} onChange={change} />
-          : editor === 'image' ? <PostPropertyImageEditor value={text} preview={preview} onChange={change} onCommit={onCommit} onUploadMedia={onUploadMedia} onBusyChange={onBusyChange} onDraftValidityChange={valid => { imageDraftValid.current = valid; }} />
+          : editor === 'image' ? <PostPropertyImageEditor value={text} preview={preview} onChange={change} onCommit={onCommit} onUploadMedia={onUploadMedia} onBusyChange={onBusyChange} onDraftValidityChange={valid => { imageDraftValid.current = valid; }}
+            deletable={!descriptor.required && schemaRequired === false} requiredBySchema={schemaRequired === true} />
           : <Field as="textarea" ref={inputRef} aria-label={key} value={text} onChange={change} error={error ?? undefined} />}
         {editor !== 'readonly' && <Button variant="secondary" size="sm" label="Done" disabled={busy} onClick={() => { void done(true); }} />}
       </div>

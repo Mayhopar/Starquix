@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ bind: vi.fn(), read: vi.fn() }));
 vi.mock('@/components/Editor/localFieldBind', () => ({ bindLocalCardImageField: (...a: unknown[]) => mocks.bind(...a), readLocalCardImageField: (...a: unknown[]) => mocks.read(...a) }));
-vi.mock('@/core/collections/content-ops', () => ({ contentOps: { updatePost: vi.fn() } }));
+vi.mock('@/core/collections/content-ops', () => ({ readRequiredLocalFields: async () => [], contentOps: { updatePost: vi.fn() } }));
 vi.mock('@/store/hooks', () => ({ useDispatch: () => vi.fn(), useEditorDoc: () => ({}), useYjsValue: () => [] }));
 vi.mock('@/context/UndoContext', () => ({ useUndoContext: () => ({ takeSnapshot: vi.fn() }), useOptionalUndoContext: () => null }));
 vi.mock('@/store/collectionSelectors', () => ({ selectContentCollections: () => [] }));
