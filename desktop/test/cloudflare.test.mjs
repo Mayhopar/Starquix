@@ -433,7 +433,22 @@ it('53/58/59. attach: zone not active yet → pending (no PUT); active → apex 
   expect(puts).toEqual([{ hostname: 'bakery.com', service: 'my-site', zone_id: 'z1' }, { hostname: 'www.bakery.com', service: 'my-site', zone_id: 'z1' }]);
 
   const { c: taken } = client({ 'GET /zones': cf([{ id: 'z1', status: 'active' }]), 'PUT /accounts/a1/workers/domains': cf(null, 409) });
-  await expect(taken.attach('a1', 'my-site', 'bakery.com')).rejects.toMatchObject({ code: 'domain-conflict' });
+  await expect(taken.attach('a1', 'my-site', 'bakery.com')).rejects.toMatchObject({ code: 'domain-conflict', holder: null }); // lookup failed
+});
+
+it('59. held by another of the account\'s Workers → its name as holder (DNS records → null); takeOver moves apex + www', async () => {
+  const zones = { 'GET /zones': cf([{ id: 'z1', status: 'active' }]), 'PUT /accounts/a1/workers/domains': cf(null, 409) };
+  const { c, calls } = client({ ...zones, 'GET /accounts/a1/workers/domains': cf([{ hostname: 'bakery.com', service: 'landing-page' }]) });
+  await expect(c.attach('a1', 'my-site', 'bakery.com')).rejects.toMatchObject({ code: 'domain-conflict', holder: 'landing-page' });
+  expect(calls.at(-1).key).toBe('GET /accounts/a1/workers/domains?hostname=bakery.com');
+  const { c: dns } = client({ ...zones, 'GET /accounts/a1/workers/domains': cf([]) });
+  await expect(dns.attach('a1', 'my-site', 'bakery.com')).rejects.toMatchObject({ code: 'domain-conflict', holder: null });
+
+  const puts = [];
+  const { c: move } = client({ 'GET /zones': zones['GET /zones'],
+    'PUT /accounts/a1/workers/domains': ({ body }) => { puts.push(body); return cf({ id: 'd1', ...body }); } });
+  expect(await move.attach('a1', 'my-site', 'bakery.com', true)).toBe('attached');
+  expect(puts).toEqual(['bakery.com', 'www.bakery.com'].map(hostname => ({ hostname, service: 'my-site', zone_id: 'z1', override_existing_origin: true })));
 });
 
 it('61/62. attached: true only when the hostname serves THIS Worker', async () => {

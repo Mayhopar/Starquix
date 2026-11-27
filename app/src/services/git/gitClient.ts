@@ -91,7 +91,8 @@ export interface CloudflareStatus {
   worker: { name: string; url: string | null; reachable: boolean } | null;
   /** HEAD is the commit the last publish uploaded. */
   published: boolean;
-  domain: { name: string; state: DomainState; sentTo: string | null } | null;
+  /** holder (conflict only) = the account's other Worker that has the hostname; null = DNS records hold it. */
+  domain: { name: string; state: DomainState; sentTo: string | null; holder?: string | null } | null;
   /** Unpublished: the address "Publish again" brings back (the Worker name + domain are kept). */
   offline: string | null;
 }
@@ -172,8 +173,9 @@ export function createGitClient(projectId: string, deps: GitDeps = desktopDeps) 
     /** Main saves the edits under `message`, builds the folder on disk and uploads it (the journal is drained first). */
     cloudflarePublish: (name: string, message: string) => run<{ wrote: boolean }>('cloudflarePublish', { name, message }),
     cloudflareSearch: (q: string) => run<DomainRow[]>('cloudflareSearch', { q }),
-    /** `buy` = the price the user saw (main refuses any other); none = a domain already theirs; null = forget the shown one. */
-    cloudflareDomain: (domain: string | null, buy?: { price: string; currency: string; autoRenew: boolean }) =>
+    /** `buy` = the price the user saw (main refuses any other); none = a domain already theirs; `takeOver` = move it off
+     *  the account's other Worker ("Use it here"); null = forget the shown one. */
+    cloudflareDomain: (domain: string | null, buy?: { price: string; currency: string; autoRenew: boolean } | { takeOver: true }) =>
       run<{ state: string | null }>('cloudflareDomain', { domain, ...buy }),
     cloudflareDisconnect: () => run<void>('cloudflareDisconnect'),
     /** Takes the site offline (the Worker leaves Cloudflare); the domain stays registered. */
