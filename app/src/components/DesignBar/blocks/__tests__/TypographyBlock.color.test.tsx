@@ -29,6 +29,12 @@ vi.mock('@/store/hooks', async (importOriginal) => {
 import { TypographyBlock } from '../TypographyBlock';
 import { cssColorToHex } from '../../utils';
 
+/** Pick a preset from a typography field's menu. */
+const pick = (field: string, option: string) => {
+  fireEvent.click(screen.getByLabelText(`${field} options`));
+  fireEvent.click(screen.getByText(option));
+};
+
 // task-094 B4: no explicit text-* color class used to render the SAME
 // transparent checkerboard as a real text-transparent — black text read as
 // "transparent". The computed color IS delivered by the bridge; show it as
@@ -98,14 +104,13 @@ describe('cssColorToHex', () => {
 describe('TypographyBlock: a variable colour is a colour, not a size (task-262)', () => {
   const renderBlock = (classes: string) => {
     const onClassesChange = vi.fn();
-    const utils = render(<TypographyBlock classes={classes} computedStyles={null} onClassesChange={onClassesChange} />);
-    const sizeSelect = [...utils.container.querySelectorAll('select')].find(s => s.querySelector('option[value="5xl"]'))!;
-    return { onClassesChange, sizeSelect };
+    render(<TypographyBlock classes={classes} computedStyles={null} onClassesChange={onClassesChange} />);
+    return { onClassesChange };
   };
 
   it.each(['text-[var(--ink)]', 'text-[color:var(--ink)]', 'text-[#ff0000]'])('a size edit keeps %s', (color) => {
-    const { onClassesChange, sizeSelect } = renderBlock(color);
-    fireEvent.change(sizeSelect, { target: { value: 'lg' } });
+    const { onClassesChange } = renderBlock(color);
+    pick('Font size', '18');
     expect(onClassesChange).toHaveBeenCalledWith(`${color} text-lg`, expect.any(Function));
   });
 
@@ -120,30 +125,28 @@ describe('TypographyBlock: a variable colour is a colour, not a size (task-262)'
 // Found live 2026-11-12: on `font-[var(--heavy)]` the Weight select showed "Regular"
 // and a pick wrote `font-light` BESIDE the variable weight.
 describe('TypographyBlock weight: an arbitrary weight is the weight', () => {
-  const weightSelect = (container: HTMLElement) =>
-    [...container.querySelectorAll('select')].find(s => [...s.options].some(o => o.textContent === 'Semibold'))!;
   const renderBlock = (classes: string) => {
     const onClassesChange = vi.fn();
     const { container } = render(<TypographyBlock classes={classes} computedStyles={null} onClassesChange={onClassesChange} />);
-    return { select: weightSelect(container), onClassesChange };
+    return { weight: container.querySelector<HTMLInputElement>('input[aria-label="Font weight"]')!, onClassesChange };
   };
 
   it('shows the variable, and a pick replaces it', () => {
-    const { select, onClassesChange } = renderBlock('font-[var(--heavy)] font-serif');
-    expect(select.selectedOptions[0].textContent).toBe('--heavy');
-    fireEvent.change(select, { target: { value: 'light' } });
+    const { weight, onClassesChange } = renderBlock('font-[var(--heavy)] font-serif');
+    expect(weight.value).toBe('--heavy');
+    pick('Font weight', 'Light');
     expect(onClassesChange).toHaveBeenCalledWith('font-serif font-light', expect.any(Function));
   });
 
   it('shows a numeric weight; Regular removes it', () => {
-    const { select, onClassesChange } = renderBlock('font-[650] text-lg');
-    expect(select.selectedOptions[0].textContent).toBe('650');
-    fireEvent.change(select, { target: { value: 'normal' } });
+    const { weight, onClassesChange } = renderBlock('font-[650] text-lg');
+    expect(weight.value).toBe('650');
+    pick('Font weight', 'Regular');
     expect(onClassesChange).toHaveBeenCalledWith('text-lg', expect.any(Function));
   });
 
   it('a named weight still shows as its option', () => {
-    expect(renderBlock('font-bold').select.value).toBe('bold');
-    expect(renderBlock('text-lg').select.value).toBe('normal');
+    expect(renderBlock('font-bold').weight.value).toBe('Bold');
+    expect(renderBlock('text-lg').weight.value).toBe('Regular');
   });
 });
