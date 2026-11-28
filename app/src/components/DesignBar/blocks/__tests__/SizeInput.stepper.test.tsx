@@ -9,7 +9,7 @@ vi.mock('@/assets/icons', () => new Proxy({}, { get: (_t, p) => (p === 'then' ? 
 import { SizeInput } from '../LayoutAppearanceBlock';
 
 const props = (value: number | null, onValueChange = vi.fn()) => ({
-  dimension: 'w' as const, state: { mode: 'fixed' as const, value, minValue: null, maxValue: null }, onModeChange: vi.fn(), onValueChange,
+  dimension: 'w' as const, state: { mode: 'fixed' as const, value, unit: 'px', minValue: null, maxValue: null }, onModeChange: vi.fn(), onValueChange,
   onConstraintChange: vi.fn(), onAddConstraint: vi.fn(), onRemoveConstraint: vi.fn(),
   mixed: { size: false, min: false, max: false },   // dev's multi-select contract: the prop is required
 });

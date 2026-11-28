@@ -35,3 +35,62 @@ describe('LayoutAppearanceBlock min/max: a variant token is not the constraint (
     expect(screen.queryByLabelText('Max width')).toBeNull();
   });
 });
+
+// Owner 2026-11-28: W / H and their min / max take px, %, vw and vh, not only px.
+describe('LayoutAppearanceBlock W/H units', () => {
+  const written = (spy: ReturnType<typeof vi.fn>) => spy.mock.calls.at(-1)![0].split(/\s+/).sort();
+  const pickUnit = (classes: string, label: string, unit: string) => {
+    const spy = vi.fn();
+    render(<LayoutAppearanceBlock classes={classes} onClassesChange={spy} />);
+    fireEvent.change(screen.getByLabelText(`${label} unit`), { target: { value: unit } });
+    return written(spy);
+  };
+
+  it.each([
+    ['w-[50px] p-4', 'Width', '%', 'p-4 w-[50%]'],
+    ['h-[100px]', 'Height', 'vh', 'h-[100vh]'],
+    ['w-[60vw]', 'Width', 'px', 'w-[60px]'],
+    ['min-w-[10px]', 'Min width', 'vw', 'min-w-[10vw]'],
+    ['max-h-[80px]', 'Max height', '%', 'max-h-[80%]'],
+  ])('%s: picking %s %s writes %s', (classes, label, unit, expected) => {
+    expect(pickUnit(classes, label, unit)).toEqual(expected.split(' ').sort());
+  });
+
+  it('reads the value and its unit back', () => {
+    render(<LayoutAppearanceBlock classes="w-[50%] h-[100vh] min-w-[10vw] max-h-[80%]" onClassesChange={vi.fn()} />);
+    for (const [label, value, unit] of [['Width', '50', '%'], ['Height', '100', 'vh'], ['Min width', '10', 'vw'], ['Max height', '80', '%']]) {
+      expect((screen.getByLabelText(label) as HTMLInputElement).value, label).toBe(value);
+      expect((screen.getByLabelText(`${label} unit`) as HTMLSelectElement).value, label).toBe(unit);
+    }
+  });
+
+  it('reads Tailwind keywords as their length: w-screen = 100vw, h-1/2 = 50%', () => {
+    render(<LayoutAppearanceBlock classes="w-screen h-1/2" onClassesChange={vi.fn()} />);
+    expect((screen.getByLabelText('Width') as HTMLInputElement).value).toBe('100');
+    expect((screen.getByLabelText('Width unit') as HTMLSelectElement).value).toBe('vw');
+    expect((screen.getByLabelText('Height') as HTMLInputElement).value).toBe('50');
+    expect((screen.getByLabelText('Height unit') as HTMLSelectElement).value).toBe('%');
+  });
+
+  it.each([
+    ['', 'Width', '50%', 'w-[50%]'],
+    ['', 'Height', '100vh', 'h-[100vh]'],
+    ['w-[50%]', 'Width', '60', 'w-[60%]'],      // a bare number keeps the unit
+    ['min-h-[20vh]', 'Min height', '30', 'min-h-[30vh]'],
+  ])('%s + %s typed %s writes %s', (classes, label, text, expected) => {
+    expect(edit(classes, label, text)).toEqual([expected]);
+  });
+
+  it('a typed value that is not a length writes nothing', () => {
+    const spy = vi.fn();
+    render(<LayoutAppearanceBlock classes="w-[50px]" onClassesChange={spy} />);
+    fireEvent.change(screen.getByLabelText('Width'), { target: { value: '50em' } });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('several selected: 50px and 50% read Mixed', async () => {
+    const { renderInMulti } = await import('../multi/__tests__/renderInMulti');
+    renderInMulti(<LayoutAppearanceBlock classes="" onClassesChange={vi.fn()} />, ['w-[50px]', 'w-[50%]']);
+    expect((screen.getByLabelText('Width') as HTMLInputElement).placeholder).toBe('Mixed');
+  });
+});
