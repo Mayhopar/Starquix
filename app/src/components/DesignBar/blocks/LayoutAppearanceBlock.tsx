@@ -13,7 +13,7 @@
 import React, { useCallback, useContext, useMemo, useState, useEffect, useRef } from 'react';
 import { GestureHostContext, getGestureScope, useValueGesture } from '@/components/ui/valueGesture';
 import { useSelectedRectOptional } from '@/context/SelectionContext';
-import { findClass, setClass } from '../utils';
+import { findClass, setClass, parseDimension } from '../utils';
 import { deriveAxisPlacement, buildAxisEdit, axisEditTokens } from './gridPlacement';
 import { resolveToClass } from '@/core/classes/vocabulary';
 import { SegmentedControl, Popover, Field, IconButton, MenuItem, fieldBox } from '@/components/ui';
@@ -80,12 +80,23 @@ const handleArrowKeys = (
 type SizeMode = 'fixed' | 'hug' | 'fill' | 'auto';
 type Dimension = 'w' | 'h';
 
+interface Length { value: number; unit: string }
+
 interface SizeState {
   mode: SizeMode;
   value: number | null;
-  minValue: number | null;
-  maxValue: number | null;
+  unit: string;
+  /** value -1: a constraint with no number (max-w-full, max-w-none…) */
+  minValue: Length | null;
+  maxValue: Length | null;
 }
+
+/** The units W / H and their min / max offer. */
+const SIZE_UNITS = ['px', '%', 'vw', 'vh'];
+/** A Mixed constraint's field: no own value. */
+const NO_LENGTH: Length = { value: 0, unit: 'px' };
+/** `50`, `50%`, `100vh`: a typed size; a bare number keeps the field's unit. */
+const TYPED_LENGTH = new RegExp(`^(\\d*\\.?\\d+)\\s*(${SIZE_UNITS.join('|')})?$`, 'i');
 
 // ============================================================================
 // Constants
@@ -126,53 +137,18 @@ const STRETCH_ICON = AlignItemsStretchIcon;
 // Size Parsing Helpers
 // ============================================================================
 
+/** The bare `prefix-` token as a length in one of SIZE_UNITS (`w-[50%]`, `w-80` = 320px, `w-screen` = 100vw); null otherwise. */
+const parseLength = (classes: string, prefix: Parameters<typeof parseDimension>[1]): Length | null => {
+  const { value, unit } = parseDimension(classes, prefix);
+  return value !== null && SIZE_UNITS.includes(unit) ? { value, unit } : null;
+};
+
 const parseSizeState = (classes: string, dim: Dimension): SizeState => {
-  const prefix = dim;
-
-  if (findClass(classes, new RegExp(`^${prefix}-full$`))) {
-    return { mode: 'fill', value: null, minValue: parseConstraint(classes, dim, 'min'), maxValue: parseConstraint(classes, dim, 'max') };
-  }
-  if (findClass(classes, /^flex-1$/) || findClass(classes, /^grow$/)) {
-    return { mode: 'fill', value: null, minValue: parseConstraint(classes, dim, 'min'), maxValue: parseConstraint(classes, dim, 'max') };
-  }
-
-  if (findClass(classes, new RegExp(`^${prefix}-fit$`)) || findClass(classes, new RegExp(`^${prefix}-min$`))) {
-    return { mode: 'hug', value: null, minValue: parseConstraint(classes, dim, 'min'), maxValue: parseConstraint(classes, dim, 'max') };
-  }
-
-  const fixedMatch = findClass(classes, new RegExp(`^${prefix}-\\[(\\d+)px\\]$`));
-  if (fixedMatch) {
-    const match = fixedMatch.match(/\[(\d+)px\]/);
-    if (match) {
-      return {
-        mode: 'fixed',
-        value: parseInt(match[1], 10),
-        minValue: parseConstraint(classes, dim, 'min'),
-        maxValue: parseConstraint(classes, dim, 'max')
-      };
-    }
-  }
-
-  const stdMatch = findClass(classes, new RegExp(`^${prefix}-(\\d+)$`));
-  if (stdMatch) {
-    const match = stdMatch.match(new RegExp(`^${prefix}-(\\d+)$`));
-    if (match) {
-      const value = parseInt(match[1], 10) * 4;
-      return {
-        mode: 'fixed',
-        value,
-        minValue: parseConstraint(classes, dim, 'min'),
-        maxValue: parseConstraint(classes, dim, 'max')
-      };
-    }
-  }
-
-  return {
-    mode: 'auto',
-    value: null,
-    minValue: parseConstraint(classes, dim, 'min'),
-    maxValue: parseConstraint(classes, dim, 'max')
-  };
+  const base = { value: null, unit: 'px', minValue: parseConstraint(classes, dim, 'min'), maxValue: parseConstraint(classes, dim, 'max') };
+  if (findClass(classes, new RegExp(`^${dim}-full$`)) || findClass(classes, /^(flex-1|grow)$/)) return { ...base, mode: 'fill' };
+  if (findClass(classes, new RegExp(`^${dim}-(fit|min)$`))) return { ...base, mode: 'hug' };
+  const fixed = parseLength(classes, dim);
+  return fixed ? { ...base, mode: 'fixed', ...fixed } : { ...base, mode: 'auto' };
 };
 
 // Named max-width values in pixels (1rem = 16px)
@@ -198,40 +174,18 @@ const NAMED_MAX_WIDTH_PX: Record<string, number> = {
 
 // The bare token only: `classes` is the active layer's, so a token still carrying a variant
 // (group-open:max-h-96, max-md:max-w-full) is a state the bar does not edit — never read or replace it.
-const parseConstraint = (classes: string, dim: Dimension, type: 'min' | 'max'): number | null => {
-  const prefix = type === 'min' ? `min-${dim}` : `max-${dim}`;
-
-  // Arbitrary px value: max-w-[100px]
-  const pxMatch = findClass(classes, new RegExp(`^${prefix}-\\[(\\d+)px\\]$`));
-  if (pxMatch) {
-    const match = pxMatch.match(/\[(\d+)px\]/);
-    if (match) return parseInt(match[1], 10);
-  }
-
-  // Numeric scale: max-w-96 = 384px (96 * 4)
-  const numericMatch = findClass(classes, new RegExp(`^${prefix}-(\\d+)$`));
-  if (numericMatch) {
-    const match = numericMatch.match(new RegExp(`${prefix}-(\\d+)$`));
-    if (match) return parseInt(match[1], 10) * 4;
-  }
+const parseConstraint = (classes: string, dim: Dimension, type: 'min' | 'max'): Length | null => {
+  const prefix = `${type}-${dim}` as const;
+  // Keywords: max-w-full, max-w-min, max-w-max, max-w-none, min-w-full — a constraint with no number
+  if (findClass(classes, new RegExp(`^${prefix}-(full|min|max|none|fit)$`))) return { value: -1, unit: 'px' };
 
   // Named sizes: max-w-md, max-w-screen-lg, etc. (max-w only, not min-w)
   if (type === 'max') {
     for (const [name, px] of Object.entries(NAMED_MAX_WIDTH_PX)) {
-      if (findClass(classes, new RegExp(`^${prefix}-${name}$`))) {
-        return px;
-      }
+      if (findClass(classes, new RegExp(`^${prefix}-${name}$`))) return { value: px, unit: 'px' };
     }
   }
-
-  // Special values: max-w-full, max-w-min, max-w-max, max-w-none, min-w-full, min-w-0
-  // Return -1 as sentinel to indicate "constraint exists but no numeric px value"
-  const specialMatch = findClass(classes, new RegExp(`^${prefix}-(full|min|max|none|fit|0)$`));
-  if (specialMatch) {
-    return -1; // Sentinel: constraint exists
-  }
-
-  return null;
+  return parseLength(classes, prefix);
 };
 
 const parseAspectRatio = (classes: string): { scale: string; arbitrary: string | null } => {
@@ -306,8 +260,8 @@ const readGap = (classes: string) => parseGaps(classes).gap;
 const readGapX = (classes: string) => parseGaps(classes).gapX;
 const readGapY = (classes: string) => parseGaps(classes).gapY;
 const sizeReader = (dim: Dimension) => (classes: string) => {
-  const { mode, value } = parseSizeState(classes, dim);
-  return [mode, value];
+  const { mode, value, unit } = parseSizeState(classes, dim);
+  return [mode, value, unit];
 };
 const SIZE_READERS = {
   w: { size: sizeReader('w'), min: (c: string) => parseConstraint(c, 'w', 'min'), max: (c: string) => parseConstraint(c, 'w', 'max') },
@@ -397,7 +351,7 @@ const generateSizeClasses = (
   switch (state.mode) {
     case 'fixed':
       if (state.value !== null && state.value > 0) {
-        const sizeClass = resolveToClass(prefix, state.value, 'px');
+        const sizeClass = resolveToClass(prefix, state.value, state.unit);
         newClasses = `${newClasses} ${sizeClass}`;
       }
       break;
@@ -421,13 +375,14 @@ const updateConstraint = (
   classes: string,
   dim: Dimension,
   type: 'min' | 'max',
-  value: number | null
+  value: number | null,
+  unit = 'px'
 ): string => {
   const prefix = type === 'min' ? `min-${dim}` : `max-${dim}`;
   let newClasses = setClass(classes, new RegExp(`^${prefix}-`), null); // the bare token only (see parseConstraint)
 
   if (value !== null && value > 0) {
-    const constraintClass = resolveToClass(prefix, value, 'px');
+    const constraintClass = resolveToClass(prefix, value, unit);
     newClasses = `${newClasses} ${constraintClass}`;
   }
 
@@ -531,12 +486,21 @@ interface SizeInputProps {
   dimension: Dimension;
   state: SizeState;
   onModeChange: (mode: SizeMode) => void;
-  onValueChange: (value: number | null) => void;
-  onConstraintChange: (type: 'min' | 'max', value: number | null) => void;
+  /** `unit` omitted: the field's current unit. */
+  onValueChange: (value: number | null, unit?: string) => void;
+  onConstraintChange: (type: 'min' | 'max', value: number | null, unit: string) => void;
   onAddConstraint: (type: 'min' | 'max') => void;
   onRemoveConstraint: (type: 'min' | 'max') => void;
   mixed: SizeMixed;
 }
+
+/** The unit of a W / H / min / max value: a sub-target in the field box (same look as SpacingBlock's unitSelectClass). */
+const UnitSelect: React.FC<{ value: string; onChange: (unit: string) => void; 'aria-label': string }> = ({ value, onChange, 'aria-label': ariaLabel }) => (
+  <select aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}
+    className="w-4 h-4 text-3xs text-text-secondary bg-transparent outline-none cursor-pointer appearance-none text-center">
+    {SIZE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+  </select>
+);
 
 /** The selection's rendered size, muted, beside Fill / Hug / auto (owner 2026-10-06).
  *  A leaf of its own: the rect updates often (scroll, resize) — only this label re-renders.
@@ -568,15 +532,16 @@ export const SizeInput: React.FC<SizeInputProps> = ({
   const stepped = useRef<number | null>(null);
   if (stepped.current !== null && state.mode === 'fixed' && state.value === stepped.current) stepped.current = null;
 
-  // What one committed text does: a positive number sets the size, '' / 'auto' switches to auto. Shared by the legacy
-  // per-keystroke path and the value gesture kit (a settled draft, or a stepper tick under the 'preview' scope).
+  // What one committed text does: a positive length (`50`, `50%`, `100vh`) sets the size, '' / 'auto' switches to auto.
+  // Shared by the legacy per-keystroke path and the value gesture kit (a settled draft, or a stepper tick under the
+  // 'preview' scope).
   const commitText = (val: string) => {
     // Only a COMMIT replaces the displayed text: a draft keystroke / stepper tick is shown by the gesture itself, and an
     // aborted gesture must fall back to the committed text, not to the aborted one.
     if (getGestureScope() === 'commit') setInputValue(val);
-    const numValue = parseFloat(val);
-    if (!isNaN(numValue) && numValue > 0) {
-      onValueChange(Math.round(numValue));
+    const typed = val.trim().match(TYPED_LENGTH);
+    if (typed && parseFloat(typed[1]) > 0) {
+      onValueChange(Math.round(parseFloat(typed[1])), typed[2]?.toLowerCase());
     } else if (val === '' || val.toLowerCase() === 'auto') {
       onModeChange('auto');
     }
@@ -664,6 +629,9 @@ export const SizeInput: React.FC<SizeInputProps> = ({
           }}
           placeholder={mixed.size ? 'Mixed' : 'auto'}
         />
+        {state.mode === 'fixed' && !mixed.size && (
+          <UnitSelect aria-label={`${name} unit`} value={state.unit} onChange={(unit) => onValueChange(state.value, unit)} />
+        )}
         {!isFocused && state.mode !== 'fixed' && <MeasuredSize dimension={dimension} label={fullLabel} />}
         <IconButton
           ref={triggerRefButton}
@@ -684,7 +652,7 @@ export const SizeInput: React.FC<SizeInputProps> = ({
         className="w-48 py-1"
       >
           <MenuItem
-            label={`Fixed ${fullLabel}${state.mode === 'fixed' && state.value ? ` (${state.value})` : ''}`}
+            label={`Fixed ${fullLabel}${state.mode === 'fixed' && state.value ? ` (${state.value}${state.unit})` : ''}`}
             icon={<FixedWidthIcon className="w-4 h-4" />}
             selected={!mixed.size && state.mode === 'fixed'}
             onSelect={() => handleModeSelect('fixed')}
@@ -718,7 +686,7 @@ export const SizeInput: React.FC<SizeInputProps> = ({
             />
           ) : (
             <MenuItem
-              label={`Remove min ${fullLabel}${state.minValue !== null && state.minValue !== -1 ? ` (${state.minValue})` : ''}`}
+              label={`Remove min ${fullLabel}${state.minValue && state.minValue.value !== -1 ? ` (${state.minValue.value}${state.minValue.unit})` : ''}`}
               icon={<MinWidthIcon className="w-4 h-4" />}
               selected
               onSelect={() => {
@@ -740,7 +708,7 @@ export const SizeInput: React.FC<SizeInputProps> = ({
             />
           ) : (
             <MenuItem
-              label={`Remove max ${fullLabel}${state.maxValue !== null && state.maxValue !== -1 ? ` (${state.maxValue})` : ''}`}
+              label={`Remove max ${fullLabel}${state.maxValue && state.maxValue.value !== -1 ? ` (${state.maxValue.value}${state.maxValue.unit})` : ''}`}
               icon={<MaxWidthIcon className="w-4 h-4" />}
               selected
               onSelect={() => {
@@ -757,9 +725,9 @@ export const SizeInput: React.FC<SizeInputProps> = ({
             <ConstraintInput
               type="min"
               dimension={dimension}
-              value={state.minValue ?? 0}
+              value={state.minValue ?? NO_LENGTH}
               mixed={mixed.min}
-              onChange={(val) => onConstraintChange('min', val)}
+              onChange={(val, unit) => onConstraintChange('min', val, unit)}
               onRemove={() => onRemoveConstraint('min')}
             />
           )}
@@ -767,9 +735,9 @@ export const SizeInput: React.FC<SizeInputProps> = ({
             <ConstraintInput
               type="max"
               dimension={dimension}
-              value={state.maxValue ?? 0}
+              value={state.maxValue ?? NO_LENGTH}
               mixed={mixed.max}
-              onChange={(val) => onConstraintChange('max', val)}
+              onChange={(val, unit) => onConstraintChange('max', val, unit)}
               onRemove={() => onRemoveConstraint('max')}
             />
           )}
@@ -786,17 +754,17 @@ export const SizeInput: React.FC<SizeInputProps> = ({
 interface ConstraintInputProps {
   type: 'min' | 'max';
   dimension: Dimension;
-  value: number;
+  value: Length;
   /** Several selected and their values differ: shows "Mixed"; typing sets it on every member. */
   mixed: boolean;
-  onChange: (value: number | null) => void;
+  onChange: (value: number | null, unit: string) => void;
   onRemove: () => void;
 }
 
 const ConstraintInput: React.FC<ConstraintInputProps> = ({
   type,
   dimension,
-  value,
+  value: { value, unit },
   mixed,
   onChange,
   onRemove
@@ -832,12 +800,13 @@ const ConstraintInput: React.FC<ConstraintInputProps> = ({
             setInputValue(val);
             const numValue = parseFloat(val);
             if (!isNaN(numValue) && numValue > 0) {
-              onChange(Math.round(numValue));
+              onChange(Math.round(numValue), unit);
             }
           }}
           placeholder={mixed ? 'Mixed' : '0'}
           readOnly={isSpecialValue}
         />
+        {!isSpecialValue && !mixed && <UnitSelect aria-label={`${name} unit`} value={unit} onChange={(u) => onChange(value, u)} />}
         <IconButton
           ref={triggerRef}
           onClick={() => setIsOpen(!isOpen)}
@@ -861,7 +830,7 @@ const ConstraintInput: React.FC<ConstraintInputProps> = ({
           <MenuItem
             label={`Set to current ${dimension === 'w' ? 'width' : 'height'}`}
             onSelect={() => {
-              onChange(value);
+              onChange(value, unit);
               setIsOpen(false);
             }}
           />
@@ -1029,8 +998,8 @@ export const LayoutAppearanceBlock: React.FC<LayoutAppearanceBlockProps> = ({
   };
 
   // ========== Parse Size State ==========
-  const [widthState, setWidthState] = useState<SizeState>({ mode: 'auto', value: null, minValue: null, maxValue: null });
-  const [heightState, setHeightState] = useState<SizeState>({ mode: 'auto', value: null, minValue: null, maxValue: null });
+  const [widthState, setWidthState] = useState<SizeState>({ mode: 'auto', value: null, unit: 'px', minValue: null, maxValue: null });
+  const [heightState, setHeightState] = useState<SizeState>({ mode: 'auto', value: null, unit: 'px', minValue: null, maxValue: null });
 
   const { aspectRatio, aspectArbitrary } = useMemo(() => {
     const parsed = parseAspectRatio(classes);
@@ -1233,22 +1202,22 @@ export const LayoutAppearanceBlock: React.FC<LayoutAppearanceBlockProps> = ({
     onClassesChange(newClasses, OWNS.w);
   }, [classes, widthState, heightState, onClassesChange, mixedSize.w.size]);
 
-  const handleWidthValueChange = useCallback((value: number | null) => {
-    const newState = { ...widthState, mode: 'fixed' as SizeMode, value };
+  const handleWidthValueChange = useCallback((value: number | null, unit = widthState.unit) => {
+    const newState = { ...widthState, mode: 'fixed' as SizeMode, value, unit };
     let newClasses = generateSizeClasses(classes, 'w', newState, heightState);
     onClassesChange(newClasses, OWNS.w);
   }, [classes, widthState, heightState, onClassesChange]);
 
-  const handleWidthConstraintChange = useCallback((type: 'min' | 'max', value: number | null) => {
-    let newClasses = updateConstraint(classes, 'w', type, value);
+  const handleWidthConstraintChange = useCallback((type: 'min' | 'max', value: number | null, unit: string) => {
+    let newClasses = updateConstraint(classes, 'w', type, value, unit);
     onClassesChange(newClasses, OWNS[`${type}-w`]);
   }, [classes, onClassesChange]);
 
   const handleWidthAddConstraint = useCallback((type: 'min' | 'max') => {
     const defaultValue = widthState.value || 100;
-    let newClasses = updateConstraint(classes, 'w', type, defaultValue);
+    let newClasses = updateConstraint(classes, 'w', type, defaultValue, widthState.unit);
     onClassesChange(newClasses, OWNS[`${type}-w`]);
-  }, [classes, widthState.value, onClassesChange]);
+  }, [classes, widthState.value, widthState.unit, onClassesChange]);
 
   const handleWidthRemoveConstraint = useCallback((type: 'min' | 'max') => {
     let newClasses = updateConstraint(classes, 'w', type, null);
@@ -1268,22 +1237,22 @@ export const LayoutAppearanceBlock: React.FC<LayoutAppearanceBlockProps> = ({
     onClassesChange(newClasses, OWNS.h);
   }, [classes, heightState, widthState, onClassesChange, mixedSize.h.size]);
 
-  const handleHeightValueChange = useCallback((value: number | null) => {
-    const newState = { ...heightState, mode: 'fixed' as SizeMode, value };
+  const handleHeightValueChange = useCallback((value: number | null, unit = heightState.unit) => {
+    const newState = { ...heightState, mode: 'fixed' as SizeMode, value, unit };
     let newClasses = generateSizeClasses(classes, 'h', newState, widthState);
     onClassesChange(newClasses, OWNS.h);
   }, [classes, heightState, widthState, onClassesChange]);
 
-  const handleHeightConstraintChange = useCallback((type: 'min' | 'max', value: number | null) => {
-    let newClasses = updateConstraint(classes, 'h', type, value);
+  const handleHeightConstraintChange = useCallback((type: 'min' | 'max', value: number | null, unit: string) => {
+    let newClasses = updateConstraint(classes, 'h', type, value, unit);
     onClassesChange(newClasses, OWNS[`${type}-h`]);
   }, [classes, onClassesChange]);
 
   const handleHeightAddConstraint = useCallback((type: 'min' | 'max') => {
     const defaultValue = heightState.value || 100;
-    let newClasses = updateConstraint(classes, 'h', type, defaultValue);
+    let newClasses = updateConstraint(classes, 'h', type, defaultValue, heightState.unit);
     onClassesChange(newClasses, OWNS[`${type}-h`]);
-  }, [classes, heightState.value, onClassesChange]);
+  }, [classes, heightState.value, heightState.unit, onClassesChange]);
 
   const handleHeightRemoveConstraint = useCallback((type: 'min' | 'max') => {
     let newClasses = updateConstraint(classes, 'h', type, null);

@@ -37,7 +37,7 @@ describe('hand-rolled field boxes: the whole box is the hit target', () => {
   });
 
   it('SizeInput and its min constraint: the label / icon slot focuses the input; the options chevron stays a button', () => {
-    render(<SizeInput dimension="w" state={{ mode: 'fixed', value: 100, minValue: 10, maxValue: null }} onModeChange={vi.fn()}
+    render(<SizeInput dimension="w" state={{ mode: 'fixed', value: 100, unit: 'px', minValue: { value: 10, unit: 'px' }, maxValue: null }} onModeChange={vi.fn()}
       onValueChange={vi.fn()} onConstraintChange={vi.fn()} onAddConstraint={vi.fn()} onRemoveConstraint={vi.fn()}
       mixed={{ size: false, min: false, max: false }} />);
     for (const value of ['100', '10']) {
