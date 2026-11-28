@@ -34,23 +34,43 @@ const B = 'font-mono text-blue-500 font-medium text-sm leading-loose tracking-ti
 const ACTIVE = /bg-btn-primary-fill-default/;
 const sel = (label: string) => screen.getByLabelText(label) as HTMLSelectElement;
 const openMenu = () => fireEvent.click(screen.getByTitle('More options'));
+const pick = (field: string, option: string) => {
+  fireEvent.click(screen.getByLabelText(`${field} options`));
+  fireEvent.click(screen.getByText(option));
+};
 
 describe('TypographyBlock while several are selected', () => {
   it('every control reads "Mixed" when the members differ in it', () => {
     renderInMulti(<TypographyBlock classes="" onClassesChange={vi.fn()} />, [A, B]);
     expect(screen.getByTestId('family').textContent).toBe('Mixed');
     expect(screen.getByTestId('color').textContent).toBe('Mixed');
-    for (const label of ['Font weight', 'Font size', 'Line height', 'Letter spacing']) expect(sel(label).selectedOptions[0].textContent).toBe('Mixed');
+    for (const label of ['Font weight', 'Font size', 'Line height', 'Letter spacing']) {
+      expect(sel(label).value).toBe('');
+      expect((screen.getByLabelText(label) as HTMLInputElement).placeholder).toBe('Mixed');
+    }
     for (const a of ['left', 'center', 'right']) expect(screen.getByTitle(`Align ${a}`).className).not.toMatch(ACTIVE);
     openMenu();
     for (const label of ['Text decoration', 'Text overflow', 'Whitespace']) expect(sel(label).selectedOptions[0].textContent).toBe('Mixed');
     for (const t of ['None', 'Uppercase', 'Lowercase', 'Capitalize']) expect(screen.getByTitle(t).className).not.toMatch(ACTIVE);
   });
 
+  it('typing into a Mixed field shows the draft and writes it for every member', () => {
+    const spy = vi.fn();
+    renderInMulti(<TypographyBlock classes="" onClassesChange={spy} />, [A, B]);
+    const input = screen.getByLabelText('Line height') as HTMLInputElement;
+    input.focus();
+    fireEvent.change(input, { target: { value: '1.35' } });
+    expect(input.value).toBe('1.35');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const [classes, owns] = spy.mock.calls.at(-1)! as [string, (t: string) => boolean];
+    expect(classes).toBe('leading-[1.35]');
+    expect(owns('leading-tight')).toBe(true);
+  });
+
   it('control: one element shows its own values (align/transform active)', () => {
     render(<TypographyBlock classes={A} onClassesChange={vi.fn()} />);
     expect(screen.getByTitle('Align center').className).toMatch(ACTIVE);
-    expect(sel('Font weight').value).toBe('bold');
+    expect(sel('Font weight').value).toBe('Bold');
     openMenu();
     expect(screen.getByTitle('Uppercase').className).toMatch(ACTIVE);
   });
@@ -64,10 +84,10 @@ describe('TypographyBlock while several are selected', () => {
   const EDITS: Record<Control, () => void> = {
     family: () => fireEvent.click(screen.getByTestId('family')),
     color: () => fireEvent.click(screen.getByTestId('color')),
-    weight: () => fireEvent.change(sel('Font weight'), { target: { value: 'black' } }),
-    size: () => fireEvent.change(sel('Font size'), { target: { value: 'xl' } }),
-    lineHeight: () => fireEvent.change(sel('Line height'), { target: { value: 'snug' } }),
-    letterSpacing: () => fireEvent.change(sel('Letter spacing'), { target: { value: 'widest' } }),
+    weight: () => pick('Font weight', 'Black'),
+    size: () => pick('Font size', '20'),
+    lineHeight: () => pick('Line height', 'Snug'),
+    letterSpacing: () => pick('Letter spacing', 'Widest'),
     align: () => fireEvent.click(screen.getByTitle('Align left')),
     transform: () => { openMenu(); fireEvent.click(screen.getByTitle('Capitalize')); },
     decoration: () => { openMenu(); fireEvent.change(sel('Text decoration'), { target: { value: 'overline' } }); },

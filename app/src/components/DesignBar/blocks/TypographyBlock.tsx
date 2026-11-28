@@ -10,7 +10,8 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { findClass, setClass, parseClasses, cssColorToHex } from '../utils';
 import { getClassesByGroup, removeClassesByGroup } from '@/core/classes/properties';
 import { ColorPicker } from '../ColorPicker';
-import { Field, IconButton, Popover, OperationNotice, cx } from '@/components/ui';
+import { Field, FieldChevron, IconButton, Popover, Menu, MenuItem, OperationNotice, cx } from '@/components/ui';
+import { resolveToClass } from '@/core/classes/vocabulary';
 import { familyToClass, classesToFamily, stripFontFamilyClasses, isSystemFontValue } from './fontFamilyClass';
 import { FontFamilySelect } from './FontFamilySelect';
 import { pickGoogleFont } from '@/services/googleFonts';
@@ -42,16 +43,17 @@ import { OPACITY_SUFFIX } from '../classPatterns';
 // Constants
 // ============================================================================
 
+// Labelled by their px size
 const FONT_SIZES = [
-  { label: 'xs', value: 'xs', px: 12 },
-  { label: 'sm', value: 'sm', px: 14 },
-  { label: 'base', value: 'base', px: 16 },
-  { label: 'lg', value: 'lg', px: 18 },
-  { label: 'xl', value: 'xl', px: 20 },
-  { label: '2xl', value: '2xl', px: 24 },
-  { label: '3xl', value: '3xl', px: 30 },
-  { label: '4xl', value: '4xl', px: 36 },
-  { label: '5xl', value: '5xl', px: 48 }
+  { label: '12', value: 'xs' },
+  { label: '14', value: 'sm' },
+  { label: '16', value: 'base' },
+  { label: '18', value: 'lg' },
+  { label: '20', value: 'xl' },
+  { label: '24', value: '2xl' },
+  { label: '30', value: '3xl' },
+  { label: '36', value: '4xl' },
+  { label: '48', value: '5xl' }
 ];
 
 const FONT_WEIGHTS = [
@@ -141,20 +143,8 @@ const FONT_WEIGHT = 'standalone:fontWeight';
 const weightToken = (classes: string): string | undefined =>
   getClassesByGroup(parseClasses(classes), FONT_WEIGHT)[0];
 
-/** The select's value: a named weight, 'normal' for none, '' for an arbitrary one (it has no option). */
-const parseFontWeight = (classes: string): string => {
-  const token = weightToken(classes);
-  if (!token) return 'normal';
-  return token.startsWith('font-[') ? '' : token.slice('font-'.length);
-};
-
-/** What the select shows for an arbitrary weight: `--heavy` for font-[var(--heavy)], `650` for font-[650]. */
-const arbitraryWeightLabel = (classes: string): string | undefined => {
-  const token = weightToken(classes);
-  return token?.startsWith('font-[')
-    ? token.slice('font-['.length, -1).replace(/^number:/, '').replace(/^var\((.+)\)$/, '$1')
-    : undefined;
-};
+/** The weight token's suffix ('bold', '[650]', '[var(--heavy)]'); 'normal' for none. */
+const parseFontWeight = (classes: string): string => weightToken(classes)?.slice('font-'.length) ?? 'normal';
 
 /** Weight as the select reads it, with "no token" = the default (design C6: a missing token and an
  *  explicit default read the same); distinct arbitrary weights stay distinct. */
@@ -255,6 +245,114 @@ const parseWhitespace = (classes: string): string => {
 };
 
 // ============================================================================
+// Preset or typed value (weight, size, line height, letter spacing)
+// ============================================================================
+
+interface Preset { label: string; value: string }
+
+/** What a field reads for a token suffix: its preset's label, else the arbitrary value as written
+ *  (`[1.35]` → 1.35; a variable `[var(--x)]` → --x, `[number:650]` → 650). */
+const presetText = (presets: Preset[], value: string) =>
+  presets.find(p => p.value === value)?.label
+    ?? value.replace(/^\[(.+)\]$/, '$1').replace(/^\w+:/, '').replace(/^var\((.+)\)$/, '$1');
+
+/** Typed text → a Tailwind arbitrary value (`1.35` → `[1.35]`, `28px` → `[28px]`); null = not a value here. */
+const typed = (re: RegExp, bareUnit: string, valid: (n: number) => boolean = () => true) => (text: string) => {
+  const m = text.match(re);
+  return m && valid(parseFloat(m[1])) ? `[${m[1]}${m[2] ?? bareUnit}]` : null;
+};
+
+/** Per field: what it reads for a suffix, and what a typed value writes. A bare line height is CSS's multiplier. */
+const FIELDS = {
+  weight: {
+    presets: FONT_WEIGHTS,
+    read: (v: string) => presetText(FONT_WEIGHTS, v),
+    write: typed(/^(\d+)$/, '', n => n >= 1 && n <= 1000),
+  },
+  size: {
+    presets: FONT_SIZES,
+    read: (v: string) => presetText(FONT_SIZES, v).replace(/px$/, ''),
+    // The vocabulary picks the scale token when there is one (16px / 1rem → base), else text-[Npx]
+    write: (t: string) => {
+      const m = t.match(/^(\d*\.?\d+)(px|rem|em)?$/);
+      return m && parseFloat(m[1]) > 0 ? resolveToClass('text', parseFloat(m[1]), m[2] ?? 'px').slice('text-'.length) : null;
+    },
+  },
+  lineHeight: {
+    presets: LINE_HEIGHTS,
+    read: (v: string) => (/^\d+$/.test(v) ? `${Number(v) * 4}px` : presetText(LINE_HEIGHTS, v)), // leading-6 = 1.5rem
+    write: typed(/^(\d*\.?\d+)(px|rem|em|%)?$/, ''),
+  },
+  letterSpacing: {
+    presets: LETTER_SPACINGS,
+    read: (v: string) => presetText(LETTER_SPACINGS, v),
+    write: typed(/^(-?\d*\.?\d+)(px|rem|em)?$/, 'px'),
+  },
+};
+
+/** Pick a preset from the menu, or type any value: Enter / blur commits, Esc reverts, empty clears. */
+const PresetField: React.FC<{
+  field: (typeof FIELDS)[keyof typeof FIELDS];
+  /** The token's suffix ('snug', '[1.35]'), '' for none. */
+  value: string;
+  onChange: (value: string) => void;
+  mixed: boolean;
+  'aria-label': string;
+  icon?: React.ReactNode;
+  placeholder?: string;
+}> = ({ field, value, onChange, mixed, icon, placeholder, 'aria-label': ariaLabel }) => {
+  const [draft, setDraft] = useState<string | null>(null); // non-null while focused
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const skipBlur = useRef(false); // Enter / Esc blur the input themselves
+  const shown = field.read(value);
+  const commit = (text: string) => {
+    const t = text.trim();
+    if (t === shown) return;
+    const preset = field.presets.find(p => p.label.toLowerCase() === t.toLowerCase() || p.value === t);
+    const next = t === '' ? '' : preset ? preset.value : field.write(t);
+    if (next !== null) onChange(next);
+  };
+  return (
+    <>
+      <Field
+        icon={icon}
+        aria-label={ariaLabel}
+        mixed={mixed && draft === null}
+        value={draft ?? shown}
+        placeholder={placeholder}
+        onChange={setDraft}
+        onFocus={() => setDraft(mixed ? '' : shown)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== 'Escape') return;
+          skipBlur.current = true;
+          if (e.key === 'Enter') commit(draft ?? '');
+          setDraft(null);
+          e.currentTarget.blur();
+        }}
+        onBlur={() => {
+          if (!skipBlur.current && draft !== null) commit(draft);
+          skipBlur.current = false;
+          setDraft(null);
+        }}
+        trailing={
+          <IconButton ref={menuRef} size="sm" aria-label={`${ariaLabel} options`} onClick={() => setOpen(!open)}
+            className="w-4 h-4 bg-transparent hover:bg-transparent">
+            <FieldChevron />
+          </IconButton>
+        }
+      />
+      <Menu isOpen={open} onClose={() => setOpen(false)} triggerRef={menuRef} placement="bottom-end">
+        {field.presets.map(p => (
+          <MenuItem key={p.value} label={p.label} selected={!mixed && p.value === value}
+            onSelect={() => { onChange(p.value); setOpen(false); }} />
+        ))}
+      </Menu>
+    </>
+  );
+};
+
+// ============================================================================
 // Three Dots Icon
 // ============================================================================
 
@@ -349,8 +447,7 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
   const {
     fontFamily,
     fontSize,
-    fontSizeDisplay,
-    fontSizeIsComputed,
+    fontSizePlaceholder,
     fontWeight,
     textColorClass,
     textColorComputedHex,
@@ -362,29 +459,8 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
     textOverflow,
     whitespace
   } = useMemo(() => {
-    const explicitFontSize = parseFontSize(classes);
+    // No size class: the field's placeholder is the size the element renders with.
     const computedFontSizePx = parsePxValue(computedStyles?.fontSize);
-
-    // Determine displayed font size
-    let fontSizeDisplay: number | null = null;
-    let fontSizeIsComputed = false;
-
-    if (explicitFontSize) {
-      // Has explicit class - find its px value
-      if (explicitFontSize.startsWith('[') && explicitFontSize.endsWith(']')) {
-        // Arbitrary value like [18px]
-        const match = explicitFontSize.match(/\[(\d+)px\]/);
-        fontSizeDisplay = match ? parseInt(match[1], 10) : null;
-      } else {
-        // Standard Tailwind size
-        const sizeEntry = FONT_SIZES.find(s => s.value === explicitFontSize);
-        fontSizeDisplay = sizeEntry?.px ?? null;
-      }
-    } else if (computedFontSizePx) {
-      // No explicit class - use computed value
-      fontSizeDisplay = Math.round(computedFontSizePx);
-      fontSizeIsComputed = true;
-    }
 
     // No explicit text-* color class → the element still renders a color
     // (inherited / UA default). Surface it as an "inherited" swatch instead of
@@ -394,9 +470,8 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
 
     return {
       fontFamily: parseFontFamily(classes),
-      fontSize: explicitFontSize,
-      fontSizeDisplay,
-      fontSizeIsComputed,
+      fontSize: parseFontSize(classes),
+      fontSizePlaceholder: computedFontSizePx ? String(Math.round(computedFontSizePx)) : 'Size',
       fontWeight: parseFontWeight(classes),
       textColorClass,
       textColorComputedHex,
@@ -722,42 +797,41 @@ export const TypographyBlock: React.FC<TypographyBlockProps> = ({
 
       {/* Row 3: Weight + Size */}
       <div className="grid grid-cols-2 gap-1 mb-1">
-        <Field as="select"
+        <PresetField
+          field={FIELDS.weight}
           aria-label="Font weight"
           mixed={mixed.weight}
           value={fontWeight}
           onChange={handleFontWeightChange}
-          options={FONT_WEIGHTS}
-          placeholder={arbitraryWeightLabel(classes)}
         />
-        <Field as="select"
+        <PresetField
+          field={FIELDS.size}
           aria-label="Font size"
           mixed={mixed.size}
           value={fontSize}
           onChange={handleFontSizeChange}
-          options={FONT_SIZES.map(s => ({ value: s.value, label: String(s.px) }))}
-          placeholder={fontSizeDisplay ? String(fontSizeDisplay) : 'Size'}
+          placeholder={fontSizePlaceholder}
         />
       </div>
 
       {/* Row 4: Line Height + Letter Spacing (with icons) */}
       <div className="grid grid-cols-2 gap-1 mb-1">
-        <Field as="select"
+        <PresetField
+          field={FIELDS.lineHeight}
           icon={<LineHeightIcon className="w-4 h-4" />}
           aria-label="Line height"
           mixed={mixed.lineHeight}
           value={lineHeight}
           onChange={handleLineHeightChange}
-          options={LINE_HEIGHTS}
           placeholder="Auto"
         />
-        <Field as="select"
+        <PresetField
+          field={FIELDS.letterSpacing}
           icon={<LetterSpacingIcon className="w-4 h-4" />}
           aria-label="Letter spacing"
           mixed={mixed.letterSpacing}
           value={letterSpacing}
           onChange={handleLetterSpacingChange}
-          options={LETTER_SPACINGS}
           placeholder="0"
         />
       </div>
